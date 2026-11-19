@@ -200,6 +200,7 @@ py_test(
         "hermetic_container/cross/windows_test.py",
     ],
     data = [
+        "//:.bazelrc",
         "//bazel:hermetic_container/hermetic_container.py",
         "//bazel/platforms:remote_execution_containers.bzl",
         "//bazel/toolchains/cc/mongo_apple_cross:macos_cross_action_wrapper.py",

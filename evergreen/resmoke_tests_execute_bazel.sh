@@ -350,11 +350,9 @@ gather_failed_tests() {
     # The relinked binaries should still be hash identical when stripped with strip.
     sed -i -e 's/--config=remote_test//g' -e 's/--separate_debug=False/--separate_debug=True/g' -e 's/--features=strip_debug//g' .bazel_build_flags
 
-    # The --config flag needs to stay consistent for the `bazel run` to avoid evicting the previous results.
-    # Strip out anything that isn't a --config flag that could interfere with the run command.
     # Skip the diagnostic rerun: rerunning whole resmoke suites locally on this host is too
     # expensive, and the original run's crash artifacts are still collected.
-    eval ${BAZEL_BINARY} run ${CONFIG_FLAGS} //buildscripts:gather_failed_tests -- --no-rerun || true
+    bazel_evergreen_shutils::gather_failed_tests --no-rerun || true
 }
 
 activate_result_tasks() {

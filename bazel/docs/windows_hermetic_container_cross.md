@@ -2,8 +2,9 @@
 
 This mode is for Windows hosts that want Bazel to produce Windows x86_64 artifacts with the hermetic
 Windows cross toolchain. Bazel runs on the Windows host, C++ and generated-source actions run on
-Linux RBE through the cross toolchain wrapper entry points, and `bazel run` for test targets
-executes the resulting Windows binary from the local workspace.
+Linux RBE through the cross toolchain wrapper entry points, and link/package actions use a local
+Linux container. `bazel test` and `bazel run` for test targets execute the resulting Windows
+binaries on the host through the Windows launcher.
 
 ## Usage
 
@@ -14,25 +15,38 @@ bazel build install-dist-test
 .\bazel-bin\install-dist-test\bin\mongod.exe --version
 ```
 
-Windows builds use the original native MSVC toolchain by default. To opt into the experimental
-host-cross integration, pass `--config=windows-cross-x86_64` explicitly:
+Windows `build`, `test`, `fetch`, `cquery`, and `aquery` commands default to
+`--config=windows-cross-x86_64`. The host needs the pinned MSVC/SDK inputs and a Linux container
+engine, described below. Explicit `--platforms` choices are preserved, including choices from
+imported RC files and automatic `:windows` config sections. `--config=local` keeps the cross
+toolchain and executes Linux build actions in a local container, without remote execution, cache, or
+credentials. Community checkouts use this local cross path by default. `--config=no-remote-exec`
+also uses local container actions while retaining remote cache access. On other host operating
+systems, select the cross configuration explicitly:
 
 ```powershell
 bazel build --config=windows-cross-x86_64 install-dist-test
 ```
 
-To make build-oriented commands such as `build`, `fetch`, `cquery`, and `aquery` default to cross
-mode for the current shell, set:
+Fully native MSVC requires an explicit opt-in:
 
 ```powershell
-$env:MONGO_WINDOWS_CROSS_DEFAULT_CONFIG="1"
+bazel build --config=windows-native install-dist-test
 ```
 
-With that opt-in, `bazel run` also defaults to Windows cross mode for test targets, builds them
-through the cross wrapper/RBE path, and runs the produced `.exe` on the Windows host:
+This config selects the host toolchain and disables remote execution. It cannot be combined with
+`--config=windows-cross-x86_64`. The existing shell-wide native rollback remains available:
+
+```powershell
+$env:MONGO_WINDOWS_CROSS_DEFAULT_CONFIG="0"
+```
+
+By default, `bazel run` also builds test targets through the cross wrapper/RBE path and runs the
+produced `.exe` on the Windows host:
 
 ```powershell
 bazel run +stdx_test
+bazel test +stdx_test
 ```
 
 To bypass the host-cross integration even when the config is explicit:
@@ -41,8 +55,34 @@ To bypass the host-cross integration even when the config is explicit:
 $env:MONGO_BAZEL_USE_HERMETIC_CONTAINER="0"
 ```
 
-`bazel test` is not auto-routed through Windows cross mode. For non-test `bazel run` targets, build
-the target and run the downloaded `.exe` from PowerShell.
+For non-test `bazel run` targets, build the target and run the downloaded `.exe` from PowerShell.
+
+## Tests and debug symbols
+
+`--config=windows_unittest` selects static linking and the Windows test launcher. The Windows cross
+wrapper adds remote linking when remote execution is enabled. With `--config=local` or
+`--config=no-remote-exec`, compilation and linking use the local Linux container. Windows tests run
+locally in both modes. Native MSVC opt-in retains native linking. The cross configuration omits PDBs
+from its automatic download regex. Evergreen's optimized unit-test tasks use
+`--remote_download_outputs=minimal`; failed-test gathering downloads PDB/debug files while retaining
+the original build configuration. Debug variants retain their normal symbol settings.
+`--debug_symbols=False` suppresses compiler and linker symbols, including native MSVC `dbg` and
+`fastbuild` modes.
+
+Evergreen compile and unit-test tasks use `windows-2022-wsl2-xxlarge`, which supplies the local
+Linux action container. Runtime-only resmoke tasks retain their smaller Windows distros. Release
+packaging also uses the cross toolchain: published release builds execute compile/link actions
+locally in the Linux container under `public-release-local`, with the release cache restrictions
+preserved. No Evergreen task opts into native MSVC. Packaging requires a container-capable
+`release-*` host to satisfy the release guard; without a Linux container engine, the build fails
+instead of falling back to MSVC. The shared shell helper enables cross RBE before generating the
+Evergreen RC. The native switches above are for manual diagnosis only.
+
+Rust uses a Linux-hosted toolchain targeting `x86_64-pc-windows-msvc` (the Windows ABI, not the MSVC
+compiler). Cargo build scripts and their Rust compiler helpers execute on Linux, and C/C++
+dependencies use the cross Clang toolchain. These actions run in the local container for local and
+release builds, or on Linux RBE otherwise. Wasmtime's downloaded Windows CLI remains a host-local
+tool for AOT generation.
 
 ## Replaying compilation database commands
 
@@ -166,6 +206,13 @@ sidecar, set `MONGO_HERMETIC_CONTAINER_LINUX_BAZEL_SHA256` to the trusted 64-cha
 digest.
 
 ## WSL2 Docker Engine
+
+Evergreen uses WSL hosts for compilation, Bazel unit tests that compile their binaries, and
+compile-command replay. Resmoke suites and benchmarks that consume archived binaries use their
+original Windows test distros, including expandedports images for connection-heavy suites. Keep
+their `large_distro_name` and task distro assignments intact when overriding release build hosts for
+patch testing. `requires_compile_variant` identifies an artifact dependency; it does not by itself
+mean that a task compiles code.
 
 Windows cross builds need Linux containers. Docker Desktop may work on desktop Windows, but Windows
 Server native Docker/Mirantis runtimes only run Windows containers and cannot run the Linux RBE

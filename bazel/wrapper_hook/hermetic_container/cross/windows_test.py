@@ -61,7 +61,284 @@ class CrossPlanningTestCase(unittest.TestCase):
         self.addCleanup(patcher.stop)
 
 
+class WindowsUnittestPolicyTest(unittest.TestCase):
+    def test_repository_local_and_native_policies_are_independent(self):
+        source = constants.REPO_ROOT / ".bazelrc"
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            (root / ".bazelrc").write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+            for config in ["local", "no-remote-exec", "public-release-local", "windows-native"]:
+                with self.subTest(config=config):
+                    args = [
+                        "--nosystem_rc",
+                        "--nohome_rc",
+                        "build",
+                        f"--config={config}",
+                        "//target",
+                    ]
+                    expected = (
+                        config_module.IntegrationMode.DIRECT
+                        if config == "windows-native"
+                        else config_module.IntegrationMode.WINDOWS_CROSS_HOST
+                    )
+                    self.assertEqual(
+                        runner.select_integration_mode(
+                            args=args, env={}, system="Windows", repo_root=root
+                        ),
+                        expected,
+                    )
+                    self.assertTrue(
+                        cross_windows._windows_cross_remote_execution_disabled(args, {}, root)
+                    )
+                    options = cross_windows._windows_cross_user_options(args, {}, root)
+                    if config == "local":
+                        for flag in [
+                            "--remote_cache=",
+                            "--experimental_remote_downloader=",
+                            "--tls_client_certificate=",
+                            "--tls_client_key=",
+                            "--bes_backend=",
+                        ]:
+                            self.assertIn(flag, options)
+                    else:
+                        self.assertNotIn("--remote_cache=", options)
+
+    def test_native_rollback_has_no_remote_only_link_strategies(self):
+        source = constants.REPO_ROOT / ".bazelrc"
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            (root / ".bazelrc").write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+            args = ["--nosystem_rc", "--nohome_rc", "test", "--config=windows_unittest", "//target"]
+            for switch in [
+                "MONGO_WINDOWS_CROSS_DEFAULT_CONFIG",
+                "MONGO_BAZEL_USE_HERMETIC_CONTAINER",
+            ]:
+                with self.subTest(switch=switch):
+                    env = {switch: "0"}
+                    self.assertFalse(
+                        runner.should_use_hermetic_container(
+                            args=args, env=env, system="Windows", repo_root=root
+                        )
+                    )
+                    options = bazelrc._bazel_effective_options(args, env, root)
+                    self.assertIn("--linkstatic=True", options)
+                    self.assertIn("--run_under=//bazel:windows_test_launcher", options)
+                    self.assertNotIn("--//bazel/config:remote_link=True", options)
+                    for mnemonic in [
+                        "CppLink",
+                        "CppArchive",
+                        "SolibSymlink",
+                        "ExtractDebugInfo",
+                        "StripDebugInfo",
+                    ]:
+                        self.assertNotIn(f"--strategy={mnemonic}=remote", options)
+
+
 class WindowsCrossExecutionTest(CrossPlanningTestCase):
+    def test_automatic_windows_config_activation_follows_option_precedence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo_root = pathlib.Path(directory)
+            (repo_root / ".bazelrc").write_text(
+                "common --enable_platform_specific_config=false\n"
+                "common:enable-host-config --enable_platform_specific_config\n"
+                "build:windows --platforms=@local_config_platform//:host\n",
+                encoding="utf-8",
+            )
+            for flags, expected in [
+                ([], config_module.IntegrationMode.WINDOWS_CROSS_HOST),
+                (["--enable_platform_specific_config=true"], config_module.IntegrationMode.DIRECT),
+                (["--config=enable-host-config"], config_module.IntegrationMode.DIRECT),
+                (
+                    ["--noenable_platform_specific_config", "--enable_platform_specific_config"],
+                    config_module.IntegrationMode.DIRECT,
+                ),
+                (
+                    ["--enable_platform_specific_config", "--noenable_platform_specific_config"],
+                    config_module.IntegrationMode.WINDOWS_CROSS_HOST,
+                ),
+            ]:
+                with self.subTest(flags=flags):
+                    self.assertEqual(
+                        runner.select_integration_mode(
+                            args=["build", *flags, "//target"],
+                            env={},
+                            system="Windows",
+                            repo_root=repo_root,
+                        ),
+                        expected,
+                    )
+
+    def test_automatic_windows_platform_choices_disable_cross_defaults(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo_root = pathlib.Path(directory)
+            (repo_root / ".bazelrc").write_text(
+                "build --platforms=@internal_platforms_do_not_use//host\n"
+                "common --enable_platform_specific_config=true\n"
+                "common:windows --remote_executor=\n"
+                "common:without-host-config --noenable_platform_specific_config\n"
+                "try-import %workspace%/.bazelrc.local\n",
+                encoding="utf-8",
+            )
+            local_rc = repo_root / ".bazelrc.local"
+            local_rc.write_text(
+                "build:windows --platforms=@local_config_platform//:host\n", encoding="utf-8"
+            )
+            for command in ["build", "test", "fetch", "cquery", "aquery", "run"]:
+                args = [command, "+stdx_test"]
+                with self.subTest(command=command):
+                    self.assertEqual(
+                        runner.select_integration_mode(
+                            args=args, env={}, system="Windows", repo_root=repo_root
+                        ),
+                        config_module.IntegrationMode.DIRECT,
+                    )
+                    for flags in [
+                        ["--noenable_platform_specific_config"],
+                        ["--enable_platform_specific_config=false"],
+                        ["--config=without-host-config"],
+                    ]:
+                        with self.subTest(flags=flags):
+                            self.assertEqual(
+                                runner.select_integration_mode(
+                                    args=[command, *flags, "+stdx_test"],
+                                    env={},
+                                    system="Windows",
+                                    repo_root=repo_root,
+                                ),
+                                config_module.IntegrationMode.WINDOWS_CROSS_HOST,
+                            )
+            # The repository's automatic Windows remote-executor clearing must
+            # not suppress the cross default when no user platform is selected.
+            local_rc.write_text("", encoding="utf-8")
+            self.assertEqual(
+                runner.select_integration_mode(
+                    args=["build", "//target"], env={}, system="Windows", repo_root=repo_root
+                ),
+                config_module.IntegrationMode.WINDOWS_CROSS_HOST,
+            )
+            for rc_contents in [
+                "common:windows --remote_executor=\n",
+                "common:windows --config=offline\ncommon:offline --config=no-remote-exec\n",
+            ]:
+                local_rc.write_text(rc_contents, encoding="utf-8")
+                with self.subTest(rc_contents=rc_contents):
+                    self.assertEqual(
+                        runner.select_integration_mode(
+                            args=["build", "//target"],
+                            env={},
+                            system="Windows",
+                            repo_root=repo_root,
+                        ),
+                        config_module.IntegrationMode.WINDOWS_CROSS_HOST,
+                    )
+
+    def test_rc_platform_choices_disable_cross_defaults(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo_root = pathlib.Path(directory)
+            (repo_root / ".bazelrc").write_text(
+                "build --platforms=@internal_platforms_do_not_use//host\n"
+                "try-import %workspace%/.bazelrc.local\n"
+                "common:native-win --platforms=@local_config_platform//:host\n"
+                "common:native-alias --config=native-win\n"
+                "common:baseline-alias --platforms=@internal_platforms_do_not_use//host\n",
+                encoding="utf-8",
+            )
+            for command in ["build", "test", "fetch", "cquery", "aquery"]:
+                for flags in [
+                    ["--config=native-win"],
+                    ["--config", "native-alias"],
+                    ["--config=baseline-alias"],
+                ]:
+                    with self.subTest(command=command, flags=flags):
+                        self.assertFalse(
+                            cross_windows._should_default_windows_cross_config(
+                                [command, *flags, "//target"], {}, "Windows", repo_root=repo_root
+                            )
+                        )
+                self.assertEqual(
+                    runner.select_integration_mode(
+                        args=[command, "//target"], env={}, system="Windows", repo_root=repo_root
+                    ),
+                    config_module.IntegrationMode.WINDOWS_CROSS_HOST,
+                )
+            (repo_root / ".bazelrc.local").write_text(
+                "build --platforms=@internal_platforms_do_not_use//host\n", encoding="utf-8"
+            )
+            for command in ["build", "test", "fetch", "cquery", "aquery"]:
+                with self.subTest(command=command):
+                    self.assertEqual(
+                        runner.select_integration_mode(
+                            args=[command, "//target"],
+                            env={},
+                            system="Windows",
+                            repo_root=repo_root,
+                        ),
+                        config_module.IntegrationMode.DIRECT,
+                    )
+
+    def test_inherited_rc_scopes_preserve_command_specific_overrides(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo_root = pathlib.Path(directory)
+            (repo_root / ".bazelrc").write_text(
+                "test --remote_executor=\n"
+                "test:native --remote_executor=\n"
+                "build --remote_executor=grpc://example.invalid\n"
+                "build:native --remote_executor=grpc://example.invalid\n",
+                encoding="utf-8",
+            )
+            for flags in [[], ["--config=native"]]:
+                with self.subTest(flags=flags):
+                    self.assertTrue(
+                        bazelrc._remote_execution_disabled_by_args(
+                            ["test", *flags, "//target"], env={}, repo_root=repo_root
+                        )
+                    )
+                    self.assertFalse(
+                        bazelrc._remote_execution_disabled_by_args(
+                            ["build", *flags, "//target"], env={}, repo_root=repo_root
+                        )
+                    )
+
+    def test_windows_cross_defaults_preserve_explicit_choices(self):
+        for command in ["build", "fetch", "cquery", "aquery", "test"]:
+            with self.subTest(command=command):
+                args = [command, "//src/mongo/stdx:stdx_test"]
+                self.assertIn(
+                    "--config=windows-cross-x86_64",
+                    cross_windows._bazel_args_with_default_windows_cross_config(
+                        args, {}, "Windows"
+                    ),
+                )
+                for system in ["Linux", "Darwin"]:
+                    self.assertEqual(
+                        args,
+                        cross_windows._bazel_args_with_default_windows_cross_config(
+                            args, {}, system
+                        ),
+                    )
+                for value in ["0", "false", "no", "off"]:
+                    self.assertEqual(
+                        args,
+                        cross_windows._bazel_args_with_default_windows_cross_config(
+                            args, {"MONGO_WINDOWS_CROSS_DEFAULT_CONFIG": value}, "Windows"
+                        ),
+                    )
+        for args in [
+            ["info"],
+            ["run", "format"],
+            ["run", "//src/mongo/db:mongod"],
+            ["build", "--platforms", "//bazel/platforms:windows_amd64", "//target"],
+            ["test", "--config=windows-cross-x86_64", "//target"],
+            ["test", "--config=windows-cross-x86_64", "--config=local", "//target"],
+        ]:
+            with self.subTest(args=args):
+                self.assertEqual(
+                    args,
+                    cross_windows._bazel_args_with_default_windows_cross_config(
+                        args, {}, "Windows"
+                    ),
+                )
+
     def test_default_windows_cross_image_supports_pinned_llvm_runtime(self):
         from bazel.wrapper_hook.hermetic_container.cross import windows
 
@@ -1252,10 +1529,149 @@ class LinuxCrossRbePlanningTest(CrossPlanningTestCase):
 
 
 class WindowsCrossSysrootTest(CrossPlanningTestCase):
+    def test_automatic_cross_alias_is_materialized_before_host_configs_are_disabled(self):
+        with tempfile.TemporaryDirectory() as directory:
+            rc_path = pathlib.Path(directory) / "cross.bazelrc"
+            rc_path.write_text(
+                "common --enable_platform_specific_config=true\n"
+                "common:windows --config=host-cross\n"
+                "common:host-cross --config=windows-cross-x86_64\n"
+                "common:host-cross --//bazel/config:debug_symbols=False\n"
+                "common:host-cross --repo_env=USER_CROSS_POLICY=retained\n"
+                "common:windows-cross-x86_64 --platforms=//bazel/platforms:windows_x86_64_cross\n",
+                encoding="utf-8",
+            )
+            for flags, env in [
+                ([], {}),
+                ([], {"MONGO_WINDOWS_CROSS_DEFAULT_CONFIG": "0"}),
+                (["--config=windows-cross-x86_64"], {}),
+            ]:
+                args = [f"--bazelrc={rc_path}", "build", *flags, "+stdx_test"]
+                with (
+                    self.subTest(flags=flags, env=env),
+                    mock.patch.object(platform, "system", return_value="Windows"),
+                    mock.patch.object(
+                        runner,
+                        "_prepare_windows_cross_env",
+                        side_effect=lambda args, env, root, system: env,
+                    ),
+                    mock.patch.object(runner, "_write_cross_host_action_config"),
+                    mock.patch.object(
+                        runner,
+                        "_prepare_windows_container_actions",
+                        side_effect=lambda args, env: (args, 0),
+                    ) as prepare,
+                    mock.patch.object(runner, "_run_direct", return_value=0) as run_direct,
+                ):
+                    self.assertEqual(runner.run_hermetic_container("bazel", args, env), 0)
+                    prepare.assert_called_once()
+                    host_args = run_direct.call_args.args[1]
+                    self.assertIn("--config=windows-cross-x86_64", host_args)
+                    self.assertIn("--noenable_platform_specific_config", host_args)
+                    self.assertIn(
+                        "--//bazel/config:windows_cross_local_container_actions=True", host_args
+                    )
+                    options = bazelrc._bazel_effective_options(host_args, env, constants.REPO_ROOT)
+                    self.assertIn("--//bazel/config:debug_symbols=False", options)
+                    self.assertIn("--repo_env=USER_CROSS_POLICY=retained", options)
+
+    def test_local_execution_policies_use_windows_cross_container(self):
+        with tempfile.TemporaryDirectory() as directory:
+            rc_path = pathlib.Path(directory) / "local.bazelrc"
+            rc_path.write_text("common:offline --config=no-remote-exec\n", encoding="utf-8")
+            for startup_flags, flags in [
+                ([], ["--config=local"]),
+                ([], ["--config", "no-remote-exec"]),
+                ([], ["--remote_executor="]),
+                ([], ["--remote_executor", ""]),
+                ([f"--bazelrc={rc_path}"], ["--config=offline"]),
+                ([], ["--//bazel/config:build_enterprise=False", "--config=local"]),
+                ([], ["--config=windows-cross-x86_64", "--config=local"]),
+                ([], ["--config=windows_unittest", "--config=local"]),
+            ]:
+                for command in ["build", "test", "run"]:
+                    with self.subTest(flags=flags, command=command):
+                        args = [*startup_flags, command, *flags, "+stdx_test"]
+                        with (
+                            mock.patch.object(platform, "system", return_value="Windows"),
+                            mock.patch.object(
+                                runner,
+                                "_prepare_windows_cross_env",
+                                side_effect=lambda args, env, root, system: env,
+                            ) as prepare_env,
+                            mock.patch.object(runner, "_write_cross_host_action_config"),
+                            mock.patch.object(
+                                runner,
+                                "_prepare_windows_container_actions",
+                                side_effect=lambda args, env: (args, 0),
+                            ) as prepare,
+                            mock.patch.object(
+                                runner, "_run_windows_cross_host_binary", return_value=0
+                            ),
+                            mock.patch.object(runner, "_run_direct", return_value=0) as run_direct,
+                        ):
+                            self.assertEqual(runner.run_hermetic_container("bazel", args, {}), 0)
+                        prepare_env.assert_called_once()
+                        prepare.assert_called_once()
+                        host_args = run_direct.call_args.args[1]
+                        self.assertIn("--config=windows-cross-x86_64", host_args)
+                        self.assertEqual(
+                            cross_windows._windows_action_strategies(host_args)["CppCompile"],
+                            "persistent-container",
+                        )
+                        self.assertEqual(
+                            cross_windows._windows_action_strategies(host_args)["CppLink"],
+                            "persistent-container",
+                        )
+                        self.assertEqual(
+                            cross_windows._windows_action_strategies(host_args)["TestRunner"],
+                            "standalone",
+                        )
+
+    def test_rc_native_platforms_keep_windows_commands_local(self):
+        with tempfile.TemporaryDirectory() as directory:
+            rc_path = pathlib.Path(directory) / "native.bazelrc"
+            for rc_contents, flags in [
+                ("common --platforms=@local_config_platform//:host\n", []),
+                ("build --platforms=@internal_platforms_do_not_use//host\n", []),
+                (
+                    "common --enable_platform_specific_config=true\n"
+                    "build:windows --platforms=@local_config_platform//:host\n",
+                    [],
+                ),
+                (
+                    "build:native-win --platforms=@local_config_platform//:host\n"
+                    "common:native-alias --config=native-win\n",
+                    ["--config=native-alias"],
+                ),
+            ]:
+                rc_path.write_text(rc_contents, encoding="utf-8")
+                for command in ["build", "test", "fetch", "cquery", "aquery", "run"]:
+                    with self.subTest(rc_contents=rc_contents, command=command):
+                        args = [f"--bazelrc={rc_path}", command, *flags, "+stdx_test"]
+                        env = {"MONGO_WINDOWS_CROSS_DEFAULT_CONFIG": "1"}
+                        self.assertEqual(
+                            runner.select_integration_mode(args=args, env=env, system="Windows"),
+                            config_module.IntegrationMode.DIRECT,
+                        )
+                        with (
+                            mock.patch.object(platform, "system", return_value="Windows"),
+                            mock.patch.object(
+                                runner, "_prepare_windows_container_actions"
+                            ) as prepare,
+                            mock.patch.object(runner, "_run_direct", return_value=0) as run_direct,
+                        ):
+                            rc = runner.run_hermetic_container("bazel", args, env)
+                        self.assertEqual(rc, 0)
+                        prepare.assert_not_called()
+                        run_direct.assert_called_once()
+                        expected_args = runner._bazel_args_with_native_install_strategy(args)
+                        self.assertEqual(run_direct.call_args.args[1], expected_args)
+
     def test_explicit_native_bazelrc_keeps_windows_build_local(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             rc_path = pathlib.Path(temp_dir) / "native.bazelrc"
-            rc_path.write_text("common --remote_executor=\n", encoding="utf-8")
+            rc_path.write_text("common --config=windows-native\n", encoding="utf-8")
             args = [f"--bazelrc={rc_path}", "build", "//target"]
             env = {
                 "MONGO_WINDOWS_CROSS_DEFAULT_CONFIG": "1",
@@ -1264,12 +1680,14 @@ class WindowsCrossSysrootTest(CrossPlanningTestCase):
             }
             with (
                 mock.patch.object(platform, "system", return_value="Windows"),
+                mock.patch.object(runner, "_prepare_windows_cross_env") as prepare_env,
                 mock.patch.object(runner, "_prepare_windows_container_actions") as prepare,
                 mock.patch.object(runner, "_run_direct", return_value=0) as run_direct,
             ):
                 rc = runner.run_hermetic_container("bazel", args, env)
 
             self.assertEqual(rc, 0)
+            prepare_env.assert_not_called()
             prepare.assert_not_called()
             run_direct.assert_called_once()
             self.assertIn(f"--bazelrc={rc_path}", run_direct.call_args.args[1])
@@ -1472,6 +1890,177 @@ class WindowsCrossSysrootTest(CrossPlanningTestCase):
 
 class WindowsPersistentContainerPlanningTest(CrossPlanningTestCase):
     containers = {"ubuntu24": {"container-url": "docker://example.com/image@sha256:abc"}}
+
+    def test_wasm_aot_uses_linux_execution_for_windows_target(self):
+        for flags, expected in (
+            ([], "remote"),
+            (["--config=remote_link"], "remote"),
+            (["--config=local"], "persistent-container"),
+            (["--config=no-remote-exec"], "persistent-container"),
+        ):
+            with self.subTest(flags=flags):
+                args = cross_windows._windows_cross_host_wrapper_action_args(
+                    ["build", *flags, "//src/mongo/scripting/mozjs/wasm:aot_compile_mozjs_wasm"],
+                    {},
+                    self.containers,
+                )
+                self.assertEqual(
+                    cross_windows._windows_action_strategies(args)["WasmAotCompile"], expected
+                )
+
+    def test_automatic_local_alias_preserves_container_and_cache_policy(self):
+        with tempfile.TemporaryDirectory() as directory:
+            rc = pathlib.Path(directory) / "auto.bazelrc"
+            rc.write_text(
+                "common --enable_platform_specific_config\n"
+                "common:windows --config=offline\n"
+                "common:offline --config=local\n"
+                "common:local --remote_executor=\n"
+                "common:local --remote_cache=\n"
+                "common:local --remote_downloader=\n"
+                "common:local --tls_client_certificate=\n"
+                "common:offline --repo_env=USER_SETTING=preserved\n",
+                encoding="utf-8",
+            )
+            for flags in [[], ["--config=windows-cross-x86_64"]]:
+                with self.subTest(flags=flags):
+                    args = cross_windows._bazel_args_with_default_windows_cross_config(
+                        [f"--bazelrc={rc}", "build", *flags, "//target"],
+                        {},
+                        "Windows",
+                    )
+                    planned = cross_windows._windows_cross_host_wrapper_action_args(
+                        args, {}, self.containers
+                    )
+                    options = bazelrc._bazel_effective_options(planned, {}, constants.REPO_ROOT)
+                    self.assertIn("--repo_env=USER_SETTING=preserved", options)
+                    for flag in [
+                        "--remote_cache=",
+                        "--remote_downloader=",
+                        "--tls_client_certificate=",
+                    ]:
+                        self.assertIn(flag, options)
+                    self.assertEqual(
+                        cross_windows._windows_action_strategies(planned)["CppCompile"],
+                        "persistent-container",
+                    )
+
+    def test_native_and_cross_configs_cannot_be_combined(self):
+        for flags in [
+            ["--config=windows-native", "--config=windows-cross-x86_64"],
+            ["--config=windows-cross-x86_64", "--config=windows-native"],
+        ]:
+            with (
+                self.subTest(flags=flags),
+                self.assertRaisesRegex(RuntimeError, "cannot be used together"),
+            ):
+                runner.select_integration_mode(
+                    args=["build", *flags, "//target"], env={}, system="Windows"
+                )
+
+    def test_local_cross_build_executes_linux_actions_in_container(self):
+        for flags, env in [
+            (["--config=local"], {}),
+            (["--config=no-remote-exec"], {}),
+            (["--remote_executor="], {}),
+            (["--config=windows_unittest", "--config=local"], {}),
+            (
+                [
+                    "--config=remote_link",
+                    "--config=local",
+                    "--strategy=CppCompile=remote",
+                    "--strategy=StripDebugInfo=remote",
+                    "--strategy=TestRunner=remote",
+                ],
+                {},
+            ),
+            ([], {"MONGO_WINDOWS_CROSS_LOCAL_CONTAINER_ONLY": "1"}),
+        ]:
+            with self.subTest(flags=flags, env=env):
+                args = cross_windows._windows_cross_host_wrapper_action_args(
+                    ["build", *flags, "//target"],
+                    env,
+                    self.containers,
+                )
+                strategies = cross_windows._windows_action_strategies(args, env)
+                for mnemonic in [
+                    "CppCompile",
+                    "CppArchive",
+                    "CppLink",
+                    "Genrule",
+                    "IdlcGenerator",
+                    "ConfigHeaderGen",
+                    "TemplateRenderer",
+                    "Rustc",
+                    "RustcMetadata",
+                    "CargoBuildScriptRun",
+                    "CargoBuildScriptCopy",
+                    "WindowsRC",
+                    "PackageZip",
+                    "WasmAotCompile",
+                ]:
+                    self.assertEqual(strategies[mnemonic], "persistent-container")
+                for mnemonic in (
+                    "MongoInstallRule",
+                    "CertificateGenerator",
+                    "ExtractCertificateGenerationYear",
+                    "MongoPrettyPrinterTestCreation",
+                    "EmbedPublicKeyHeader",
+                    "GpgExportArmored",
+                    "GpgSign",
+                ):
+                    self.assertEqual(strategies.get(mnemonic), "local", mnemonic)
+                self.assertEqual(strategies["WixCandle"], "local")
+                self.assertEqual(strategies["StripDebugInfo"], "local")
+                self.assertEqual(strategies["TestRunner"], "standalone")
+                self.assertTrue(cross_windows._windows_container_actions_requested(args))
+                options = bazelrc._bazel_effective_options(args, env, constants.REPO_ROOT)
+                self.assertTrue(bazelrc._remote_execution_disabled_for_options(options))
+                self.assertIn("--spawn_strategy=persistent-container", args)
+                self.assertEqual(
+                    [arg for arg in options if arg.startswith("--//bazel/config:remote_link=")][-1],
+                    "--//bazel/config:remote_link=False",
+                )
+
+    def test_remote_cross_build_keeps_host_python_actions_local(self):
+        args = cross_windows._windows_cross_host_wrapper_action_args(
+            ["build", "//target"], {}, self.containers
+        )
+        strategies = cross_windows._windows_action_strategies(args)
+        for mnemonic in (
+            "CertificateGenerator",
+            "ExtractCertificateGenerationYear",
+            "MongoPrettyPrinterTestCreation",
+            "EmbedPublicKeyHeader",
+            "GpgExportArmored",
+            "GpgSign",
+        ):
+            self.assertEqual(strategies.get(mnemonic), "local", mnemonic)
+
+    def test_windows_native_is_explicit_opt_in(self):
+        for command in ["build", "test", "run", "fetch", "cquery", "aquery"]:
+            args = [command, "--config=windows-native", "+stdx_test"]
+            with self.subTest(command=command):
+                self.assertEqual(
+                    runner.select_integration_mode(args=args, env={}, system="Windows"),
+                    config_module.IntegrationMode.DIRECT,
+                )
+                self.assertEqual(
+                    cross_windows._bazel_args_with_default_windows_cross_config(
+                        args, {}, "Windows"
+                    ),
+                    args,
+                )
+
+    def test_cross_unittest_profile_enables_remote_links(self):
+        args = cross_windows._windows_cross_host_wrapper_action_args(
+            ["test", "--config=windows_unittest", "//src/mongo/stdx:stdx_test"],
+            {},
+            self.containers,
+        )
+        self.assertIn("--config=remote_link", args)
+        self.assertIn("--strategy=CppLink=remote", args)
+        self.assertIn("--strategy=TestRunner=standalone", args)
 
     def test_linux_build_tools_default_to_remote_execution(self):
         for link_options in ([], ["--config=remote_link"]):
@@ -1707,7 +2296,10 @@ class WindowsPersistentContainerPlanningTest(CrossPlanningTestCase):
         self.assertEqual(config["runner_environment"]["SYSTEMROOT"], "C:/Windows")
         self.assertEqual(config["host_path"], "host-tools")
         self.assertIn("C:/sysroot", config["mount_paths"])
-        self.assertTrue(config["sandbox_base"].endswith("-mongo-action-sandbox"))
+        self.assertEqual(
+            config["sandbox_base"],
+            str(cross_windows._linux_action_sandbox_base(pathlib.Path(temp_dir) / "output")),
+        )
 
     def test_failed_preflight_prevents_bazel_invocation(self):
         env = {
@@ -1716,22 +2308,28 @@ class WindowsPersistentContainerPlanningTest(CrossPlanningTestCase):
             "MONGO_WINDOWS_CROSS_SYSROOT_URL": "https://example.invalid/sysroot.tar.xz",
             "MONGO_WINDOWS_CROSS_SYSROOT_SHA256": "abc",
         }
-        with (
-            mock.patch.object(platform, "system", return_value="Windows"),
-            mock.patch.object(
-                cross_windows, "load_remote_execution_containers", return_value=self.containers
-            ),
-            mock.patch.object(runner, "_write_cross_host_action_config"),
-            mock.patch.object(
-                runner,
-                "_prepare_windows_container_actions",
-                side_effect=lambda args, env: (args, 1),
-            ),
-            mock.patch.object(runner, "_run_direct") as run_direct,
-        ):
-            rc = runner.run_hermetic_container("bazel", ["build", "//target"], env)
-        self.assertEqual(rc, 1)
-        run_direct.assert_not_called()
+        for flags in [
+            [],
+            ["--config=local"],
+            ["--config=windows_unittest", "--config=no-remote-exec"],
+        ]:
+            with (
+                self.subTest(flags=flags),
+                mock.patch.object(platform, "system", return_value="Windows"),
+                mock.patch.object(
+                    cross_windows, "load_remote_execution_containers", return_value=self.containers
+                ),
+                mock.patch.object(runner, "_write_cross_host_action_config"),
+                mock.patch.object(
+                    runner,
+                    "_prepare_windows_container_actions",
+                    side_effect=lambda args, env: (args, 1),
+                ),
+                mock.patch.object(runner, "_run_direct") as run_direct,
+            ):
+                rc = runner.run_hermetic_container("bazel", ["build", *flags, "//target"], env)
+            self.assertEqual(rc, 1)
+            run_direct.assert_not_called()
 
     def test_preflight_runs_under_shared_publication_lock(self):
         with tempfile.TemporaryDirectory() as temp_dir:

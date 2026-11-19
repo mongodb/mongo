@@ -221,9 +221,11 @@ def select_integration_mode(
 
     if system == "Windows":
         if (
-            _windows_cross_host_wrapper_action_candidate(args, env, system)
-            or _windows_cross_host_run_requested(args, env, system)
-            or _should_default_windows_hermetic_container(args, env=env, system=system)
+            _windows_cross_host_wrapper_action_candidate(args, env, system, repo_root=repo_root)
+            or _windows_cross_host_run_requested(args, env, system, repo_root=repo_root)
+            or _should_default_windows_hermetic_container(
+                args, env=env, system=system, repo_root=repo_root
+            )
         ):
             return IntegrationMode.WINDOWS_CROSS_HOST
         return IntegrationMode.DIRECT
@@ -888,7 +890,7 @@ def run_hermetic_container(
                     )
                     return 0
 
-                _info("building Windows cross target through host Bazel with RBE actions")
+                _info("building Windows cross target through host Bazel")
                 _write_cross_host_action_config(host_build_args, env, system)
                 if _windows_container_actions_requested(host_build_args):
                     host_build_args, prepare_rc = _prepare_windows_container_actions(
@@ -924,7 +926,7 @@ def run_hermetic_container(
                 )
                 return 0
 
-            _info("running Windows cross actions through host Bazel with remote compilation")
+            _info("running Windows cross actions through host Bazel")
             _write_cross_host_action_config(host_args, env, system)
             if _windows_container_actions_requested(host_args):
                 host_args, prepare_rc = _prepare_windows_container_actions(host_args, env)

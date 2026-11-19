@@ -90,6 +90,12 @@ sh_binary(
     srcs = ["bazel_test.sh"],
 )
 
+sh_test(
+    name = "bazel_test_groups_test",
+    srcs = ["bazel_test_groups_test.sh"],
+    data = ["bazel_test.sh"],
+)
+
 sh_binary(
     name = "materialize_ibm_test_install",
     srcs = ["materialize_ibm_test_install.sh"],

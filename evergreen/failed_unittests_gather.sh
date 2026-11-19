@@ -5,10 +5,10 @@ cd src
 
 set -eou pipefail
 
-# Only run on unit test tasks so we don't target mongod binaries from cores.
+# Bazel unit-test tasks gather their failed binaries in bazel_test.sh. This
+# collector handles the remaining resmoke-driven dbtest and integration tasks.
 if [ "${task_name}" != "run_dbtest" ] &&
-    [[ ${task_name} != integration_tests* ]] &&
-    [[ "${task_name}" != unit_test_group*_no_sandbox ]]; then
+    [[ ${task_name} != integration_tests* ]]; then
     echo "Not gathering failed unittests binaries as this is not a unittest task: ${task_name}"
     exit 0
 fi

@@ -23,6 +23,7 @@ from ..bazelrc import (
     _bazel_effective_options,
     _bazel_output_base,
     _config_requested,
+    _remote_execution_disabled_for_options,
     _remote_link_requested,
     _replace_bazel_startup_option,
     _repo_env_overrides_from_args,
@@ -55,6 +56,7 @@ from ..env import (
     _bazel_command,
     _bazel_command_index,
     _bazel_run_target,
+    _config_values,
     _env_is_false,
     _env_is_true,
     _info,
@@ -78,9 +80,18 @@ from .common import (
     _label_to_host_executable,
     _macos_cross_linux_python_options,
 )
-from .macos import _macos_cross_remote_execution_disabled
 
 WINDOWS_CROSS_CONFIG = "windows-cross-x86_64"
+WINDOWS_NATIVE_CONFIG = "windows-native"
+
+# Cross defaults replace these native repository defaults. User platform choices
+# still opt out; user executor settings choose local container execution or RBE.
+WINDOWS_NATIVE_DEFAULT_RC_OPTIONS = frozenset(
+    {
+        ("build", "--platforms=@internal_platforms_do_not_use//host"),
+        ("common:windows", "--remote_executor="),
+    }
+)
 
 
 WINDOWS_CROSS_DEFAULT_CONFIG_ENV = "MONGO_WINDOWS_CROSS_DEFAULT_CONFIG"
@@ -111,6 +122,7 @@ WINDOWS_CROSS_DEFAULT_COMMANDS = frozenset(
         "build",
         "cquery",
         "fetch",
+        "test",
     ]
 )
 
@@ -121,6 +133,43 @@ WINDOWS_CONTAINER_ACTION_WRAPPER_SCRIPT = (
 WINDOWS_CONTAINER_ACTIONS_LAYOUT_VERSION = "v1"
 WINDOWS_CROSS_UNIX_ROOT = "C:/bazel-linux"
 WINDOWS_LOCAL_CONTAINER_MNEMONICS = ("CppLink", "PackageZip")
+# Actions using tools built for the Linux execution platform cannot run on the
+# Windows client. In local mode they all use the same persistent container.
+WINDOWS_CROSS_CONTAINER_MNEMONICS = (
+    *WINDOWS_LOCAL_CONTAINER_MNEMONICS,
+    "CppCompile",
+    "CppArchive",
+    "ConfigHeaderGen",
+    "TemplateRenderer",
+    "IdlcGenerator",
+    "Genrule",
+    "Rustc",
+    "RustcMetadata",
+    "CargoBuildScriptRun",
+    "CargoBuildScriptCopy",
+    "WindowsRC",
+    "WasmAotCompile",
+)
+WINDOWS_HOST_LOCAL_MNEMONICS = (
+    # These rules constrain their interpreter and dependencies to the native
+    # Windows host. They must bypass both Linux RBE and the persistent container.
+    "CertificateGenerator",
+    "ExtractCertificateGenerationYear",
+    "MongoPrettyPrinterTestCreation",
+    "EmbedPublicKeyHeader",
+    "GpgExportArmored",
+    "GpgSign",
+    "MongoInstallRule",
+    "SolibSymlink",
+    "ExtractDebugInfo",
+    "StripDebugInfo",
+    "CcGenerateIntermediateDwp",
+    "CcGenerateDwp",
+    "DefParser",
+    "WixCandle",
+    "WixLight",
+    "MsiTrim",
+)
 WINDOWS_CONTAINER_PREFLIGHT_TIMEOUT_SECONDS = 900
 WINDOWS_CONTAINER_RUNNER_ENVIRONMENT_KEYS = (
     "APPDATA",
@@ -197,36 +246,67 @@ def _bazelrc_windows_repo_envs(repo_root: pathlib.Path) -> dict[str, str]:
     return values
 
 
+def _windows_cross_user_options(
+    args: Sequence[str],
+    env: Mapping[str, str],
+    repo_root: pathlib.Path,
+    *,
+    platform_specific_only: bool = False,
+) -> list[str]:
+    return _bazel_effective_options(
+        args,
+        env,
+        repo_root,
+        excluded_workspace_options=WINDOWS_NATIVE_DEFAULT_RC_OPTIONS,
+        platform_specific_config="windows",
+        platform_specific_only=platform_specific_only,
+    )
+
+
 def _windows_cross_config_requested(
     args: Sequence[str],
     env: Mapping[str, str] = os.environ,
     repo_root: pathlib.Path = REPO_ROOT,
+    system: str | None = None,
 ) -> bool:
-    return _config_requested(args, WINDOWS_CROSS_CONFIG, env=env, repo_root=repo_root)
+    options = _windows_cross_user_options(args, env, repo_root)
+    configs = _config_values(options)
+    if WINDOWS_NATIVE_CONFIG in configs:
+        if WINDOWS_CROSS_CONFIG in configs:
+            raise RuntimeError("windows-native and windows-cross-x86_64 cannot be used together")
+        return False
+    if _config_requested(args, WINDOWS_CROSS_CONFIG, env=env, repo_root=repo_root):
+        return True
+    if (system or platform.system()) != "Windows":
+        return False
+    return WINDOWS_CROSS_CONFIG in configs
 
 
 def _windows_cross_remote_execution_disabled(
     args: Sequence[str],
     env: Mapping[str, str],
+    repo_root: pathlib.Path = REPO_ROOT,
 ) -> bool:
     if _env_is_true(env.get("MONGO_WINDOWS_CROSS_LOCAL_CONTAINER_ONLY")):
         return True
 
-    return _macos_cross_remote_execution_disabled(args, env)
+    return _remote_execution_disabled_for_options(_windows_cross_user_options(args, env, repo_root))
 
 
 def _should_default_windows_cross_config(
     args: Sequence[str],
     env: Mapping[str, str] = os.environ,
     system: str | None = None,
+    repo_root: pathlib.Path = REPO_ROOT,
 ) -> bool:
     if (system or platform.system()) != "Windows":
         return False
-    if not _env_is_true(env.get(WINDOWS_CROSS_DEFAULT_CONFIG_ENV)):
+    if _env_is_false(env.get(WINDOWS_CROSS_DEFAULT_CONFIG_ENV)):
         return False
-    if _windows_cross_config_requested(args, env=env):
+    if _windows_cross_config_requested(args, env=env, repo_root=repo_root, system=system):
         return False
-    if _platforms_requested(args):
+    options = _windows_cross_user_options(args, env, repo_root)
+    if WINDOWS_NATIVE_CONFIG in _config_values(options) or _platforms_requested(options):
         return False
     command = _bazel_command(args)
     if command in WINDOWS_CROSS_DEFAULT_COMMANDS:
@@ -240,29 +320,55 @@ def _should_default_windows_hermetic_container(
     args: Sequence[str],
     env: Mapping[str, str] = os.environ,
     system: str | None = None,
+    repo_root: pathlib.Path = REPO_ROOT,
 ) -> bool:
-    if _windows_cross_config_requested(args, env=env):
+    if _windows_cross_config_requested(args, env=env, repo_root=repo_root, system=system):
         return True
-    return _should_default_windows_cross_config(args, env=env, system=system)
+    return _should_default_windows_cross_config(args, env=env, system=system, repo_root=repo_root)
 
 
 def _bazel_args_with_default_windows_cross_config(
     args: Sequence[str],
     env: Mapping[str, str] = os.environ,
     system: str | None = None,
+    repo_root: pathlib.Path = REPO_ROOT,
 ) -> list[str]:
-    if not _should_default_windows_cross_config(args, env=env, system=system):
+    automatic_options = (
+        _windows_cross_user_options(args, env, repo_root, platform_specific_only=True)
+        if (system or platform.system()) == "Windows"
+        else []
+    )
+    if not _windows_cross_config_requested(
+        args, env=env, repo_root=repo_root, system=system
+    ) and not _should_default_windows_cross_config(
+        args, env=env, system=system, repo_root=repo_root
+    ):
         return list(args)
 
     command_index = _bazel_command_index(args)
     if command_index is None:
         return list(args)
 
-    return [
-        *args[: command_index + 1],
-        f"--config={WINDOWS_CROSS_CONFIG}",
-        *args[command_index + 1 :],
-    ]
+    # Materialize automatic Windows options before the cross route disables host
+    # configs, preserving aliases and local cache/auth policies as well as cross selection.
+    configured_args = list(args)
+    if not _config_requested(args, WINDOWS_CROSS_CONFIG, env=env, repo_root=repo_root):
+        configured_args.insert(command_index + 1, f"--config={WINDOWS_CROSS_CONFIG}")
+    if automatic_options:
+        # The options are already expanded. Keep their final ordering without
+        # re-expanding aliases or restoring the native Windows executor default.
+        materialized_options = []
+        index = 0
+        while index < len(automatic_options):
+            option = automatic_options[index]
+            if option == "--config":
+                index += 2
+                continue
+            if not option.startswith("--config="):
+                materialized_options.append(option)
+            index += 1
+        configured_args = _append_bazel_command_options_last(configured_args, materialized_options)
+    return configured_args
 
 
 def _windows_cross_repo_env_values(
@@ -465,7 +571,7 @@ def _prepare_windows_cross_env(
     system: str,
 ) -> Mapping[str, str]:
     if system != "Windows" or not _windows_cross_config_requested(
-        args, env=env, repo_root=repo_root
+        args, env=env, repo_root=repo_root, system=system
     ):
         return env
 
@@ -523,6 +629,7 @@ def _windows_cross_host_wrapper_action_candidate(
     args: Sequence[str],
     env: Mapping[str, str],
     system: str,
+    repo_root: pathlib.Path = REPO_ROOT,
 ) -> bool:
     command = _bazel_command(args)
     if command == "run" and not _is_cross_default_run_target(_bazel_run_target(args)):
@@ -532,10 +639,11 @@ def _windows_cross_host_wrapper_action_candidate(
         system == "Windows"
         and not _env_is_false(env.get(WINDOWS_CROSS_ACTION_WRAPPER_ENV))
         and command in {"build", "test", "run"}
-        and not _windows_cross_remote_execution_disabled(args, env)
         and (
-            _windows_cross_config_requested(args, env=env)
-            or _should_default_windows_cross_config(args, env=env, system=system)
+            _windows_cross_config_requested(args, env=env, repo_root=repo_root, system=system)
+            or _should_default_windows_cross_config(
+                args, env=env, system=system, repo_root=repo_root
+            )
         )
     )
 
@@ -547,18 +655,19 @@ def _windows_cross_host_wrapper_action_requested(
 ) -> bool:
     return _windows_cross_host_wrapper_action_candidate(
         args, env, system
-    ) and _windows_cross_config_requested(args, env=env)
+    ) and _windows_cross_config_requested(args, env=env, system=system)
 
 
 def _windows_cross_host_run_requested(
     args: Sequence[str],
     env: Mapping[str, str],
     system: str,
+    repo_root: pathlib.Path = REPO_ROOT,
 ) -> bool:
     return (
         system == "Windows"
         and _bazel_command(args) == "run"
-        and _windows_cross_config_requested(args, env=env)
+        and _windows_cross_config_requested(args, env=env, repo_root=repo_root, system=system)
     )
 
 
@@ -612,6 +721,12 @@ def _windows_cross_host_wrapper_action_args(
     env: Mapping[str, str],
     containers: Mapping[str, Mapping[str, str]] | None = None,
 ) -> list[str]:
+    local_actions = _windows_cross_remote_execution_disabled(args, env)
+    if not local_actions and _config_requested(
+        args, "windows_unittest", env=env, repo_root=REPO_ROOT
+    ):
+        # Remote unittest builds link on RBE; local builds link in the container.
+        args = _append_bazel_command_options(args, ["--config=remote_link"])
     command_index = _bazel_command_index(args)
     if command_index is not None:
         unix_root_option = f"--host_jvm_args=-Dbazel.windows_unix_root={WINDOWS_CROSS_UNIX_ROOT}"
@@ -622,7 +737,9 @@ def _windows_cross_host_wrapper_action_args(
     exec_properties = _windows_cross_rbe_exec_properties(selection_env, containers=containers)
     platform_properties = dict(prop.split("=", 1) for prop in exec_properties)
     output_base = _bazel_output_base(args, env)
-    if _remote_link_requested(args, env=env, repo_root=REPO_ROOT):
+    if local_actions:
+        link_options = []
+    elif _remote_link_requested(args, env=env, repo_root=REPO_ROOT):
         link_options = ["--//bazel/config:remote_link=True", "--strategy=CppLink=remote"]
     else:
         link_options = _windows_container_action_options(output_base)
@@ -671,18 +788,13 @@ def _windows_cross_host_wrapper_action_args(
             "--shell_executable=/bin/bash",
             f"--action_env=PATH={_windows_cross_action_path(env)}",
             f"--host_action_env=PATH={_windows_cross_action_path(env)}",
-            "--strategy=MongoInstallRule=local",
+            *[f"--strategy={mnemonic}=local" for mnemonic in WINDOWS_HOST_LOCAL_MNEMONICS],
             # Build tools target the Linux execution platform, including Python and Rust
             # helper actions. Native Windows installation/debug actions stay local below.
             "--spawn_strategy=remote,local",
             "--strategy=CppCompile=remote",
             *link_options,
             "--strategy=CppArchive=remote",
-            "--strategy=SolibSymlink=local",
-            "--strategy=ExtractDebugInfo=local",
-            "--strategy=StripDebugInfo=local",
-            "--strategy=CcGenerateIntermediateDwp=local",
-            "--strategy=CcGenerateDwp=local",
             "--strategy=ConfigHeaderGen=remote",
             "--strategy=TemplateRenderer=remote",
             "--strategy=IdlcGenerator=remote",
@@ -694,17 +806,37 @@ def _windows_cross_host_wrapper_action_args(
             "--strategy=CargoBuildScriptRun=remote,local",
             "--strategy=CargoBuildScriptCopy=remote,local",
             "--@rules_rust//rust/settings:toolchain_linker_preference=rust",
-            "--strategy=DefParser=local",
-            "--strategy=WixCandle=local",
-            "--strategy=WixLight=local",
-            "--strategy=MsiTrim=local",
             "--strategy=WindowsRC=remote",
+            # Wasmtime is built for the Linux execution platform and uses
+            # --target to produce a Windows AOT module.
+            "--strategy=WasmAotCompile=remote",
             "--features=-thin_archive",
             "--test_strategy=standalone",
             "--strategy=TestRunner=standalone",
             *_windows_cross_action_container_env_options(selection_env, containers=containers),
         ],
     )
+    if local_actions:
+        # Apply the local policy after RC/CLI strategies, including remote_link.
+        # Preserve local's cache/auth settings and no-remote-exec's cache access.
+        host_args = _append_bazel_command_options_last(
+            host_args,
+            [
+                *container_actions.persistent_container_options(
+                    output_base, WINDOWS_CONTAINER_ACTION_WRAPPER_SCRIPT
+                ),
+                "--remote_executor=",
+                "--//bazel/config:remote_link=False",
+                "--spawn_strategy=persistent-container",
+                *[
+                    f"--strategy={mnemonic}=persistent-container"
+                    for mnemonic in WINDOWS_CROSS_CONTAINER_MNEMONICS
+                ],
+                *[f"--strategy={mnemonic}=local" for mnemonic in WINDOWS_HOST_LOCAL_MNEMONICS],
+                "--test_strategy=standalone",
+                "--strategy=TestRunner=standalone",
+            ],
+        )
     # The input contract must match the final ZIP strategy, including user
     # overrides. Keep runfiles whenever native execution remains a fallback.
     zip_source_only = (
@@ -823,7 +955,7 @@ def _windows_container_actions_requested(args: Sequence[str]) -> bool:
     strategies = _windows_action_strategies(args)
     return any(
         "persistent-container" in strategies.get(mnemonic, "").split(",")
-        for mnemonic in WINDOWS_LOCAL_CONTAINER_MNEMONICS
+        for mnemonic in WINDOWS_CROSS_CONTAINER_MNEMONICS
     )
 
 
@@ -919,14 +1051,14 @@ def _prepare_windows_container_actions(
     try:
         config = windows_action_runner.prepare_runner_config(config)
     except (OSError, subprocess.TimeoutExpired, SystemExit):
-        _info("could not select a Linux engine for Windows link actions")
+        _info("could not select a Linux engine for Windows cross actions")
         return host_args, 1
     if not container_actions.ensure_container_image(
         str(config["docker_command"]), str(config["image"])
     ):
         _info(
             f"could not pull build container image {config['image']}; "
-            "refusing to run Windows link actions natively"
+            "refusing to run Windows cross actions natively"
         )
         return host_args, 1
 
@@ -945,14 +1077,14 @@ def _prepare_windows_container_actions(
         detail_suffix = "" if detail else " (the runner produced no output)"
         _info(
             f"could not start or verify the Windows action container "
-            f"{config['container_name']}{detail_suffix}; refusing to run link actions natively"
+            f"{config['container_name']}{detail_suffix}; refusing to run cross actions natively"
         )
         return host_args, 1
 
     image_identifier = str(config["image"]).rsplit("@", 1)[-1]
     _info(
         f"Container image {image_identifier} is running in the background to execute "
-        "Windows link actions; compile actions execute on RBE in the same image."
+        "Windows cross actions selected for local execution."
     )
     return host_args, 0
 

@@ -396,8 +396,8 @@ class HermeticContainerEnablementTest(unittest.TestCase):
 
         self.assertEqual(mode, config_module.IntegrationMode.DIRECT)
 
-    def test_windows_build_defaults_to_native_toolchain(self):
-        self.assertFalse(
+    def test_windows_build_defaults_to_cross_toolchain(self):
+        self.assertTrue(
             runner.should_use_hermetic_container(
                 env={},
                 system="Windows",
@@ -405,7 +405,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
                 args=["build", "install-dist-test"],
             )
         )
-        self.assertFalse(
+        self.assertTrue(
             runner.should_use_hermetic_container(
                 env={"MONGO_BAZEL_USE_HERMETIC_CONTAINER": "1"},
                 system="Windows",
@@ -413,7 +413,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
                 args=["build", "install-dist-test"],
             )
         )
-        self.assertFalse(
+        self.assertTrue(
             runner.should_use_hermetic_container(
                 env={},
                 system="Windows",
@@ -450,8 +450,8 @@ class HermeticContainerEnablementTest(unittest.TestCase):
             )
         )
 
-    def test_windows_run_defaults_to_native_toolchain_for_test_targets(self):
-        self.assertFalse(
+    def test_windows_run_defaults_to_cross_toolchain_for_test_targets(self):
+        self.assertTrue(
             runner.should_use_hermetic_container(
                 env={},
                 system="Windows",
@@ -476,8 +476,8 @@ class HermeticContainerEnablementTest(unittest.TestCase):
             )
         )
 
-    def test_windows_test_does_not_default_to_cross_hermetic_container(self):
-        self.assertFalse(
+    def test_windows_test_defaults_to_cross_hermetic_container(self):
+        self.assertTrue(
             runner.should_use_hermetic_container(
                 env={},
                 system="Windows",
@@ -486,17 +486,17 @@ class HermeticContainerEnablementTest(unittest.TestCase):
             )
         )
 
-    def test_windows_cross_default_config_requires_opt_in(self):
+    def test_windows_cross_default_config_can_be_disabled(self):
         args = cross_windows._bazel_args_with_default_windows_cross_config(
             ["build", "install-dist-test"],
-            {},
+            {"MONGO_WINDOWS_CROSS_DEFAULT_CONFIG": "0"},
             system="Windows",
         )
 
         self.assertEqual(args, ["build", "install-dist-test"])
         self.assertFalse(
             runner.should_use_hermetic_container(
-                env={},
+                env={"MONGO_WINDOWS_CROSS_DEFAULT_CONFIG": "0"},
                 system="Windows",
                 docker_exists=lambda: True,
                 args=["build", "install-dist-test"],
@@ -535,7 +535,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
         )
 
         self.assertEqual(
-            args,
+            args[:4],
             [
                 "--output_base=C:/tmp/bazel",
                 "build",

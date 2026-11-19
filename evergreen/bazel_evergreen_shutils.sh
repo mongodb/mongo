@@ -12,7 +12,22 @@ BAZEL_EVERGREEN_OUTPUT_BASE="${BAZEL_EVERGREEN_OUTPUT_BASE:-}"
 bazel_evergreen_shutils::activate_and_cd_src() {
     cd src
     set -o verbose
+    bazel_evergreen_shutils::enable_windows_cross_container_rbe
     activate_venv
+}
+
+# Windows compilation runs on Linux RBE; Windows test actions remain on the host.
+# Preserve explicit native-build policies when diagnosing the cross toolchain.
+bazel_evergreen_shutils::enable_windows_cross_container_rbe() {
+    case "${MONGO_WINDOWS_CROSS_DEFAULT_CONFIG:-}" in
+    0 | false | no | off) return 0 ;;
+    esac
+    case "${MONGO_BAZEL_USE_HERMETIC_CONTAINER:-}" in
+    0 | false | no | off) return 0 ;;
+    esac
+    if bazel_evergreen_shutils::is_windows; then
+        export evergreen_remote_exec=on
+    fi
 }
 
 # --- Distro quirks -----------------------------------------------------
@@ -40,7 +55,7 @@ bazel_evergreen_shutils::is_macos() {
 # they talk to is a native Win32 process. That mismatch matters for any PID handling: see
 # bazel_evergreen_shutils::pid_is_live.
 bazel_evergreen_shutils::is_windows() {
-    if [[ "${distro_id:-}" == windows-* ]]; then
+    if [[ "${distro_id:-}" == windows-* || "${distro_id:-}" == release-windows-* ]]; then
         return 0
     fi
     local -r os="$(uname -s | tr '[:upper:]' '[:lower:]')"
@@ -78,6 +93,19 @@ bazel_evergreen_shutils::bazel_get_binary_path() {
     else
         echo "bazel"
     fi
+}
+
+# Run outside Bazel's Python runtime: a nested build can re-fetch that runtime
+# while the collector still holds its DLLs open on Windows. Retain the task's
+# Bazelisk entry point so diagnostic builds use the same cross-build wrapper.
+bazel_evergreen_shutils::gather_failed_tests() {
+    local bazel_binary
+    bazel_binary="$(realpath "$(command -v "$BAZEL_BINARY")")" || return
+    if bazel_evergreen_shutils::is_windows; then
+        bazel_binary="$(cygpath -m "$bazel_binary")" || return
+    fi
+    BAZEL_BINARY="$bazel_binary" PYTHONDONTWRITEBYTECODE=1 \
+        "$python" buildscripts/gather_failed_tests.py "$@"
 }
 
 # --- RBE/local flags + arch tuning ----------------------------------------

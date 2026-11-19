@@ -552,9 +552,17 @@ common:macos --//bazel/config:compress_debug_compile=False
 common:windows --//bazel/config:linkstatic=True
 common:windows --//bazel/config:skip_archive=False
 
-# The only Windows compiler we support is MSVC.
+# Native Windows builds use MSVC; the default cross route uses clang-cl with
+# the pinned MSVC ABI and SDK inputs.
 common:windows --//bazel/config:compiler_type=msvc
 common:windows --//bazel/config:linker=auto
+
+# Explicit opt-in to fully native MSVC. --config=local controls execution only:
+# it keeps the cross toolchain and runs Linux build actions in a local container.
+common:windows-native --config=no-remote-exec
+common:windows-native --platforms=@internal_platforms_do_not_use//host
+common:windows-native --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=0
+common:windows-native --enable_platform_specific_config
 
 # Data dependencies don't work in bazel run or bazel test on windows without this
 startup --windows_enable_symlinks
@@ -566,9 +574,8 @@ test:windows --test_env=MONGO_BAZEL_BASH
 test:windows-cross-x86_64 --run_under=//bazel:windows_test_launcher
 test:windows-cross-x86_64 --test_env=MONGO_BAZEL_BASH
 
-# Static linking and the native launcher for Evergreen Windows unit-test tasks.
+# Static linking and the host launcher for Evergreen Windows unit-test tasks.
 common:windows_unittest --linkstatic=True
-common:windows_unittest --config=remote_link
 test:windows_unittest --run_under=//bazel:windows_test_launcher
 build:windows --action_env=MSYS=winsymlinks:nativestrict
 test:windows --action_env=MSYS=winsymlinks:nativestrict

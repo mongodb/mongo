@@ -499,11 +499,75 @@ test_retry_bazel_cmd_does_not_retry_test_timeouts() {
     PATH="$old_path"
 }
 
+test_windows_cross_rbe_enablement_preserves_other_hosts_and_rollback() {
+    local actual
+    actual=$(
+        source "${TEST_SRCDIR}/${TEST_WORKSPACE}/evergreen/bazel_evergreen_shutils.sh"
+        distro_id=windows-2022-wsl2-xxlarge
+        evergreen_remote_exec=off
+        bazel_evergreen_shutils::enable_windows_cross_container_rbe
+        echo "$evergreen_remote_exec"
+    )
+    assert_eq "on" "$actual" "Windows compilation should use cross RBE"
+    actual=$(
+        source "${TEST_SRCDIR}/${TEST_WORKSPACE}/evergreen/bazel_evergreen_shutils.sh"
+        distro_id=release-windows-2022-xxlarge
+        evergreen_remote_exec=off
+        unset MONGO_WINDOWS_CROSS_DEFAULT_CONFIG
+        bazel_evergreen_shutils::enable_windows_cross_container_rbe
+        echo "$evergreen_remote_exec ${MONGO_WINDOWS_CROSS_DEFAULT_CONFIG:-unset}"
+    )
+    assert_eq "on unset" "$actual" "release hosts must not implicitly select MSVC"
+    actual=$(
+        source "${TEST_SRCDIR}/${TEST_WORKSPACE}/evergreen/bazel_evergreen_shutils.sh"
+        distro_id=release-windows-2022-xxlarge
+        evergreen_remote_exec=off
+        windows_native_build_tasks="archive_dist_test package crypt_create_lib"
+        task_name=package
+        bazel_evergreen_shutils::enable_windows_cross_container_rbe
+        echo "$evergreen_remote_exec"
+    )
+    assert_eq "on" "$actual" "release packaging must use the cross toolchain even with stale native metadata"
+    actual=$(
+        source "${TEST_SRCDIR}/${TEST_WORKSPACE}/evergreen/bazel_evergreen_shutils.sh"
+        distro_id=windows-2022-wsl2-xxlarge
+        evergreen_remote_exec=off
+        windows_native_build_tasks="archive_dist_test package crypt_create_lib"
+        task_name=unit_tests
+        bazel_evergreen_shutils::enable_windows_cross_container_rbe
+        echo "$evergreen_remote_exec"
+    )
+    assert_eq "on" "$actual" "release variant unit tests retain cross compilation"
+    local original
+    for original in on off; do
+        actual=$(
+            stub_function bazel_evergreen_shutils::is_windows 'return 1;'
+            evergreen_remote_exec="$original"
+            bazel_evergreen_shutils::enable_windows_cross_container_rbe
+            echo "$evergreen_remote_exec"
+        )
+        assert_eq "$original" "$actual" "other hosts should retain their execution policy"
+    done
+    local setting value
+    for setting in MONGO_WINDOWS_CROSS_DEFAULT_CONFIG MONGO_BAZEL_USE_HERMETIC_CONTAINER; do
+        for value in 0 false no off; do
+            actual=$(
+                stub_function bazel_evergreen_shutils::is_windows 'return 0;'
+                export "$setting=$value"
+                evergreen_remote_exec=off
+                bazel_evergreen_shutils::enable_windows_cross_container_rbe
+                echo "$evergreen_remote_exec"
+            )
+            assert_eq "off" "$actual" "native rollback must preserve disabled RBE"
+        done
+    done
+}
+
 test_windows_unittests_do_not_use_linux_remote_test_runner() {
     local flags
     flags=$(
         source "${TEST_SRCDIR}/${TEST_WORKSPACE}/evergreen/bazel_evergreen_shutils.sh"
-        distro_id=windows-2022-container-xxlarge
+        distro_id=windows-2022-wsl2-xxlarge
         evergreen_remote_exec=on
         task_name=unit_tests
         bazel_evergreen_shutils::compute_local_arg test
@@ -805,6 +869,44 @@ test_toolchain_capture_preserves_analysis_only_target_modes() {
     restore_stubbed_functions
 }
 
+test_gather_failed_tests_uses_task_python_and_absolute_bazel() (
+    local tmpdir
+    tmpdir="$(new_tmpdir)"
+    mkdir -p "$tmpdir/task bin" "$tmpdir/bazel"
+    cat >"$tmpdir/task bin/python" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" "$BAZEL_BINARY" "$PYTHONDONTWRITEBYTECODE" >"$GATHER_LAUNCH_LOG"
+EOF
+    chmod +x "$tmpdir/task bin/python"
+    touch "$tmpdir/task bin/bazel" "$tmpdir/bazel/bazelisk.py"
+    chmod +x "$tmpdir/task bin/bazel" "$tmpdir/bazel/bazelisk.py"
+    export GATHER_LAUNCH_LOG="$tmpdir/launch.log"
+    export PATH="$tmpdir/task bin:$PATH"
+    local python="$tmpdir/task bin/python"
+    cd "$tmpdir"
+
+    stub_function bazel_evergreen_shutils::is_windows 'return 1;'
+    local BAZEL_BINARY=bazel
+    bazel_evergreen_shutils::gather_failed_tests
+    local expected_bazel
+    expected_bazel="$(realpath 'task bin/bazel')"
+    assert_eq "$(printf '%s\n' buildscripts/gather_failed_tests.py "$expected_bazel" 1)" "$(cat "$GATHER_LAUNCH_LOG")" "collector should use task Python and an absolute Bazelisk path"
+    assert_eq bazel "$BAZEL_BINARY" "diagnostics should not change the caller's Bazel path"
+
+    BAZEL_BINARY=bazel/bazelisk.py
+    bazel_evergreen_shutils::gather_failed_tests --no-rerun
+    expected_bazel="$(realpath bazel/bazelisk.py)"
+    assert_contains "$(cat "$GATHER_LAUNCH_LOG")" "$expected_bazel" "relative Bazelisk entry points should also be absolute"
+    assert_eq "$(printf '%s\n' 'buildscripts/gather_failed_tests.py --no-rerun' "$expected_bazel" 1)" "$(cat "$GATHER_LAUNCH_LOG")" "collector should forward the resmoke no-rerun policy"
+
+    stub_function bazel_evergreen_shutils::is_windows 'return 0;'
+    stub_function cygpath '[[ "$1" == "-m" && "$2" == "$(realpath bazel/bazelisk.py)" ]] || fail "cygpath should receive the absolute entry point"; printf "%s\n" "C:/task bin/bazelisk.py";'
+    bazel_evergreen_shutils::gather_failed_tests
+    assert_contains "$(cat "$GATHER_LAUNCH_LOG")" 'C:/task bin/bazelisk.py' "native Windows Python should receive a native Bazel path"
+)
+
+test_gather_failed_tests_uses_task_python_and_absolute_bazel
 test_pid_is_live_detects_live_and_dead_pids_on_posix
 test_pid_is_live_uses_tasklist_on_windows
 test_pid_is_live_reports_unknown_when_it_cannot_check
@@ -820,6 +922,7 @@ test_timeout_prefix_uses_the_expected_fallback_for_each_execution_mode
 test_retry_bazel_cmd_does_not_retry_test_timeouts
 test_compute_local_arg_keeps_cross_rbe_for_ibm_run_mode
 test_windows_unittests_do_not_use_linux_remote_test_runner
+test_windows_cross_rbe_enablement_preserves_other_hosts_and_rollback
 test_compute_local_arg_keeps_engflow_cache_for_non_rbe_run_mode
 test_maybe_release_flag_classifies_patch_test_and_release_tasks
 test_local_release_command_disables_remote_fallback_timeout

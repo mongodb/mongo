@@ -374,6 +374,12 @@ py_test(
 )
 
 py_test(
+    name = "test_bazel_test_groups",
+    srcs = ["test_bazel_test_groups.py"],
+    deps = ["//buildscripts:bazel_test_groups"],
+)
+
+py_test(
     name = "test_create_bazel_test_report",
     srcs = ["test_create_bazel_test_report.py"],
     visibility = ["//visibility:public"],

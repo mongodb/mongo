@@ -948,12 +948,8 @@ class TestEvergreenYML(unittest.TestCase):
             if unit_test_string in task.name:
                 unit_test_tasks.append(task.name)
 
-        # Spawnhost extracts both the split-group archives and shared Bazel outputs.
-        expected_tasks = {
-            f"unit_test_group{group}{suffix}"
-            for group in range(1, 9)
-            for suffix in ("", "_no_sandbox")
-        }
+        # Spawnhost still supports split-group archives and shared Bazel outputs.
+        expected_tasks = {f"unit_test_group{group}" for group in range(1, 9)}
         self.assertEqual(set(unit_test_tasks), expected_tasks)
         self.assertTrue(
             {"unit_tests", "unit_tests_remote_exec_incompatible"}.issubset(

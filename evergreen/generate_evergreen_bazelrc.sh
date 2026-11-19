@@ -1,5 +1,6 @@
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
+. "$DIR/bazel_evergreen_shutils.sh"
 
 cd src
 
@@ -77,6 +78,9 @@ if [[ "${requester}" == "commit" ]]; then
     fi
     echo "common --define MONGO_VERSION=${mongo_version}" >>.bazelrc.git
 fi
+
+# Enable cross RBE before writing the no-remote-exec policy for other hosts.
+bazel_evergreen_shutils::enable_windows_cross_container_rbe
 
 if [[ "${evergreen_remote_exec}" != "on" ]]; then
     # Temporarily disable remote exec and only use remote cache

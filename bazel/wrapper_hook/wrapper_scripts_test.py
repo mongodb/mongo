@@ -36,7 +36,7 @@ class WrapperScriptsProtocolTest(unittest.TestCase):
         self.assertIn('set "handled_exit_code="', self.windows)
         self.assertIn('set "fallback_exit=!ERRORLEVEL!"', self.windows)
 
-    def test_windows_integration_keeps_default_opt_in(self):
+    def test_wrapper_scripts_preserve_user_container_settings(self):
         self.assertIn("hermetic_container_integration.py", self.windows)
         self.assertNotIn('set "MONGO_BAZEL_USE_HERMETIC_CONTAINER=1"', self.windows)
         self.assertNotIn("export MONGO_BAZEL_USE_HERMETIC_CONTAINER=1", self.bash)

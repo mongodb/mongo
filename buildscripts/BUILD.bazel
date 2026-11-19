@@ -396,6 +396,12 @@ py_binary(
     ],
 )
 
+py_library(
+    name = "bazel_test_groups",
+    srcs = ["bazel_test_groups.py"],
+    visibility = ["//visibility:public"],
+)
+
 py_binary(
     name = "create_bazel_test_report",
     srcs = ["create_bazel_test_report.py"],

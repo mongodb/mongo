@@ -23,12 +23,14 @@ bazel_evergreen_shutils::export_ssl_paths_if_needed
 # golden tests could not find their data files. Point them at the checked-out source
 # tree instead: its paths stay well under the limit. Convert with cygpath -m: the shell
 # is cygwin and pwd is a /cygdrive/... path that boost::filesystem cannot use.
-if [[ "${distro_id:-}" == windows-* ]]; then
+if bazel_evergreen_shutils::is_windows; then
     export GOLDEN_TEST_DATA_ROOT="$(cygpath -m "$(pwd)")"
     # A bare --test_env=GOLDEN_TEST_DATA_ROOT does not deliver the client environment
     # variable to locally executed test actions on Windows (the test falls back to the
     # runfiles lookup, whose data deps tw.cc does not materialize past MAX_PATH), so
     # pass the value explicitly. Appended last, it wins over the task's bare flag.
+    # Shared unit-test tasks explicitly select the Linux test_wrapper, so the
+    # Windows launcher must also be supplied last to override that task flag.
     task_compile_flags="${task_compile_flags:-} --test_env=GOLDEN_TEST_DATA_ROOT=$GOLDEN_TEST_DATA_ROOT --run_under=//bazel:windows_test_launcher"
 fi
 
@@ -59,6 +61,13 @@ fi
 ALL_FLAGS="--verbose_failures ${LOCAL_ARG} ${MONGO_VERSION_ARG} ${bazel_args:-} ${bazel_compile_flags:-} ${task_compile_flags:-} ${patch_compile_flags:-}"
 echo "${ALL_FLAGS}" >.bazel_build_flags
 
+SPLIT_WINDOWS_TESTS=false
+BUILD_BEP_FLAG=""
+if bazel_evergreen_shutils::is_windows && [[ "${task_name:-}" == unit_tests ]]; then
+    SPLIT_WINDOWS_TESTS=true
+    BUILD_BEP_FLAG="--build_event_json_file=build_events.build.json"
+fi
+
 # to capture exit codes
 set +o errexit
 
@@ -80,14 +89,54 @@ set +o errexit
 # config, hence the explicit override; it is a no-op for local exec (no remote executor).
 export RETRY_ON_FAIL=1
 bazel_evergreen_shutils::retry_bazel_cmd 3 "$BAZEL_BINARY" \
-    build --build_tests_only --remote_download_outputs=minimal ${ALL_FLAGS} ${targets}
+    build --build_tests_only --remote_download_outputs=minimal ${ALL_FLAGS} ${BUILD_BEP_FLAG} ${targets}
 RET=$?
 
 if [[ "$RET" == "0" ]]; then
     export RETRY_ON_FAIL=0
-    bazel_evergreen_shutils::retry_bazel_cmd 3 "$BAZEL_BINARY" \
-        test ${ALL_FLAGS} --build_event_json_file=build_events.json ${targets}
-    RET=$?
+    if $SPLIT_WINDOWS_TESTS; then
+        # Use the build's selected tests: adding a positive tag to test_tag_filters
+        # would OR it with the task's existing tags and could widen test coverage.
+        "$python" buildscripts/bazel_test_groups.py build_events.build.json \
+            bazel-test-targets.normal.txt bazel-test-targets.timing_sensitive.txt
+        RET=$?
+    fi
+
+    if [[ "$RET" == 0 ]]; then
+        if $SPLIT_WINDOWS_TESTS && [[ -s bazel-test-targets.timing_sensitive.txt ]]; then
+            : >build_events.json
+            for group in normal timing_sensitive; do
+                if [[ ! -s "bazel-test-targets.${group}.txt" ]]; then
+                    continue
+                fi
+                GROUP_FLAGS=()
+                if [[ "$group" == timing_sensitive ]]; then
+                    GROUP_FLAGS=(--local_test_jobs=1)
+                fi
+                echo "Running Windows ${group} unit tests."
+                : >"build_events.${group}.json"
+                bazel_evergreen_shutils::retry_bazel_cmd 3 "$BAZEL_BINARY" \
+                    test ${ALL_FLAGS} "${GROUP_FLAGS[@]}" \
+                    --build_event_json_file="build_events.${group}.json" \
+                    --target_pattern_file="bazel-test-targets.${group}.txt"
+                GROUP_RET=$?
+                # Both passes run even if the first fails. Retain their BEP records
+                # for failed-binary gathering, and preserve the first failure status.
+                if [[ -s "build_events.${group}.json" ]]; then
+                    cat "build_events.${group}.json" >>build_events.json || GROUP_RET=$?
+                elif [[ "$GROUP_RET" == 0 ]]; then
+                    GROUP_RET=1
+                fi
+                if [[ "$RET" == 0 ]]; then
+                    RET="$GROUP_RET"
+                fi
+            done
+        else
+            bazel_evergreen_shutils::retry_bazel_cmd 3 "$BAZEL_BINARY" \
+                test ${ALL_FLAGS} --build_event_json_file=build_events.json ${targets}
+            RET=$?
+        fi
+    fi
 
     if [[ "$RET" -eq 124 ]]; then
         echo "Bazel timed out after ${build_timeout_seconds:-<unspecified>} seconds."
@@ -100,11 +149,8 @@ bazel_evergreen_shutils::write_last_engflow_link
 
 set -o errexit
 
-# The --config flag needs to stay consistent between invocations to avoid evicting the previous results.
-# Strip out anything that isn't a --config flag that could interfere with the run command.
 if [[ "$RET" != "0" ]]; then
-    CONFIG_FLAGS="$(bazel_evergreen_shutils::extract_config_flags "${ALL_FLAGS}")"
-    eval ${BAZEL_BINARY} run ${CONFIG_FLAGS} //buildscripts:gather_failed_tests || true
+    bazel_evergreen_shutils::gather_failed_tests || true
 fi
 
 : "${RET:=1}"

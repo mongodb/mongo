@@ -94,8 +94,8 @@ else
   os="unknown"
 fi
 
-# macOS keeps its native wrapper behavior. Windows may opt into cross-host
-# integration; the integration layer keeps native execution as its default.
+# macOS keeps its native wrapper behavior. Windows defaults to cross-host
+# integration; fully native MSVC builds require an explicit opt-in.
 if [[ "$os" == "macos" ]]; then
   export MONGO_BAZEL_USE_HERMETIC_CONTAINER=0
 fi
