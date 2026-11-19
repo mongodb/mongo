@@ -57,7 +57,6 @@ function runJoinTest(test, baseColl, pipeline, assertResultsEqual = true) {
         pipeline,
         {internalEnableJoinOptimization: true},
         noJoinOptResults,
-        {},
         assertResultsEqual,
     );
 }

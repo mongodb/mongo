@@ -2,7 +2,7 @@
  * Run basic tests that validate join reordering preserves null semantics.
  *
  * @tags: [
- *   requires_fcv_91,
+ *   requires_fcv_90,
  *   requires_sbe,
  * ]
  */
@@ -40,14 +40,16 @@ assert.commandWorked(thirdColl.createIndex({dummy: 1, "foo": 1, "key.foo": 1}));
 
 const testCases = [
     {
-        serverParams: {internalJoinReorderMode: "bottomUp"},
-        querySettings: {queryKnobs: {joinPlanTreeShape: "zigZag"}},
+        internalJoinReorderMode: "bottomUp",
+        internalJoinPlanTreeShape: "zigZag",
     },
     {
-        serverParams: {internalJoinReorderMode: "random", internalRandomJoinOrderSeed: 42},
+        internalJoinReorderMode: "random",
+        internalRandomJoinOrderSeed: 42,
     },
     {
-        serverParams: {internalJoinReorderMode: "random", internalRandomJoinOrderSeed: 64},
+        internalJoinReorderMode: "random",
+        internalRandomJoinOrderSeed: 64,
     },
 ];
 
@@ -69,25 +71,16 @@ function runNullSemanticsTest(pipeline, extraParams = {}) {
     assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}));
 
     // Run tests.
-    for (const {serverParams, querySettings} of testCases) {
-        const caseParams = {...serverParams, ...(querySettings ? querySettings.queryKnobs : {})};
+    for (const params of testCases) {
         let caseName = "";
-        for (const [k, v] of Object.entries(caseParams)) {
+        for (const [k, v] of Object.entries(params)) {
             if (caseName.length > 0) {
                 caseName += ", ";
             }
             caseName += `${k} = ${v}`;
         }
-        assert.commandWorked(db.adminCommand({setParameter: 1, ...serverParams, ...extraParams}));
-        runJoinTestAndCompare(
-            caseName,
-            coll,
-            pipeline,
-            serverParams,
-            noJoinOptResults,
-            querySettings,
-            true,
-        );
+        assert.commandWorked(db.adminCommand({setParameter: 1, ...params, ...extraParams}));
+        runJoinTestAndCompare(caseName, coll, pipeline, params, noJoinOptResults);
     }
 }
 

@@ -98,9 +98,6 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: joinPlanTreeShape
-                pqs_settable: true
-                fcv:
-                    min: "9.1"
 
     internalMaxNodesInJoinGraph:
         description: >-

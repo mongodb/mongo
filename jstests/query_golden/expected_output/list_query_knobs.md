@@ -368,19 +368,6 @@ Number of PQS-settable knobs: 77
 }
 ```
 
-### joinPlanTreeShape
-```json
-{
-	"allowedValues" : [
-		"leftDeep",
-		"rightDeep",
-		"zigZag"
-	],
-	"type" : "enum",
-	"wireName" : "joinPlanTreeShape"
-}
-```
-
 ### maxDegreeOfParallelism
 ```json
 {

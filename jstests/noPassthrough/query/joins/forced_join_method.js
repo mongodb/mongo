@@ -4,7 +4,7 @@
  * infeasible method (e.g., INLJ without indexes) results in an error.
  *
  * @tags: [
- *   requires_fcv_91,
+ *   requires_fcv_90,
  *   requires_sbe
  * ]
  */
@@ -67,16 +67,15 @@ const twoJoinPipeline = [
 const enumerators = [
     {
         name: "bottomUp (CHEAPEST)",
-        params: {internalJoinReorderMode: "bottomUp"},
-        joinPlanTreeShape: "leftDeep",
+        params: {internalJoinReorderMode: "bottomUp", internalJoinPlanTreeShape: "leftDeep"},
     },
     {
         name: "bottomUp (ALL)",
         params: {
             internalJoinReorderMode: "bottomUp",
+            internalJoinPlanTreeShape: "leftDeep",
             internalMinAllPlansEnumerationSubsetLevel: 0,
         },
-        joinPlanTreeShape: "leftDeep",
     },
     {name: "random", params: {internalJoinReorderMode: "random", internalRandomJoinOrderSeed: 42}},
 ];
@@ -86,16 +85,13 @@ const enumerators = [
  * join node in the plan uses 'forcedMethod'.
  */
 function runForcedJoinMethodTest(pipeline, forcedMethod) {
-    for (const {name, params, joinPlanTreeShape} of enumerators) {
+    for (const {name, params} of enumerators) {
         jsTest.log.info(`Force ${forcedMethod} with ${name} enumerator`);
         assert.commandWorked(
             db.adminCommand({setParameter: 1, internalJoinMethod: forcedMethod, ...params}),
         );
-        const aggOptions = joinPlanTreeShape
-            ? {querySettings: {queryKnobs: {joinPlanTreeShape}}}
-            : {};
 
-        const explain = coll.explain().aggregate(pipeline, aggOptions);
+        const explain = coll.explain().aggregate(pipeline);
         assertAllJoinsUseMethod(explain, forcedMethod);
     }
 }
@@ -104,17 +100,14 @@ function runForcedJoinMethodTest(pipeline, forcedMethod) {
  * Asserts that forcing the given join method causes an error with both enumerators.
  */
 function assertForcedMethodFails(pipeline, forcedMethod) {
-    for (const {name, params, joinPlanTreeShape} of enumerators) {
+    for (const {name, params} of enumerators) {
         jsTest.log.info(`Force ${forcedMethod} with ${name} enumerator (expect failure)`);
         assert.commandWorked(
             db.adminCommand({setParameter: 1, internalJoinMethod: forcedMethod, ...params}),
         );
-        const aggOptions = joinPlanTreeShape
-            ? {querySettings: {queryKnobs: {joinPlanTreeShape}}}
-            : {};
 
         assert.throwsWithCode(
-            () => coll.aggregate(pipeline, aggOptions).toArray(),
+            () => coll.aggregate(pipeline).toArray(),
             ErrorCodes.QueryRejectedBySettings,
         );
     }

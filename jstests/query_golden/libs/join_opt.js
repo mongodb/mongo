@@ -25,22 +25,10 @@ export function verifyExplainOutput(explain, joinOptExpectedInExplainOutput) {
     assert(!("usedJoinOptimization" in winningPlan), winningPlan);
 }
 
-export function getJoinTestResultsAndExplain(
-    desc,
-    coll,
-    pipeline,
-    serverParams,
-    querySettings = {},
-) {
+export function getJoinTestResultsAndExplain(desc, coll, pipeline, params) {
     subSection(desc);
-    if (Object.keys(serverParams).length > 0) {
-        assert.commandWorked(db.adminCommand({setParameter: 1, ...serverParams}));
-    }
-    const aggOptions = Object.keys(querySettings).length > 0 ? {querySettings} : {};
-    return [
-        coll.aggregate(pipeline, aggOptions).toArray(),
-        coll.explain().aggregate(pipeline, aggOptions),
-    ];
+    assert.commandWorked(db.adminCommand({setParameter: 1, ...params}));
+    return [coll.aggregate(pipeline).toArray(), coll.explain().aggregate(pipeline)];
 }
 
 /**
@@ -50,18 +38,11 @@ export function runJoinTestAndCompare(
     desc,
     coll,
     pipeline,
-    serverParams,
+    params,
     expected,
-    querySettings = {},
     assertResultsEqual = true,
 ) {
-    const [actual, explain] = getJoinTestResultsAndExplain(
-        desc,
-        coll,
-        pipeline,
-        serverParams,
-        querySettings,
-    );
+    const [actual, explain] = getJoinTestResultsAndExplain(desc, coll, pipeline, params);
     if (assertResultsEqual) {
         assertArrayEq({expected, actual});
     }

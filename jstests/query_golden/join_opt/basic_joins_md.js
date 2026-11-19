@@ -2,7 +2,7 @@
  * Run basic tests that validate we enter join ordering logic.
  *
  * @tags: [
- *   requires_fcv_91,
+ *   requires_fcv_90,
  *   requires_sbe,
  * ]
  */
@@ -78,20 +78,19 @@ function runBasicJoinTest(pipeline) {
             "With bottom-up plan enumeration (left-deep)",
             coll,
             pipeline,
-            {internalJoinReorderMode: "bottomUp"},
+            {
+                internalJoinReorderMode: "bottomUp",
+                internalJoinPlanTreeShape: "leftDeep",
+            },
             noJoinOptResults,
-            {queryKnobs: {joinPlanTreeShape: "leftDeep"}},
-            true /* assertResultsEqual */,
         );
 
         runJoinTestAndCompare(
             "With bottom-up plan enumeration (right-deep)",
             coll,
             pipeline,
-            {},
+            {internalJoinPlanTreeShape: "rightDeep"},
             noJoinOptResults,
-            {queryKnobs: {joinPlanTreeShape: "rightDeep"}},
-            true /* assertResultsEqual */,
         );
     }
 
@@ -99,10 +98,8 @@ function runBasicJoinTest(pipeline) {
         "With bottom-up plan enumeration (zig-zag)",
         coll,
         pipeline,
-        {},
+        {internalJoinPlanTreeShape: "zigZag"},
         noJoinOptResults,
-        {queryKnobs: {joinPlanTreeShape: "zigZag"}},
-        true /* assertResultsEqual */,
     );
 
     if (!hasHint) {
@@ -132,10 +129,8 @@ function runBasicJoinTest(pipeline) {
             "With bottom-up plan enumeration and indexes",
             coll,
             pipeline,
-            {internalJoinReorderMode: "bottomUp"},
+            {internalJoinReorderMode: "bottomUp", internalJoinPlanTreeShape: "leftDeep"},
             noJoinOptResults,
-            {queryKnobs: {joinPlanTreeShape: "leftDeep"}},
-            true /* assertResultsEqual */,
         );
 
         assert.commandWorked(foreignColl1.dropIndex({a: 1}));

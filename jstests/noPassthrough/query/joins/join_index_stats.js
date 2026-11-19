@@ -2,7 +2,7 @@
  * Ensures that the join optimizer correctly reports index stats for the single table access plans
  * for all involved collections. Regression test for SERVER-114567.
  * @tags: [
- *   requires_fcv_91,
+ *   requires_fcv_90,
  *   requires_sbe
  * ]
  */
@@ -108,8 +108,8 @@ dropAndRecreateColls();
 assert.commandWorked(conn.adminCommand({setParameter: 1, internalJoinReorderMode: "bottomUp"}));
 
 for (let shape of ["leftDeep", "rightDeep", "zigZag"]) {
-    const aggOptions = {querySettings: {queryKnobs: {joinPlanTreeShape: shape}}};
-    coll1.aggregate(pipeline, aggOptions).toArray();
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalJoinPlanTreeShape: shape}));
+    coll1.aggregate(pipeline).toArray();
 }
 // No matter the join order, we should use index scan on "a" for coll1, index scan on "b" for coll2,
 // and collection scan for coll3.
