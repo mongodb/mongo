@@ -1,6 +1,5 @@
 # Golden test output of GoldenSbeStageBuilderTest/TestCountScan
-$$RESULT=s8 env: { s2 = {} (emptyObj) }
-[2] project [s8 = newBsonObj("_id", s7, "count", s4)] 
+$$RESULT=s2 $$RESULT_CHANGES=closed{_id=add(s7),count=add(s4)} env: { s2 = {} (emptyObj) }
 [2] group [s6] [s7 = s6] [s4 = _internalCount::accumulate(s4, 1)] spillSlots[s5] mergingExprs[_internalCount::merge] 
 [2] project [s6 = (s3 ?: null)] 
 [1] project [s3 = getField(s2, "_id")] 

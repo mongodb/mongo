@@ -325,9 +325,9 @@ feature_flags:
             Feature flag to enable efficient data materialization between SBE plans and
             document sources.
         cpp_varname: gFeatureFlagSbeEfficientBoundaryMaterialization
-        default: false
+        default: true
         fcv_gated: false
-        incremental_rollout_phase: in_development
+        incremental_rollout_phase: rollout
 
     featureFlagPathArrayness:
         description: "Feature flag to enable tracking of path arrayness."
@@ -426,16 +426,16 @@ feature_flags:
     featureFlagSbeEqLookupUnwindHashJoin:
         description: "Enables executing $lookup-$unwind in SBE using the hash join strategy."
         cpp_varname: gFeatureFlagSbeEqLookupUnwindHashJoin
-        default: false
+        default: true
         fcv_gated: false
-        incremental_rollout_phase: in_development
+        incremental_rollout_phase: rollout
 
     featureFlagSbeEqLookupUnwindIndexedLoopJoin:
         description: "Enables executing $lookup-$unwind in SBE using the indexed loop join strategy."
         cpp_varname: gFeatureFlagSbeEqLookupUnwindIndexedLoopJoin
-        default: false
+        default: true
         fcv_gated: false
-        incremental_rollout_phase: in_development
+        incremental_rollout_phase: rollout
 
     featureFlagSbeEqLookupUnwindNestedLoopJoin:
         description: "Enables executing $lookup-$unwind in SBE using the nested loop join strategy."
@@ -454,23 +454,23 @@ feature_flags:
     featureFlagSbeEqLookupUnwindLocalCollscan:
         description: "Enables executing $lookup-$unwind in SBE with a collection scan local-side access plan."
         cpp_varname: gFeatureFlagSbeEqLookupUnwindLocalCollscan
-        default: false
+        default: true
         fcv_gated: false
-        incremental_rollout_phase: in_development
+        incremental_rollout_phase: rollout
 
     featureFlagSbeEqLookupUnwindLocalIxscanFetch:
         description: "Enables executing $lookup-$unwind in SBE with an index scan + fetch local-side access plan."
         cpp_varname: gFeatureFlagSbeEqLookupUnwindLocalIxscanFetch
-        default: false
+        default: true
         fcv_gated: false
-        incremental_rollout_phase: in_development
+        incremental_rollout_phase: rollout
 
     featureFlagSbeEqLookupUnwindLocalComplexDataAccessPlans:
         description: "Enables executing $lookup-$unwind in SBE with complex local-side access plans (sort, OR, and sorted merge variants)."
         cpp_varname: gFeatureFlagSbeEqLookupUnwindLocalComplexDataAccessPlans
-        default: false
+        default: true
         fcv_gated: false
-        incremental_rollout_phase: in_development
+        incremental_rollout_phase: rollout
 
     featureFlagImprovedDepsAnalysis:
         description: "Feature flag to enable pipeline rewrites that require a dependency graph"
