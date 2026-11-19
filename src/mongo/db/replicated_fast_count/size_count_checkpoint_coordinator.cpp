@@ -16,6 +16,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/timer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -192,7 +193,7 @@ void SizeCountCheckpointCoordinator::_runFlushThread(ServiceContext* service) {
                 batch = _buffer.awaitCheckoutForFlush(opCtx);
             }
 
-            const Date_t flushStart = Date_t::now();
+            Timer flushTimer;
             boost::optional<flusher::FlushResult> result = boost::none;
             hangAfterReplicatedFastCountSnapshot.pauseWhileSet();
             if (batch.has_value()) {
@@ -209,7 +210,7 @@ void SizeCountCheckpointCoordinator::_runFlushThread(ServiceContext* service) {
                 }
             });
 
-            const Milliseconds duration = Date_t::now() - flushStart;
+            const Milliseconds duration = duration_cast<Milliseconds>(flushTimer.elapsed());
             if (result.has_value()) {
                 LOGV2(13195100,
                       "SizeCountCheckpointFlusher flushed successfully",
@@ -221,7 +222,7 @@ void SizeCountCheckpointCoordinator::_runFlushThread(ServiceContext* service) {
                       "updateCount"_attr = result->writeCounts.updateCount,
                       "flushAttempts"_attr = result->flushAttempts,
                       "duration"_attr = duration);
-                recordFlush(flushStart, result->writeCounts);
+                recordFlush(duration, result->writeCounts);
             } else {
                 LOGV2_DEBUG(13195101,
                             3,

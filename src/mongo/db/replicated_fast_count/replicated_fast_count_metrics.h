@@ -58,7 +58,7 @@ void recordWatermarkAwaitTime(Milliseconds waitTime);
  * Records metrics for a successful flush. Updates flush timing, success count, flushed-document
  * counters, and the insert/update write counters from `writeCounts`.
  */
-void recordFlush(Date_t startTime, replicated_fast_count::CheckpointWriteCounts writeCounts);
+void recordFlush(Milliseconds duration, replicated_fast_count::CheckpointWriteCounts writeCounts);
 
 /**
  * Records metrics for a call to `mergeAndValidate()`, regardless if a checkpoint was validated or

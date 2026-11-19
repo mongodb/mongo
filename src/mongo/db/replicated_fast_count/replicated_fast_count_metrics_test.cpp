@@ -72,8 +72,8 @@ TEST(ReplicatedFastCountMetricsTest, FlushSuccessCounterIncrementsViaRecordFlush
     OtelMetricsCapturer capturer;
     const CheckpointWriteCounts writeCounts{
         .entryWriteCount = 1, .insertCount = 0, .updateCount = 0};
-    recordFlush(Date_t::now(), writeCounts);
-    recordFlush(Date_t::now(), writeCounts);
+    recordFlush(Milliseconds{0}, writeCounts);
+    recordFlush(Milliseconds{0}, writeCounts);
 
     EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountFlushSuccessCount), 2);
 }
@@ -210,11 +210,11 @@ TEST(ReplicatedFastCountMetricsTest, ValidatorCallMetricsAccumulate) {
 
 TEST(ReplicatedFastCountMetricsTest, FlushedDocsTotalUpdatedAfterFlushes) {
     OtelMetricsCapturer capturer;
-    recordFlush(Date_t::now(),
+    recordFlush(Milliseconds{0},
                 CheckpointWriteCounts{.entryWriteCount = 3, .insertCount = 0, .updateCount = 0});
-    recordFlush(Date_t::now(),
+    recordFlush(Milliseconds{0},
                 CheckpointWriteCounts{.entryWriteCount = 7, .insertCount = 0, .updateCount = 0});
-    recordFlush(Date_t::now(),
+    recordFlush(Milliseconds{0},
                 CheckpointWriteCounts{.entryWriteCount = 1, .insertCount = 0, .updateCount = 0});
 
     EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountFlushedDocsTotal), 11);
@@ -223,9 +223,9 @@ TEST(ReplicatedFastCountMetricsTest, FlushedDocsTotalUpdatedAfterFlushes) {
 TEST(ReplicatedFastCountMetricsTest, InsertAndUpdateCountersRecordedViaRecordFlush) {
     OtelMetricsCapturer capturer;
 
-    recordFlush(Date_t::now(),
+    recordFlush(Milliseconds{0},
                 CheckpointWriteCounts{.entryWriteCount = 3, .insertCount = 1, .updateCount = 2});
-    recordFlush(Date_t::now(),
+    recordFlush(Milliseconds{0},
                 CheckpointWriteCounts{.entryWriteCount = 2, .insertCount = 2, .updateCount = 0});
 
     EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountInsertCount), 3);

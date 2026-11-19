@@ -7,6 +7,7 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_size_count.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+#include "mongo/util/timer.h"
 
 namespace mongo::replicated_fast_count {
 namespace {
@@ -49,10 +50,10 @@ bool SizeCountCheckpointBuffer::readyForWatermark() const {
 }
 
 OplogScanResult SizeCountCheckpointBuffer::awaitCheckoutForFlush(OperationContext* opCtx) {
-    const Date_t start = Date_t::now();
+    Timer awaitTimer;
     std::unique_lock lk(_mutex);
     opCtx->waitForConditionOrInterrupt(_batchReady, lk, [&] { return _inFlight.has_value(); });
-    recordWatermarkAwaitTime(Date_t::now() - start);
+    recordWatermarkAwaitTime(duration_cast<Milliseconds>(awaitTimer.elapsed()));
     return *_inFlight;
 }
 
