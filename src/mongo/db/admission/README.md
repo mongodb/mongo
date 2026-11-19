@@ -229,6 +229,16 @@ The following metrics were introduced to `serverStatus`:
 }
 ```
 
+# Session Establishment Concurrency Limiter
+
+The Session Establishment Concurrency Limiter is an alternative ingress method that limits both the
+resources spent on connection establishment as well as the number of connections that may be in the
+establishment phase concurrently.
+
+This feature is gated by `featureFlagSessionEstablishmentConcurrencyLimiter`.
+
+Additional design / configuration to be added as the project progresses.
+
 # Ingress Request Rate Limiting
 
 The `IngressRequestRateLimiter` places a limit on the number of requests that the server (either

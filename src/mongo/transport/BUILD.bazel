@@ -19,11 +19,13 @@ mongo_cc_library(
         "transport_layer.cpp",
         "transport_options.cpp",
         "transport_options_gen",
+        ":secl_feature_flag_gen",
     ],
     deps = [
         ":cidr_range_list_parameter",
         "//src/mongo:base",
         "//src/mongo/db:connection_health_metrics_parameter",
+        "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
         "//src/mongo/db:wire_version",
         "//src/mongo/db/admission:rate_limiter",
@@ -118,6 +120,14 @@ mongo_cc_library(
 idl_generator(
     name = "transport_options_gen",
     src = "transport_options.idl",
+)
+
+idl_generator(
+    name = "secl_feature_flag_gen",
+    src = "secl_feature_flag.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
 )
 
 idl_generator(

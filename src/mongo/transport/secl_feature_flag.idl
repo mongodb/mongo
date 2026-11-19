@@ -1,0 +1,18 @@
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
+
+# Feature flag for the Session Establishment Concurrency Limiter.
+
+global:
+    cpp_namespace: "mongo::feature_flags"
+    mod_visibility: public
+
+imports:
+    - "mongo/db/basic_types.idl"
+
+feature_flags:
+    featureFlagSessionEstablishmentConcurrencyLimiter:
+        description: "Feature flag to enable the Session Establishment Concurrency Limiter (SECL)."
+        cpp_varname: gFeatureFlagSessionEstablishmentConcurrencyLimiter
+        default: false
+        fcv_gated: false
