@@ -2,7 +2,7 @@
  * Run basic tests that validate join reordering preserves null semantics.
  *
  * @tags: [
- *   requires_fcv_90,
+ *   requires_fcv_91,
  *   requires_sbe,
  * ]
  */
@@ -40,16 +40,14 @@ assert.commandWorked(thirdColl.createIndex({dummy: 1, "foo": 1, "key.foo": 1}));
 
 const testCases = [
     {
-        internalJoinReorderMode: "bottomUp",
-        internalJoinPlanTreeShape: "zigZag",
+        serverParams: {internalJoinReorderMode: "bottomUp"},
+        querySettings: {queryKnobs: {joinPlanTreeShape: "zigZag"}},
     },
     {
-        internalJoinReorderMode: "random",
-        internalRandomJoinOrderSeed: 42,
+        serverParams: {internalJoinReorderMode: "random", internalRandomJoinOrderSeed: 42},
     },
     {
-        internalJoinReorderMode: "random",
-        internalRandomJoinOrderSeed: 64,
+        serverParams: {internalJoinReorderMode: "random", internalRandomJoinOrderSeed: 64},
     },
 ];
 
@@ -71,16 +69,25 @@ function runNullSemanticsTest(pipeline, extraParams = {}) {
     assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}));
 
     // Run tests.
-    for (const params of testCases) {
+    for (const {serverParams, querySettings} of testCases) {
+        const caseParams = {...serverParams, ...(querySettings ? querySettings.queryKnobs : {})};
         let caseName = "";
-        for (const [k, v] of Object.entries(params)) {
+        for (const [k, v] of Object.entries(caseParams)) {
             if (caseName.length > 0) {
                 caseName += ", ";
             }
             caseName += `${k} = ${v}`;
         }
-        assert.commandWorked(db.adminCommand({setParameter: 1, ...params, ...extraParams}));
-        runJoinTestAndCompare(caseName, coll, pipeline, params, noJoinOptResults);
+        assert.commandWorked(db.adminCommand({setParameter: 1, ...serverParams, ...extraParams}));
+        runJoinTestAndCompare(
+            caseName,
+            coll,
+            pipeline,
+            serverParams,
+            noJoinOptResults,
+            querySettings,
+            true,
+        );
     }
 }
 

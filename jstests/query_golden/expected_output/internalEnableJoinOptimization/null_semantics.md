@@ -11,7 +11,7 @@
 { "_id" : 4, "key" : { "foo" : null }, "lf" : { "_id" : 4, "key" : { "foo" : null } } }
 { "_id" : 5, "key" : { "foo" : { } }, "lf" : { "_id" : 5, "key" : { "foo" : { } } } }
 ```
-### internalJoinReorderMode = bottomUp, internalJoinPlanTreeShape = zigZag
+### internalJoinReorderMode = bottomUp, joinPlanTreeShape = zigZag
 usedJoinOptimization: true
 
 ```
@@ -84,7 +84,7 @@ rightEmbeddingField: "none"
 { "_id" : 4, "key" : { "foo" : null }, "lf" : { "_id" : 4, "key" : { "foo" : null } } }
 { "_id" : 5, "key" : { "foo" : { } }, "lf" : { "_id" : 5, "key" : { "foo" : { } } } }
 ```
-### internalJoinReorderMode = bottomUp, internalJoinPlanTreeShape = zigZag
+### internalJoinReorderMode = bottomUp, joinPlanTreeShape = zigZag
 usedJoinOptimization: true
 
 ```
@@ -137,7 +137,7 @@ rightEmbeddingField: "none"
 { "_id" : 4, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "key" : { "foo" : null } }
 { "_id" : 5, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "key" : { "foo" : { } } }
 ```
-### internalJoinReorderMode = bottomUp, internalJoinPlanTreeShape = zigZag
+### internalJoinReorderMode = bottomUp, joinPlanTreeShape = zigZag
 usedJoinOptimization: true
 
 ```
@@ -202,7 +202,7 @@ rightEmbeddingField: "none"
 { "_id" : 4, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "key" : { "foo" : null } }
 { "_id" : 5, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "key" : { "foo" : { } } }
 ```
-### internalJoinReorderMode = bottomUp, internalJoinPlanTreeShape = zigZag
+### internalJoinReorderMode = bottomUp, joinPlanTreeShape = zigZag
 usedJoinOptimization: true
 
 ```
@@ -261,7 +261,7 @@ rightEmbeddingField: "none"
 { "_id" : 4, "key" : { "foo" : null }, "lf" : { "_id" : 4, "key" : { "foo" : null } }, "lf2" : { "_id" : 4, "key" : { "foo" : null } } }
 { "_id" : 5, "key" : { "foo" : { } }, "lf" : { "_id" : 5, "key" : { "foo" : { } } }, "lf2" : { "_id" : 5, "key" : { "foo" : { } } } }
 ```
-### internalJoinReorderMode = bottomUp, internalJoinPlanTreeShape = zigZag
+### internalJoinReorderMode = bottomUp, joinPlanTreeShape = zigZag
 usedJoinOptimization: true
 
 ```
@@ -340,7 +340,7 @@ rightEmbeddingField: "none"
 { "_id" : 2, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "key" : null, "lf" : { "_id" : 2, "key" : null } }
 { "_id" : 3, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "key" : { }, "lf" : { "_id" : 3, "key" : { } } }
 ```
-### internalJoinReorderMode = bottomUp, internalJoinPlanTreeShape = zigZag
+### internalJoinReorderMode = bottomUp, joinPlanTreeShape = zigZag
 usedJoinOptimization: true
 
 ```
@@ -432,7 +432,7 @@ rightEmbeddingField: "none"
 { "_id" : 5, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "cor2" : { "_id" : 2, "key" : null }, "key" : { "foo" : { } } }
 { "_id" : 5, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "cor2" : { "_id" : 3, "key" : { } }, "key" : { "foo" : { } } }
 ```
-### internalJoinReorderMode = bottomUp, internalJoinPlanTreeShape = zigZag
+### internalJoinReorderMode = bottomUp, joinPlanTreeShape = zigZag
 usedJoinOptimization: true
 
 ```
@@ -511,7 +511,7 @@ rightEmbeddingField: "none"
 { "_id" : 2, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "key" : null, "lf" : { "_id" : 2, "key" : null } }
 { "_id" : 3, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "key" : { }, "lf" : { "_id" : 3, "key" : { } } }
 ```
-### internalJoinReorderMode = bottomUp, internalJoinPlanTreeShape = zigZag
+### internalJoinReorderMode = bottomUp, joinPlanTreeShape = zigZag
 usedJoinOptimization: true
 
 ```
@@ -594,7 +594,7 @@ rightEmbeddingField: "none"
 { "_id" : 4, "c1" : { "_id" : 4, "key" : { "foo" : null } }, "c2" : { "_id" : 4, "key" : { "foo" : null } }, "c3" : { "_id" : 4, "key" : { "foo" : null } }, "c4" : { "_id" : 4, "key" : { "foo" : null } }, "key" : { "foo" : null } }
 { "_id" : 5, "c1" : { "_id" : 5, "key" : { "foo" : { } } }, "c2" : { "_id" : 5, "key" : { "foo" : { } } }, "c3" : { "_id" : 5, "key" : { "foo" : { } } }, "c4" : { "_id" : 5, "key" : { "foo" : { } } }, "key" : { "foo" : { } } }
 ```
-### internalJoinReorderMode = bottomUp, internalJoinPlanTreeShape = zigZag
+### internalJoinReorderMode = bottomUp, joinPlanTreeShape = zigZag
 usedJoinOptimization: true
 
 ```
