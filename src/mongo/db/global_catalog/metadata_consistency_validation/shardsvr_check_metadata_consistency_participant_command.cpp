@@ -81,6 +81,12 @@ public:
             ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
+            // Make sure that a newly elected primary will see all previous majority writes when
+            // doing local snapshot reads.
+            uassertStatusOK(
+                repl::ReplicationCoordinator::get(opCtx)->waitForPrimaryMajorityReadsAvailable(
+                    opCtx));
+
             const auto nss = ns();
             const auto& primaryShardId = request().getPrimaryShardId();
             const auto checkRangeDeletionIndexes =
