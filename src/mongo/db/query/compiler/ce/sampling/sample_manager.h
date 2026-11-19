@@ -76,7 +76,7 @@ public:
 
     /**
      * Draws a new sample for 'spec' from the source collection and persists it, replacing the
-     * existing sample if there is one. 'spec' must request an on-the-fly sample.
+     * existing sample if there is one. 'spec' must request a random on-the-fly sample.
      *
      * Returns summary statistics of the sample persisted if successful.
      */

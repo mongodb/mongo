@@ -49,10 +49,7 @@ StatusWith<PersistedSampleSummary> refreshRandomSample(OperationContext* opCtx,
                                                        size_t sampleSize) {
     SampleManager manager(PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                           nullptr /*customerQueryExpCtx*/);
-    return manager.refresh(
-        opCtx,
-        makeSpec(
-            nss, sampleSize, SamplingCEMethodEnum::kRandom, SamplingSourceEnum::kOnTheFlySample));
+    return manager.refresh(opCtx, makePersistentSampleRequestSpec(nss, sampleSize));
 }
 
 }  // namespace
@@ -259,9 +256,8 @@ TEST_F(SamplingEstimatorTest, SampleManagerRefreshGeneratesAndPersistsSample) {
     // refresh() acquires the source collection itself, so the caller does not need one.
     SampleManager manager(PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                           nullptr /*customerQueryExpCtx*/);
-    const auto summary = manager.refresh(
-        operationContext(),
-        makeSpec(_kTestNss, 2, SamplingCEMethodEnum::kRandom, SamplingSourceEnum::kOnTheFlySample));
+    const auto summary =
+        manager.refresh(operationContext(), makePersistentSampleRequestSpec(_kTestNss, 2));
     ASSERT_OK(summary);
     ASSERT_EQUALS(summary.getValue().docsPersisted, 2u);
     ASSERT_EQUALS(summary.getValue().pagesPersisted, 1u);
@@ -285,13 +281,10 @@ TEST_F(SamplingEstimatorTest, SampleManagerRefreshFailsIfCollectionDoesNotExist)
     const auto noSuchNss = NamespaceString::createNamespaceString_forTest("TestDB", "NoSuchColl");
     SampleManager manager(PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                           nullptr /*customerQueryExpCtx*/);
-    ASSERT_THROWS_CODE(manager.refresh(operationContext(),
-                                       makeSpec(noSuchNss,
-                                                10,
-                                                SamplingCEMethodEnum::kRandom,
-                                                SamplingSourceEnum::kOnTheFlySample)),
-                       DBException,
-                       13097202);
+    ASSERT_THROWS_CODE(
+        manager.refresh(operationContext(), makePersistentSampleRequestSpec(noSuchNss, 10)),
+        DBException,
+        13097202);
 }
 
 TEST_F(SamplingEstimatorTest, SampleManagerRefreshFailsOnTimeseriesCollection) {
@@ -303,13 +296,10 @@ TEST_F(SamplingEstimatorTest, SampleManagerRefreshFailsOnTimeseriesCollection) {
 
     SampleManager manager(PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                           nullptr /*customerQueryExpCtx*/);
-    ASSERT_THROWS_CODE(manager.refresh(operationContext(),
-                                       makeSpec(timeseriesNss,
-                                                10,
-                                                SamplingCEMethodEnum::kRandom,
-                                                SamplingSourceEnum::kOnTheFlySample)),
-                       DBException,
-                       ErrorCodes::IllegalOperation);
+    ASSERT_THROWS_CODE(
+        manager.refresh(operationContext(), makePersistentSampleRequestSpec(timeseriesNss, 10)),
+        DBException,
+        ErrorCodes::IllegalOperation);
 }
 
 TEST_F(SamplingEstimatorTest, SampleManagerRefreshFailsOnUnreplicatedCollection) {
@@ -322,13 +312,10 @@ TEST_F(SamplingEstimatorTest, SampleManagerRefreshFailsOnUnreplicatedCollection)
 
     SampleManager manager(PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                           nullptr /*customerQueryExpCtx*/);
-    ASSERT_THROWS_CODE(manager.refresh(operationContext(),
-                                       makeSpec(localNss,
-                                                2,
-                                                SamplingCEMethodEnum::kRandom,
-                                                SamplingSourceEnum::kOnTheFlySample)),
-                       DBException,
-                       ErrorCodes::IllegalOperation);
+    ASSERT_THROWS_CODE(
+        manager.refresh(operationContext(), makePersistentSampleRequestSpec(localNss, 2)),
+        DBException,
+        ErrorCodes::IllegalOperation);
 
     // Nothing was persisted, so the samples collection was never created.
     const auto samplesNss =
@@ -348,8 +335,7 @@ TEST_F(SamplingEstimatorTest, SampleManagerRefreshReplacesMatchingSample) {
 
     SampleManager manager(PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                           nullptr /*customerQueryExpCtx*/);
-    const auto spec =
-        makeSpec(_kTestNss, 2, SamplingCEMethodEnum::kRandom, SamplingSourceEnum::kOnTheFlySample);
+    const SampleSpec spec = makePersistentSampleRequestSpec(_kTestNss, 2);
     const auto summary = manager.refresh(operationContext(), spec);
     ASSERT_OK(summary);
     ASSERT_EQUALS(summary.getValue().docsPersisted, 2u);
@@ -510,7 +496,7 @@ TEST_F(SamplingEstimatorTest, SampleManagerFallsBackToOnTheFlyWhenNoGenerationIs
     }
 }
 
-TEST_F(SamplingEstimatorTest, SampleManagerRefreshReplacesSampleOfDifferentSizeAndMethod) {
+TEST_F(SamplingEstimatorTest, SampleManagerRefreshReplacesSampleOfDifferentSize) {
     // TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
     unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
     std::vector<BSONObj> sourceDocs;
@@ -523,29 +509,62 @@ TEST_F(SamplingEstimatorTest, SampleManagerRefreshReplacesSampleOfDifferentSizeA
 
     SampleManager manager(PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                           nullptr /*customerQueryExpCtx*/);
-    ASSERT_OK(manager.refresh(
-        operationContext(),
-        makeSpec(
-            _kTestNss, 2, SamplingCEMethodEnum::kRandom, SamplingSourceEnum::kOnTheFlySample)));
+    ASSERT_OK(manager.refresh(operationContext(), makePersistentSampleRequestSpec(_kTestNss, 2)));
     ASSERT_EQUALS(countSamplesCollDocs(operationContext(), samplesNss), 1u);
 
-    // A refresh with a different size and method replaces the existing sample
-    ASSERT_OK(manager.refresh(operationContext(),
-                              makeSpec(_kTestNss,
-                                       10,
-                                       SamplingCEMethodEnum::kChunk,
-                                       SamplingSourceEnum::kOnTheFlySample,
-                                       /*numChunks=*/2)));
+    // A refresh with a different size replaces the existing sample
+    ASSERT_OK(manager.refresh(operationContext(), makePersistentSampleRequestSpec(_kTestNss, 10)));
     ASSERT_EQUALS(countSamplesCollDocs(operationContext(), samplesNss), 1u);
 
     auto coll = acquireCollectionForSampling(operationContext(), _kTestNss);
     MultipleCollectionAccessor colls(std::move(coll));
     auto loaded = manager.load(operationContext(), colls, makeSpec(_kTestNss, 10));
     ASSERT_TRUE(loaded.isPersisted());
-    ASSERT_TRUE(loaded.technique() == SamplingTechniqueEnum::kChunk);
-    // Chunk samples may contain fewer docs than requested depending on cursor placement
-    ASSERT_GTE(loaded.size(), 2u);
-    ASSERT_LTE(loaded.size(), 10u);
+    ASSERT_TRUE(loaded.technique() == SamplingTechniqueEnum::kRandom);
+    ASSERT_EQ(loaded.size(), 10u);
+}
+
+TEST_F(SamplingEstimatorTest, SampleManagerRefreshAlwaysRequestsRandomSample) {
+    // TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
+    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
+    std::vector<BSONObj> sourceDocs;
+    for (int i = 0; i < 20; ++i) {
+        sourceDocs.push_back(BSON("_id" << i));
+    }
+    insertDocuments(_kTestNss, sourceDocs);
+    const NamespaceString samplesNss =
+        NamespaceStringUtil::deserialize(_kTestNss.dbName(), kSamplesCollectionName);
+
+    SampleManager manager(PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                          nullptr /*customerQueryExpCtx*/);
+    ASSERT_OK(manager.refresh(operationContext(), makePersistentSampleRequestSpec(_kTestNss, 10)));
+    ASSERT_EQUALS(countSamplesCollDocs(operationContext(), samplesNss), 1u);
+
+    DBDirectClient client(operationContext());
+    auto swParsed = parsePersistentSample(client.findOne(samplesNss, BSONObj{}));
+    ASSERT_OK(swParsed.getStatus());
+    ASSERT_TRUE(swParsed.getValue().getRequestedSamplingMethod() == SamplingTechniqueEnum::kRandom);
+}
+
+TEST(SampleSpecTest, MakePersistentSampleRequestSpec) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
+    const SampleSpec spec = makePersistentSampleRequestSpec(nss, 10);
+    ASSERT_EQ(spec.nss, nss);
+    ASSERT_EQ(spec.requestedSampleSize, 10u);
+    ASSERT_TRUE(spec.sampleGenerationMethod == SamplingCEMethodEnum::kRandom);
+    ASSERT_FALSE(spec.numChunks);
+    ASSERT_TRUE(spec.samplingSource == SamplingSourceEnum::kOnTheFlySample);
+    ASSERT_TRUE(spec.topLevelSampleFieldNames.empty());
+}
+
+using SampleManagerDeathTest = SamplingEstimatorTest;
+
+DEATH_TEST_F(SampleManagerDeathTest, RefreshRejectsChunkSample, "13097203") {
+    SampleManager manager(PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                          nullptr /*customerQueryExpCtx*/);
+    SampleSpec spec = makePersistentSampleRequestSpec(_kTestNss, 10);
+    spec.sampleGenerationMethod = SamplingCEMethodEnum::kChunk;
+    manager.refresh(operationContext(), spec).getStatus().ignore();
 }
 
 // ── makePersistentSamplePageDocs ──────────────────────────────────────────────────────────────

@@ -305,8 +305,9 @@ Sample SampleManager::loadOnTheFly(OperationContext* opCtx,
 StatusWith<PersistedSampleSummary> SampleManager::refresh(OperationContext* opCtx,
                                                           const SampleSpec& spec) {
     tassert(13097203,
-            "refresh() requires a spec that requests an on-the-fly sample",
-            spec.samplingSource == SamplingSourceEnum::kOnTheFlySample);
+            "refresh() requires a spec that requests a random on-the-fly sample",
+            spec.samplingSource == SamplingSourceEnum::kOnTheFlySample &&
+                spec.sampleGenerationMethod == SamplingCEMethodEnum::kRandom);
 
     // Acquire the source collection to generate the sample.
     auto sourceCollection = acquireCollectionMaybeLockFree(

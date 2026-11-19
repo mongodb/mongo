@@ -2631,7 +2631,7 @@ TEST_F(SamplingEstimatorTest, PersistedMissFallsBackToOnTheFlySamplingMethod) {
         operationContext(),
         NamespaceStringUtil::deserialize(kTestNss.dbName(), kSamplesCollectionName),
         {buildPersistentSampleDoc(
-            UUID::gen(), SamplingTechniqueEnum::kChunk, sampleSize, persistedDocs)});
+            UUID::gen(), SamplingTechniqueEnum::kRandom, sampleSize, persistedDocs)});
 
     auto coll = acquireCollection(operationContext(), kTestNss);
     auto colls = MultipleCollectionAccessor(coll, {}, false);

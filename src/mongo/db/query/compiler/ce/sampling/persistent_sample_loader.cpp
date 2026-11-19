@@ -302,9 +302,8 @@ StatusWith<PersistentSampleDoc> parsePersistentSample(const BSONObj& doc) {
 
     const auto requestedSampleSize = static_cast<size_t>(parsed.getRequestedSampleSize());
     // It is valid for `docs` to contain fewer entries than `requestedSampleSize`: this happens when
-    // the collection is smaller than the requested sample size at analyze time or if the sample was
-    // generated with chunking technique and some were starting less docs away from EOF than the
-    // chunk size.
+    // the collection is smaller than the requested sample size at analyze time or when documents
+    // too large to persist were discarded.
     if (parsed.getDocs().size() > requestedSampleSize) {
         return Status(ErrorCodes::UnsupportedFormat,
                       str::stream()

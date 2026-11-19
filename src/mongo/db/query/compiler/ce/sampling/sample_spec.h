@@ -40,6 +40,11 @@ struct SampleSpec {
 };
 
 /**
+ * Builds the spec for drawing a new sample of 'nss' to persist.
+ */
+SampleSpec makePersistentSampleRequestSpec(const NamespaceString& nss, size_t requestedSampleSize);
+
+/**
  * Converts a SamplingCEMethodEnum value into its equivalent SamplingTechniqueEnum value.
  * TODO SERVER-129240: Remove this helper once types are unified.
  */

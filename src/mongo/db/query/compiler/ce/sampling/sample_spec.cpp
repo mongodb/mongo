@@ -53,6 +53,17 @@ double getZScore(SamplingConfidenceIntervalEnum confidenceInterval) {
 }
 }  // namespace
 
+SampleSpec makePersistentSampleRequestSpec(const NamespaceString& nss, size_t requestedSampleSize) {
+    return SampleSpec{
+        .nss = nss,
+        .requestedSampleSize = requestedSampleSize,
+        .sampleGenerationMethod = SamplingCEMethodEnum::kRandom,
+        .numChunks = boost::none,
+        .samplingSource = SamplingSourceEnum::kOnTheFlySample,
+        .topLevelSampleFieldNames = {},
+    };
+}
+
 SamplingTechniqueEnum resolveSamplingTechnique(const SampleSpec& spec, size_t collectionCard) {
     // Test-only knobs override the requested method.
     if (const auto testOnlySamplingMode = getTestOnlySamplingModeIfSet()) {

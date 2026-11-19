@@ -265,15 +265,7 @@ void runSampleMode(OperationContext* opCtx, const NamespaceString& nss) {
     size_t requestedSampleSize = std::max(
         ce::calculateSampleSize(qkc), static_cast<size_t>(qkc.getInternalJoinPlanSamplingSize()));
 
-    // Use kOnTheFlySample to force collection of a new sample rather than attempting to
-    // read an existing one.
-    const ce::SampleSpec spec{
-        .nss = nss,
-        .requestedSampleSize = requestedSampleSize,
-        .sampleGenerationMethod = SamplingCEMethodEnum::kRandom,
-        .samplingSource = SamplingSourceEnum::kOnTheFlySample,
-        .topLevelSampleFieldNames = {},
-    };
+    const ce::SampleSpec spec = ce::makePersistentSampleRequestSpec(nss, requestedSampleSize);
 
     // TODO SERVER-127210: Investigate if this is the right yield policy to ensure we sample
     // from a consistent snapshot.
