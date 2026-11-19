@@ -731,6 +731,59 @@ TEST_F(QuerySettingsServiceTest, LookupValidatesUserSuppliedQuerySettings) {
         7746608);
 }
 
+TEST_F(QuerySettingsServiceTest, LookupValidatesUserSuppliedQuerySettingsForIneligibleNamespace) {
+    auto ineligibleExpCtx = makeBlankExpressionContext(
+        opCtx(),
+        NamespaceStringUtil::deserialize(
+            /* tenantId */ boost::none, "admin", "system.keys", kSerializationContext));
+    ASSERT_FALSE(QuerySettingsService::isEligibleForQuerySettings(ineligibleExpCtx));
+
+    QuerySettings invalidSettings;
+    invalidSettings.setQueryKnobs(QuerySettingsKnobOverrides::fromBSON(BSON("unknownKnob" << 1)));
+
+    for (const auto& initializeService : {
+             +[](ServiceContext* sc) { QuerySettingsService::initializeForRouter(sc); },
+             +[](ServiceContext* sc) {
+                 QuerySettingsService::initializeForShard(sc, /*setClusterParameterFn=*/nullptr);
+             },
+         }) {
+        initializeService(getServiceContext());
+
+        // Invalid user-supplied settings from an external client are rejected, with or without a
+        // query shape hash.
+        ASSERT_THROWS_CODE(service().lookupQuerySettingsWithRejectionCheck(
+                               ineligibleExpCtx, boost::none, invalidSettings),
+                           DBException,
+                           12194501);
+
+        // Valid, absent, and empty user-supplied settings are still a no-op returning defaults.
+        ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(
+                      ineligibleExpCtx, boost::none, boost::none),
+                  QuerySettings());
+        ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(
+                      ineligibleExpCtx, boost::none, QuerySettings()),
+                  QuerySettings());
+    }
+}
+
+TEST_F(QuerySettingsServiceTest,
+       LookupDoesNotRevalidateForwardedQuerySettingsForIneligibleNamespace) {
+    QuerySettingsService::initializeForShard(getServiceContext(),
+                                             /*setClusterParameterFn=*/nullptr);
+    auto ineligibleExpCtx = makeBlankExpressionContext(
+        opCtx(),
+        NamespaceStringUtil::deserialize(
+            /* tenantId */ boost::none, "admin", "system.keys", kSerializationContext));
+
+    QuerySettings invalidSettings;
+    invalidSettings.setQueryKnobs(QuerySettingsKnobOverrides::fromBSON(BSON("unknownKnob" << 1)));
+
+    InternalClientScope internalClientScope(opCtx());
+    ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(
+                  ineligibleExpCtx, boost::none, invalidSettings),
+              QuerySettings());
+}
+
 // ---- maxTimeMS query setting tests ----
 
 TEST_F(QuerySettingsServiceTest, IsDefaultReturnsFalseWhenOnlyMaxTimeMSIsSet) {

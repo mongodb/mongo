@@ -8,6 +8,7 @@
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_settings/query_settings_service_dependencies.h"
 #include "mongo/db/query/query_shape/shape_helpers.h"
+#include "mongo/db/query/query_utils.h"
 #include "mongo/db/query/util/deferred.h"
 #include "mongo/stdx/trusted_hasher.h"
 #include "mongo/util/modules.h"
@@ -155,8 +156,13 @@ public:
         const boost::optional<query_shape::QueryShapeHash>& queryShapeHash,
         const boost::optional<QuerySettings>& querySettingsFromOriginalCommand) const {
         // Ineligible queries (IDHACK/Express, FLE, internal/system namespaces) never receive query
-        // settings, whether from persisted settings or supplied directly by the user.
+        // settings, whether from persisted settings or supplied directly by the user. User-supplied
+        // settings must validate here to avoid silently dropping malformed input.
         if (!isEligibleForQuerySettings(expCtx)) {
+            if (querySettingsFromOriginalCommand.has_value() &&
+                !isInternalOrDirectClient(expCtx->getOperationContext()->getClient())) {
+                validateQueryKnobs(*querySettingsFromOriginalCommand);
+            }
             return QuerySettings();
         }
 
