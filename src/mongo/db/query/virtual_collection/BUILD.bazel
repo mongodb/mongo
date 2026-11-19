@@ -32,6 +32,11 @@ mongo_cc_benchmark(
     name = "multi_bson_stream_cursor_bm",
     srcs = ["multi_bson_stream_cursor_bm.cpp"],
     tags = ["query_bm"],
+    # Not supported on Windows
+    target_compatible_with = select({
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":virtual_collection",
         "//src/mongo/db/storage:record_store_base",

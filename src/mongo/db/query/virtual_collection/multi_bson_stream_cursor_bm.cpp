@@ -8,6 +8,9 @@
  *     most sensitive to work added to the read loop.
  *   - Documents spanning block reads: the partial-object path.
  *   - Documents larger than the initial buffer: the buffer expansion path.
+ *
+ * Benchmark is POSIX-only since it relies on piping data through a file in `/tmp/`
+ * (kDefaultPipePath), which is not supported on Windows.
  */
 
 #include "mongo/db/query/virtual_collection/multi_bson_stream_cursor.h"
@@ -23,6 +26,8 @@
 
 #include <benchmark/benchmark.h>
 #include <fmt/format.h>
+
+#ifndef _WIN32
 
 namespace mongo {
 namespace {
@@ -139,3 +144,5 @@ BENCHMARK(BM_ReadDocuments)
 
 }  // namespace
 }  // namespace mongo
+
+#endif  // !_WIN32
