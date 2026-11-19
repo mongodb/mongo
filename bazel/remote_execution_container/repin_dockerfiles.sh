@@ -16,7 +16,32 @@ fi
 
 # Use the repository directory as the base for output. This should always be the
 # same, regardless of invocation location.
-cd "$REPO_DIR/bazel/remote_execution_container"
+toolchain_sysroots=false
+output_dir_set=false
+output_root="$REPO_DIR/bazel/remote_execution_container"
+while (($#)); do
+    case "$1" in
+    --toolchain-sysroots)
+        toolchain_sysroots=true
+        shift
+        ;;
+    --output-dir)
+        output_root=$(realpath -m "$2")
+        output_dir_set=true
+        shift 2
+        ;;
+    *)
+        echo "Unknown argument: $1" >&2
+        exit 2
+        ;;
+    esac
+done
+if [[ $toolchain_sysroots == true && $output_dir_set == false ]]; then
+    echo "--toolchain-sysroots requires --output-dir to keep container recipes unchanged" >&2
+    exit 2
+fi
+mkdir -p "$output_root"
+cd "$output_root"
 
 echo "Working directory: $(pwd)"
 
@@ -151,7 +176,18 @@ IMAGE_DIRS["ubuntu:26.04"]="ubuntu26"
 
 # Fetch the latest sha256:xxx hash for an image.
 get_latest_sha() {
-    docker pull "$1" >/dev/null
+    local attempt
+    for attempt in 1 2 3; do
+        if docker pull "$1" >/dev/null; then
+            break
+        fi
+        if ((attempt == 3)); then
+            echo "Failed to pull $1 after $attempt attempts" >&2
+            return 1
+        fi
+        echo "Retrying pull of $1 after attempt $attempt" >&2
+        sleep 2
+    done
     docker inspect --format='{{index .RepoDigests 0}}' "$1" | cut -d@ -f2
 }
 
@@ -237,9 +273,16 @@ generate_dockerfile() {
     readarray -t packages < <(echo "${COMMON_PACKAGES[$distribution_family]}" | sed '/^\s*$/d')
     readarray -t additional < <(echo "${ADDITIONAL_PACKAGES[$image]:-}" | sed '/^\s*$/d')
     packages+=("${additional[@]}")
+    if [[ $toolchain_sysroots == true ]]; then
+        # Runtime-build inputs only; use the same distro/base-image definitions.
+        packages=(glibc-devel kernel-headers libxcrypt-devel systemtap-sdt-devel)
+    fi
 
     local sha
-    sha=$(get_latest_sha "$image")
+    if ! sha=$(get_latest_sha "$image"); then
+        echo "Failed to resolve the base image for $image" >&2
+        return 1
+    fi
     local image_with_sha="${image}@${sha}"
 
     local pkg_manager
@@ -321,7 +364,36 @@ EOF
 
 echo "Generating Dockerfiles..."
 declare -A pids
+selected_distro=${remote_execution_container_distro:-}
+if [[ $toolchain_sysroots == true ]]; then
+    selected_distro=${toolchain_sysroot_distro:-}
+fi
+case "$selected_distro" in
+linux) selected_distro=amazon_linux_2 ;;
+rhel8) selected_distro=rhel89 ;;
+rhel9) selected_distro=rhel93 ;;
+suse15) selected_distro=suse ;;
+esac
+if [[ -n $selected_distro ]]; then
+    matched_distro=false
+    for directory in "${IMAGE_DIRS[@]}"; do
+        if [[ $directory == "$selected_distro" ]]; then
+            matched_distro=true
+            break
+        fi
+    done
+    if [[ $matched_distro == false || ($toolchain_sysroots == true && $selected_distro != rhel89 && $selected_distro != rhel93 && $selected_distro != rhel10) ]]; then
+        echo "Unknown remote execution container distro: $selected_distro" >&2
+        exit 1
+    fi
+fi
 for image in "${!IMAGE_DIRS[@]}"; do
+    if [[ $toolchain_sysroots == true && $image != redhat/ubi* ]]; then
+        continue
+    fi
+    if [[ -n $selected_distro && ${IMAGE_DIRS[$image]} != "$selected_distro" ]]; then
+        continue
+    fi
     (
         generate_dockerfile "$image"
     ) &

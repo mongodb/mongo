@@ -13,6 +13,7 @@ exports_files([
     "package_test_cleanup.sh",
     "prelude.sh",
     "remote_execution_containers_generate.sh",
+    "toolchain_sysroots_generate.sh",
     "resmoke_tests_execute.sh",
     "upload_task_artifact.sh",
 ])

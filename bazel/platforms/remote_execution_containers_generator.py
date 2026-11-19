@@ -13,8 +13,14 @@ import subprocess
 import tarfile
 import tempfile
 from datetime import datetime
+from typing import Any
 
 from retry import retry
+
+from bazel.platforms.toolchain_sysroot_manifest import (
+    TOOLCHAIN_SYSROOT_ARCHITECTURES as PUBLISHED_ARCHITECTURES,
+)
+from bazel.platforms.toolchain_sysroot_manifest import TOOLCHAIN_SYSROOT_DISTROS
 
 DEFAULT_PLATFORMS = ("linux/amd64", "linux/arm64/v8")
 RHEL_EXTRA_PLATFORMS = ("linux/ppc64le", "linux/s390x")
@@ -26,20 +32,109 @@ ECR_REPOSITORY = f"{ECR_REGISTRY}/{ECR_PUBLIC_ALIAS}/{ECR_REPOSITORY_NAME}"
 BINFMT_IMAGE = (
     "tonistiigi/binfmt@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0"
 )
-PUBLISHED_ARCHITECTURES = ("amd64", "arm64", "ppc64le", "s390x")
 MACHINE_ARCHITECTURES = {
     "aarch64": "arm64",
     "x86_64": "amd64",
 }
 SYSROOT_PATHS = ("usr/include", "usr/lib", "usr/lib64", "lib", "lib64")
+SYSROOT_EXCLUDED_PATHS = ("usr/lib/.build-id", "usr/lib64/.build-id")
+TARGET_ELF = {
+    "amd64": (62, 1, "ld-linux-x86-64.so.2"),
+    "arm64": (183, 1, "ld-linux-aarch64.so.1"),
+    "ppc64le": (21, 1, "ld64.so.2"),
+    "s390x": (22, 2, "ld64.so.1"),
+}
+
+
+def validate_toolchain_sysroot(root: pathlib.Path, architecture: str) -> list[str]:
+    """Check the target files used to configure/build GCC's runtime libraries."""
+    machine, encoding, loader = TARGET_ELF[architecture]
+    for path in sorted(root.rglob("*")):
+        if path.is_symlink():
+            try:
+                target = path.resolve(strict=True)
+            except (OSError, RuntimeError) as exc:
+                raise ValueError(f"Sysroot has a dangling or cyclic link: {path}") from exc
+            if not target.is_relative_to(root.resolve()):
+                raise ValueError(f"Sysroot link escapes the archive: {path}")
+    validated = []
+    for header in ("stdio.h", "linux/version.h", "asm/unistd.h", "sys/sdt.h", "crypt.h"):
+        path = root / "usr/include" / header
+        if not path.is_file():
+            raise ValueError(f"Toolchain sysroot is missing usr/include/{header}")
+        validated.append(path.relative_to(root).as_posix())
+    elf_files = ("crt1.o", "crti.o", "crtn.o", "libc.so.6", "libgcc_s.so.1", "libcrypt.so", loader)
+    for name in (*elf_files, "libc.so", "libc_nonshared.a"):
+        # These RHEL targets are all 64-bit. A copy in usr/lib or an unrelated
+        # subdirectory cannot replace GCC's required usr/lib64 linker inputs.
+        required = root / "usr/lib64" / name
+        if not required.is_file():
+            raise ValueError(f"Toolchain sysroot is missing usr/lib64/{name}")
+        paths = [required, root / "lib64" / name]
+        if name == loader:
+            # RHEL also exposes some 64-bit loaders through /lib and /usr/lib.
+            paths.extend([root / "usr/lib" / name, root / "lib" / name])
+        for path in paths:
+            if not path.is_file():
+                continue
+            if name in elf_files:
+                with path.open("rb") as source:
+                    header = source.read(20)
+                byteorder = "little" if encoding == 1 else "big"
+                if (
+                    len(header) < 20
+                    or header[:5] != b"\x7fELF\x02"
+                    or header[5] != encoding
+                    or int.from_bytes(header[18:20], byteorder) != machine
+                ):
+                    raise ValueError(f"Wrong ELF architecture for {architecture}: {path}")
+            validated.append(path.relative_to(root).as_posix())
+    return sorted(validated)
+
+
+def sysroot_provenance(
+    image: str, distro: str, build_platform: str, image_identity: str
+) -> dict[str, Any]:
+    """Read target package versions from the exact image being exported."""
+    query = (
+        ["dpkg-query", "-W", "-f=${Package}=${Version}:${Architecture}\n"]
+        if distro.startswith(("ubuntu", "debian"))
+        else ["rpm", "-qa", "--qf", "%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\n"]
+    )
+    result = log_subprocess_run(
+        ["docker", "run", "--rm", "--platform", build_platform, image, *query],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    packages = sorted(set(result.stdout.splitlines()))
+    if not packages:
+        raise ValueError(f"No target package inventory returned for {image}")
+    return {
+        "schema-version": 1,
+        "distro": distro,
+        "architecture": build_platform.split("/")[1],
+        "image": image_identity,
+        "packages": packages,
+    }
 
 
 def _is_sysroot_path(path: str) -> bool:
-    return any(path == root or path.startswith(root + "/") for root in SYSROOT_PATHS)
+    # Debugger lookup indexes can reference executables omitted from this archive.
+    return any(path == root or path.startswith(root + "/") for root in SYSROOT_PATHS) and not any(
+        path == root or path.startswith(root + "/") for root in SYSROOT_EXCLUDED_PATHS
+    )
 
 
-def create_sysroot_archive(rootfs: pathlib.Path, archive: pathlib.Path) -> str:
+def create_sysroot_archive(
+    rootfs: pathlib.Path, archive: pathlib.Path, *, provenance: dict[str, Any] | None = None
+) -> str:
     """Package headers/libraries with portable links and return the archive's SHA-256."""
+
+    def link_target(name: str, link: str) -> str:
+        return posixpath.normpath(
+            link if link.startswith("/") else posixpath.join(posixpath.dirname(name), link)
+        ).lstrip("/")
 
     def extract_filter(member: tarfile.TarInfo, destination: str) -> tarfile.TarInfo | None:
         name = posixpath.normpath(member.name.removeprefix("./"))
@@ -47,13 +142,18 @@ def create_sysroot_archive(rootfs: pathlib.Path, archive: pathlib.Path) -> str:
             return None
         member = member.replace(name=name)
         if member.issym():
-            target = posixpath.normpath(
-                member.linkname
-                if member.linkname.startswith("/")
-                else posixpath.join(posixpath.dirname(name), member.linkname)
-            ).lstrip("/")
-            if not _is_sysroot_path(target):
-                return None
+            target = link_target(name, member.linkname)
+            visited = set()
+            while not _is_sysroot_path(target):
+                # Preserve library selections routed through /etc/alternatives without
+                # including system configuration in the compiler's sysroot.
+                selected = exported_members.get(target)
+                if selected is None or not selected.issym():
+                    return None
+                if target in visited:
+                    raise ValueError(f"Sysroot link has a cyclic external target: {name}")
+                visited.add(target)
+                target = link_target(target, selected.linkname)
             member = member.replace(linkname=posixpath.relpath(target, posixpath.dirname(name)))
         elif member.islnk() and not _is_sysroot_path(member.linkname):
             raise ValueError(f"Sysroot hard link points outside the archive: {name}")
@@ -74,9 +174,23 @@ def create_sysroot_archive(rootfs: pathlib.Path, archive: pathlib.Path) -> str:
     with tempfile.TemporaryDirectory(dir=rootfs.parent) as temp_dir:
         sysroot = pathlib.Path(temp_dir)
         with tarfile.open(rootfs) as exported:
+            exported_members = {
+                posixpath.normpath(member.name.removeprefix("./")): member
+                for member in exported.getmembers()
+            }
             exported.extractall(sysroot, filter=extract_filter)
         if not (sysroot / "usr/include").is_dir():
             raise ValueError("Extracted sysroot does not contain usr/include")
+        if provenance is not None:
+            manifest = dict(provenance)
+            manifest["validated-files"] = (
+                validate_toolchain_sysroot(sysroot, provenance["architecture"])
+                if provenance["distro"] in TOOLCHAIN_SYSROOT_DISTROS
+                else []
+            )
+            manifest_path = sysroot / "sysroot-manifest.json"
+            manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+            manifest_path.chmod(0o644)
         with (
             archive.open("wb") as output,
             gzip.GzipFile(filename="", fileobj=output, mode="wb", mtime=0) as compressed,

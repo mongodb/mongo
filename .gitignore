@@ -379,3 +379,7 @@ CLAUDE.local.md
 
 # C++ Code Coverage Artifacts
 coverage/
+
+# Local toolchain sysroot build and validation output.
+/toolchain-sysroot-output/
+/toolchain-sysroot-validation.tgz

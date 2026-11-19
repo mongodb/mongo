@@ -331,12 +331,18 @@ platform(
 )
 
 load("//bazel/uv:defs.bzl", "dependency")
-load("@rules_python//python:defs.bzl", "py_binary", "py_test")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
+
+py_library(
+    name = "toolchain_sysroot_manifest",
+    srcs = ["toolchain_sysroot_manifest.py"],
+)
 
 py_binary(
     name = "remote_execution_containers_generator",
     srcs = ["remote_execution_containers_generator.py"],
     visibility = ["//visibility:public"],
+    deps = [":toolchain_sysroot_manifest"],
 )
 
 py_test(
@@ -344,7 +350,28 @@ py_test(
     srcs = ["remote_execution_containers_generator_test.py"],
     data = [
         "remote_execution_containers_generator.py",
+        "//bazel/remote_execution_container:repin_dockerfiles.sh",
         "//evergreen:remote_execution_containers_generate.sh",
+    ],
+    deps = [":toolchain_sysroot_manifest"],
+)
+
+py_test(
+    name = "toolchain_sysroots_generator_test",
+    srcs = ["toolchain_sysroots_generator_test.py"],
+    data = [
+        "remote_execution_containers_generator.py",
+        "remote_execution_containers_generator_test.py",
+        "toolchain_sysroots_generator.py",
+        "//bazel/remote_execution_container:repin_dockerfiles.sh",
+        "//evergreen:toolchain_sysroots_generate.sh",
+    ],
+    deps = [
+        ":toolchain_sysroot_manifest",
+        dependency(
+            "retry",
+            group = "wrapper-hook",
+        ),
     ],
 )
 
@@ -353,6 +380,7 @@ py_binary(
     srcs = ["remote_execution_containers_pr.py"],
     visibility = ["//visibility:public"],
     deps = [
+        ":toolchain_sysroot_manifest",
         dependency(
             "pygithub",
             group = "testing",
@@ -364,6 +392,7 @@ py_test(
     name = "remote_execution_containers_pr_test",
     srcs = ["remote_execution_containers_pr_test.py"],
     data = ["remote_execution_containers_pr.py"],
+    deps = [":toolchain_sysroot_manifest"],
 )
 
 exports_files([

@@ -1,5 +1,7 @@
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 
+exports_files(["repin_dockerfiles.sh"])
+
 sh_binary(
     name = "repin_dockerfiles",
     srcs = ["repin_dockerfiles.sh"],

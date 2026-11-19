@@ -18,9 +18,13 @@ import time
 
 from github import GithubException, GithubIntegration, InputGitTreeElement, Repository
 
+from bazel.platforms.toolchain_sysroot_manifest import read_sysroot_manifest
+
 CONTAINER_FILE = "bazel/platforms/remote_execution_containers.bzl"
 DOCKERFILE_DIR = "bazel/remote_execution_container"
 LOCKFILE = "MODULE.bazel.lock"
+TOOLCHAIN_SYSROOT_FILE = "bazel/toolchains/target_sysroots.json"
+TOOLCHAIN_SYSROOT_REPORT = "toolchain-sysroot-output/validation.json"
 
 
 def chdir_to_workspace() -> None:
@@ -35,8 +39,10 @@ def is_truthy(value: str) -> bool:
     return value.strip().lower() in ("true", "1", "yes")
 
 
-def default_files() -> list[str]:
+def default_files(toolchain_sysroots: bool = False) -> list[str]:
     """Return the container map plus every generated dockerfile."""
+    if toolchain_sysroots:
+        return [TOOLCHAIN_SYSROOT_FILE]
     dockerfiles = sorted(
         str(path) for path in pathlib.Path(DOCKERFILE_DIR).glob("*/[Dd]ockerfile") if path.is_file()
     )
@@ -60,13 +66,17 @@ def lockfile_digests() -> dict[str, str]:
     }
 
 
-def print_dry_run(files: list[str]) -> None:
+def print_dry_run(files: list[str], toolchain_sysroots: bool = False) -> None:
     """Dump what a real run would commit: the container map and the lockfile digests.
 
     The digests are needed alongside the map, since rewriting it invalidates the recorded
     extension digests and analysis then fails with "MODULE.bazel.lock is no longer up-to-date".
     """
     print("Dry run, not opening a PR.\n")
+
+    if toolchain_sysroots:
+        print(pathlib.Path(TOOLCHAIN_SYSROOT_FILE).read_text(encoding="utf-8"))
+        return
 
     container_file = pathlib.Path(CONTAINER_FILE)
     if container_file.is_file():
@@ -142,14 +152,64 @@ def summarize_container_changes(old_content: str, new_content: str) -> str:
     return "\n".join(lines) if lines else "- No container changes"
 
 
-def file_content_on_branch(repo: Repository.Repository, path: str, branch: str) -> str:
-    """Return a file's content on a branch, or an empty string when it does not exist."""
+def summarize_sysroot_changes(old_content: str, new_content: str) -> str:
+    """Report target sysroot pin changes without container or lockfile changes."""
+    old = read_sysroot_manifest(old_content)["sysroots"]
+    new = read_sysroot_manifest(new_content)["sysroots"]
+    lines = []
+    for distro in sorted(new):
+        for architecture, pin in sorted(new[distro].items()):
+            if old.get(distro, {}).get(architecture) != pin:
+                lines.append(f"- **{distro}/{architecture}**: `{pin['sha256']}`")
+    return "\n".join(lines) or "- No sysroot changes"
+
+
+def merge_sysroot_pins(
+    base_content: str,
+    pending_content: str,
+    pending_base_content: str,
+    generated_content: str,
+    published_distros: set[str],
+) -> str:
+    """Keep pending updates and merged pins, replacing only freshly published distros."""
+    merged = read_sysroot_manifest(base_content, source=f"Base {TOOLCHAIN_SYSROOT_FILE}")
+    ancestor = read_sysroot_manifest(
+        pending_base_content, source=f"PR ancestor {TOOLCHAIN_SYSROOT_FILE}"
+    )["sysroots"]
+    pending = read_sysroot_manifest(pending_content, source=f"Pending {TOOLCHAIN_SYSROOT_FILE}")[
+        "sysroots"
+    ]
+    generated = read_sysroot_manifest(
+        generated_content, source=f"Generated {TOOLCHAIN_SYSROOT_FILE}"
+    )["sysroots"]
+    for distro, pins in pending.items():
+        for architecture, pin in pins.items():
+            old_pin = ancestor.get(distro, {}).get(architecture)
+            current_pin = merged["sysroots"].get(distro, {}).get(architecture)
+            if pin != old_pin and current_pin == old_pin:
+                merged["sysroots"].setdefault(distro, {})[architecture] = pin
+    for distro in published_distros:
+        if distro not in generated:
+            raise ValueError(
+                f"Generated {TOOLCHAIN_SYSROOT_FILE} is missing published distro {distro}"
+            )
+        merged["sysroots"][distro] = generated[distro]
+    return json.dumps(merged, indent=2, sort_keys=True) + "\n"
+
+
+def file_content_on_ref(repo: Repository.Repository, path: str, ref: str) -> str:
+    """Return a file's content at a Git ref, or an empty string if absent."""
     try:
-        return repo.get_contents(path, ref=f"refs/heads/{branch}").decoded_content.decode()
+        return repo.get_contents(path, ref=ref).decoded_content.decode()
     except GithubException as exc:
-        if exc.status in (403, 404):
+        if exc.status == 404:
             return ""
         raise
+
+
+def file_content_on_branch(repo: Repository.Repository, path: str, branch: str) -> str:
+    """Return a file's content on a branch, or an empty string when it does not exist."""
+    return file_content_on_ref(repo, path, f"refs/heads/{branch}")
 
 
 def create_branch(repo: Repository.Repository, base_branch: str, new_branch: str) -> None:
@@ -175,6 +235,14 @@ def main() -> int:
     parser.add_argument("--base-branch", required=True, help="Branch to merge into.")
     parser.add_argument("--new-branch", required=True, help="Branch to push the changes to.")
     parser.add_argument("--pr-title", required=True, help="Title for the PR.")
+    parser.add_argument(
+        "--toolchain-sysroots", action="store_true", help="Propose only target sysroot pins."
+    )
+    parser.add_argument(
+        "--sysroot-report",
+        default=TOOLCHAIN_SYSROOT_REPORT,
+        help="Publication report identifying which toolchain sysroot distros were rebuilt.",
+    )
     parser.add_argument(
         "--file",
         action="append",
@@ -204,10 +272,10 @@ def main() -> int:
     args = parser.parse_args()
 
     chdir_to_workspace()
-    files = args.file or default_files()
+    files = args.file or default_files(args.toolchain_sysroots)
 
     if is_truthy(args.dry_run):
-        print_dry_run(files)
+        print_dry_run(files, args.toolchain_sysroots)
         return 0
 
     if not args.app_id or not args.private_key:
@@ -217,11 +285,28 @@ def main() -> int:
         )
 
     repo = get_repository(args.github_owner, args.github_repo, args.app_id, args.private_key)
+    pulls = None
+    published_distros: set[str] = set()
+    pending_content = ""
+    pending_base_content = ""
+    if args.toolchain_sysroots:
+        report = json.loads(pathlib.Path(args.sysroot_report).read_text(encoding="utf-8"))
+        if report.get("failed_distros") or not report.get("sysroots"):
+            raise ValueError("Cannot propose pins without a successful sysroot publication report")
+        published_distros = set(report["sysroots"])
+        pulls = repo.get_pulls(
+            state="open", head=f"{args.github_owner}:{args.new_branch}", base=args.base_branch
+        )
+        if pulls.totalCount:
+            pending_content = file_content_on_branch(repo, TOOLCHAIN_SYSROOT_FILE, args.new_branch)
+            ancestor = repo.compare(args.base_branch, args.new_branch).merge_base_commit.sha
+            pending_base_content = file_content_on_ref(repo, TOOLCHAIN_SYSROOT_FILE, ancestor)
 
     # Files that differ from the base branch. Anything else is left alone so an unrelated
     # dockerfile does not get dragged into the PR.
     changed: list[tuple[str, str]] = []
     original_container_file = ""
+    original_sysroot_file = ""
     for path in files:
         try:
             new_content = pathlib.Path(path).read_text(encoding="utf-8")
@@ -232,12 +317,22 @@ def main() -> int:
         base_content = file_content_on_branch(repo, path, args.base_branch)
         if path == CONTAINER_FILE:
             original_container_file = base_content
+        if path == TOOLCHAIN_SYSROOT_FILE:
+            original_sysroot_file = base_content
+            if args.toolchain_sysroots:
+                new_content = merge_sysroot_pins(
+                    base_content,
+                    pending_content,
+                    pending_base_content,
+                    new_content,
+                    published_distros,
+                )
         if base_content != new_content:
             print(f"Detected change in '{path}'")
             changed.append((path, new_content))
 
     if not changed:
-        print("No container files changed. Skipping PR.")
+        print("No generated files changed. Skipping PR.")
         return 0
 
     create_branch(repo, args.base_branch, args.new_branch)
@@ -261,22 +356,36 @@ def main() -> int:
             ],
             repo.get_git_tree(base_commit.sha),
         )
-        message = "Update remote execution containers: " + ", ".join(path for path, _ in to_commit)
+        message = (
+            "Update toolchain sysroots: "
+            if args.toolchain_sysroots
+            else "Update remote execution containers: "
+        ) + ", ".join(path for path, _ in to_commit)
         commit = repo.create_git_commit(message, tree, [base_commit])
         repo.get_git_ref(f"heads/{args.new_branch}").edit(commit.sha)
         print(f"Committed {len(to_commit)} file(s) as {commit.sha}")
     else:
         print("PR branch already has these files. Skipping commit.")
 
-    pulls = repo.get_pulls(
-        state="open", head=f"{args.github_owner}:{args.new_branch}", base=args.base_branch
-    )
+    if pulls is None:
+        pulls = repo.get_pulls(
+            state="open", head=f"{args.github_owner}:{args.new_branch}", base=args.base_branch
+        )
     new_container_file = dict(changed).get(CONTAINER_FILE, "")
     body = (
         "Automated PR updating the bazel remote execution containers.\n\n"
         "### Container changes\n\n"
         f"{summarize_container_changes(original_container_file, new_container_file)}\n"
     )
+    if args.toolchain_sysroots:
+        body = (
+            "Automated update of validated, content-addressed target sysroots for cross-toolchain runtime builds. "
+            "Archives include the complete recipe, pinned base image, and package inventory.\n\n"
+            + summarize_sysroot_changes(
+                original_sysroot_file, dict(changed).get(TOOLCHAIN_SYSROOT_FILE, "")
+            )
+            + "\n"
+        )
 
     if pulls.totalCount:
         pull_request = pulls[0]
@@ -284,7 +393,11 @@ def main() -> int:
         print(f"Updated existing PR #{pull_request.number}")
     else:
         pull_request = repo.create_pull(
-            title=args.pr_title, head=args.new_branch, base=args.base_branch, body=body
+            title=args.pr_title,
+            head=args.new_branch,
+            base=args.base_branch,
+            body=body,
+            **({"draft": True} if args.toolchain_sysroots else {}),
         )
         print(f"Created PR #{pull_request.number}")
 

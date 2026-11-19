@@ -104,6 +104,10 @@ include:
   - filename: monguard/.evergreen/config_tasks.yml
 
 parameters:
+  - key: toolchain_sysroot_distro
+    description: "Optional RHEL distro for toolchain sysroots; defaults to all supported distros."
+  - key: toolchain_sysroot_architectures
+    description: "Optional comma-separated architectures for no-push validation, such as ppc64le,s390x. Publication always builds every architecture."
   - key: evergreen_config_file_path
     value: "etc/evergreen.yml"
     description: "path to this file"
