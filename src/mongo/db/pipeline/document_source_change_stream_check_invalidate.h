@@ -4,6 +4,7 @@
 #pragma once
 
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -110,9 +111,11 @@ private:
      * Use the create static method to create a DocumentSourceChangeStreamCheckInvalidate.
      */
     DocumentSourceChangeStreamCheckInvalidate(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                              boost::optional<ResumeTokenData> startAfterInvalidate)
+                                              boost::optional<ResumeTokenData> startAfterInvalidate,
+                                              boost::optional<ResumeTokenData> resumePoint)
         : DocumentSourceInternalChangeStreamStage(kStageName, expCtx),
-          _startAfterInvalidate(std::move(startAfterInvalidate)) {
+          _startAfterInvalidate(std::move(startAfterInvalidate)),
+          _resumePoint(std::move(resumePoint)) {
         tassert(11294807,
                 "Expected the passed resume token to be from an invalidate notification",
                 !_startAfterInvalidate ||
@@ -120,6 +123,11 @@ private:
     }
 
     boost::optional<ResumeTokenData> _startAfterInvalidate;
+
+    // The stream's resume point, set only when the stream was rebuilt for an end-of-transaction
+    // lookback. An invalidating command that sorts before this token has already been passed by the
+    // stream and must not raise an invalidation.
+    boost::optional<ResumeTokenData> _resumePoint;
 };
 
 }  // namespace mongo

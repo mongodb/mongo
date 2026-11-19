@@ -225,10 +225,14 @@ ResumeTokenData ChangeStreamEventTransformation::makeResumeToken(Value tsVal,
 
     // If we have a resume token, we need to match the version with which it was generated until we
     // have surpassed all events against which it may have been compared in the original stream, at
-    // which point we can begin generating tokens with our default version.
-    auto version = (clusterTime > _resumeToken.clusterTime || txnOpIndex > _resumeToken.txnOpIndex)
-        ? _expCtx->getChangeStreamTokenVersion()
-        : _resumeToken.version;
+    // which point we can begin generating tokens with our default version. The 'txnOpIndex' only
+    // orders events that share the same 'clusterTime', so an event with an older 'clusterTime'
+    // (which a backfill can observe) has not surpassed the resume token, regardless of its
+    // 'txnOpIndex'.
+    const bool didSurpassResumeToken = clusterTime > _resumeToken.clusterTime ||
+        (clusterTime == _resumeToken.clusterTime && txnOpIndex > _resumeToken.txnOpIndex);
+    const auto version =
+        didSurpassResumeToken ? _expCtx->getChangeStreamTokenVersion() : _resumeToken.version;
 
     // Construct and return the final resume token.
     return {clusterTime, version, txnOpIndex, uuid, operationType, documentKey, opDescription};

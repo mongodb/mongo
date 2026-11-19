@@ -11,6 +11,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
+#include <compare>
 #include <cstddef>
 #include <cstdint>
 #include <iosfwd>
@@ -81,6 +82,62 @@ struct ResumeTokenData {
     bool operator!=(const ResumeTokenData& other) const {
         return !(*this == other);
     }
+
+    /**
+     * The result of comparing two resume tokens by their position in the change stream.
+     */
+    struct StreamPositionComparison {
+        // Orders the two tokens by position. 'unordered' means the event identifiers cannot be
+        // ordered because the tokens use different versions.
+        std::partial_ordering ordering;
+
+        // True when every position field before the event identifier is equal and the event
+        // identifiers are equal. The event identifier layout is version-specific, so this compares
+        // the identifier values directly and is independent of the token version.
+        bool sameEventIdentifier;
+    };
+
+    /**
+     * Compares this token's position in the change stream with 'other'.
+     * operation index, invalidate flag, UUID, event identifier and fragment number.
+     *
+     * The comparison follows this strict precedence, in order:
+     *
+     * 1. Cluster time
+     *    If timestamps differ, that determines the result immediately.
+     *    Equal timestamps continue.
+     * 2. Token type
+     *    A high-water-mark token sorts before an event token at the same cluster time.
+     * 3. Transaction operation index
+     *    Sorts by position within the same transaction timestamp.
+     * 4. Invalidate flag
+     *    An invalidate notification sorts after a normal/non-invalidate token at the same position.
+     * 5. UUID presence and value
+     *    Missing UUID sorts before present UUID.
+     *    When both exist, the UUID values determine the ordering.
+     * 6. Event identifier
+     *    Identifiers are compared when they use comparable layouts.
+     * 7. Token version
+     *    The version is not itself an ordering key.
+     *    If the versions differ, event identifiers are treated as unordered because their layouts
+     * may differ.
+     * 8. Fragment number
+     *    If identifiers match and both versions are comparable, fragment number orders pieces of a
+     * split event. An unsplit token sorts before a fragmented token.
+     *
+     * The 'sameEventIdentifier' flag in the returned struct reports whether the two tokens carry
+     * the same event identifier, so a caller that recognizes the resume point by its event can
+     * still match it when the token version differs. Callers that require the identifiers to be
+     * ordered, or that need a version-strict match, must use 'ordering' instead.
+     */
+    StreamPositionComparison compareStreamPosition(const ResumeTokenData& other) const;
+
+    /**
+     * Three-way compares this token's position in the change stream with 'other'; equivalent to the
+     * 'ordering' of compareStreamPosition(). The result is consistent with 'operator==': it is
+     * 'equivalent' only when the two tokens are equal, including the version and fragment number.
+     */
+    std::partial_ordering operator<=>(const ResumeTokenData& other) const;
 
     Timestamp clusterTime;
     int version = kDefaultTokenVersion;

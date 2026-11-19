@@ -50,7 +50,8 @@ ChangeStreamAddPostImageStage::ChangeStreamAddPostImageStage(
     const FullDocumentModeEnum& fullDocumentMode)
     : Stage(stageName, pExpCtx),
       _fullDocumentMode(fullDocumentMode),
-      _resumeTokenTracker(ChangeStreamCheckResumabilityStage::getClientResumeToken(pExpCtx)) {}
+      _resumeTokenTracker(ChangeStreamCheckResumabilityStage::getClientResumeToken(pExpCtx),
+                          ChangeStreamCheckResumabilityStage::isBackfillingScan(pExpCtx)) {}
 
 GetNextResult ChangeStreamAddPostImageStage::doGetNext() {
     auto input = pSource->getNext();

@@ -5,6 +5,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/agg/change_stream_check_resumability_stage.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
@@ -176,11 +177,46 @@ void PlanExecutorPipeline::_performChangeStreamsAccounting(const boost::optional
         // this document before it is emitted here.
         _validateChangeStreamsResumeToken(*doc);
         _latestOplogTimestamp = PipelineD::getLatestOplogTimestamp(_execPipeline.get());
-        _postBatchResumeToken = doc->metadata().getSortKey().getDocument().toBson();
 
-        // Reseting '_postBatchResumeTokenTimestamp' value to avoid recomputing it by parsing
-        // ResumeToken. The value is needed to determine the PBRT advanced past 'highWaterMark'.
-        _postBatchResumeTokenTimestamp = boost::none;
+        // The oplog scan normally starts at the stream's starting point, so every observed event's
+        // token is at or after it. When the router rebuilds the stream for an end-of-transaction
+        // lookback, however, the scan starts before the resume point and accounting control events
+        // below it pass through suppression. Never let such an event lower the post-batch resume
+        // token below the stream's starting point, which would advertise a resume position that
+        // sorts before the client's.
+        //
+        // Compare the event against the start point with the same ordering used to resume a change
+        // stream. That ordering ignores the token version, a format artifact: the client's starting
+        // token may carry a different version than the stream's own event tokens, so comparing the
+        // raw '_data' key strings would not yield the token order and could wrongly keep the resume
+        // position stale. It does account for every field that determines a token's position,
+        // including the token type, the invalidate flag and the fragment number. Comparing only the
+        // cluster time and transaction operation index would treat a token that differs in one of
+        // those fields as being at the start point, and could lower the post-batch resume token
+        // below it.
+        //
+        // An event the resume point matches except that it has not been split yet ('kNeedsSplit')
+        // carries the unsplit token, which sorts before the client's fragment token. It is not at
+        // or after the start point and must not lower the post-batch resume token; the split
+        // fragments that follow advance it instead.
+        //
+        // Events are returned in resume-token order, so once one is at or after the start point no
+        // later event can sort before it. Latch that and skip the comparison for the rest of the
+        // cursor's life instead of comparing every event against the start point.
+        if (!_atOrPastStartPoint && _startPointData) {
+            using ResumabilityStage = exec::agg::ChangeStreamCheckResumabilityStage;
+            const auto status = ResumabilityStage::compareAgainstClientResumeToken(
+                *doc, *_startPointData, ResumabilityStage::isBackfillingScan(_expCtx));
+            _atOrPastStartPoint = status == ResumabilityStage::ResumeStatus::kFoundToken ||
+                status == ResumabilityStage::ResumeStatus::kSurpassedToken;
+        }
+        if (_atOrPastStartPoint) {
+            _postBatchResumeToken = doc->metadata().getSortKey().getDocument().toBson();
+
+            // Reseting '_postBatchResumeTokenTimestamp' value to avoid recomputing it by parsing
+            // ResumeToken. The value is needed to determine the PBRT advanced past 'highWaterMark'.
+            _postBatchResumeTokenTimestamp = boost::none;
+        }
 
         _setSpeculativeReadTimestamp();
     } else {
@@ -267,6 +303,9 @@ void PlanExecutorPipeline::_initializeResumableScanState() {
             _postBatchResumeToken = _expCtx->getInitialPostBatchResumeToken().getOwned();
             _postBatchResumeTokenTimestamp = ResumeToken::extractClusterTime(_postBatchResumeToken);
             _latestOplogTimestamp = *_postBatchResumeTokenTimestamp;
+            // Decode the starting token once. It is constant for the life of the cursor and is
+            // compared against every returned event, so decoding it per event would waste CPU.
+            _startPointData = ResumeToken::parse(_postBatchResumeToken).getData();
             break;
         case ResumableScanType::kOplogScan:
             // Initialize the oplog timestamp and postBatchResumeToken here in case the request has

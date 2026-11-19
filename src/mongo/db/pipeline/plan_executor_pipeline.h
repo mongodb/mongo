@@ -15,6 +15,7 @@
 #include "mongo/db/pipeline/explain_util.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/plan_explainer_pipeline.h"
+#include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/explain_policy.h"
@@ -275,6 +276,18 @@ private:
     // 'boost::none' means the cached value is stale and must be recomputed by decoding
     // '_postBatchResumeToken' before use.
     boost::optional<Timestamp> _postBatchResumeTokenTimestamp;
+
+    // For change streams only: the decoded form of the stream's starting resume token, computed
+    // once. Every returned event is compared against it so an event that sorts before the starting
+    // point (possible only when the router rebuilt the stream to scan from an earlier backfilling
+    // point) does not lower '_postBatchResumeToken' below it. 'boost::none' when the stream has no
+    // starting token.
+    boost::optional<ResumeTokenData> _startPointData;
+
+    // For change streams only: set once a returned event is at or after '_startPointData'. Events
+    // are returned in resume-token order, so no later event can sort before it and the comparison
+    // can be skipped for the rest of the cursor's life.
+    bool _atOrPastStartPoint = false;
 };
 
 }  // namespace mongo

@@ -6689,10 +6689,78 @@ TEST_F(ChangeStreamStageTest, DSCSCheckInvalidateStageSerialization) {
                                            Value(),
                                            DSChangeStream::kDropCollectionOpType,
                                            ResumeTokenData::FromInvalidate::kFromInvalidate)));
+    spec.setResumePoint(ResumeToken::parse(
+        makeResumeToken(Timestamp(200, 3), testUuid(), Value(), DSChangeStream::kInsertOpType)));
     auto stageSpecAsBSON = BSON("" << spec.toBSON());
 
     validateDocumentSourceStageSerialization<DocumentSourceChangeStreamCheckInvalidate>(
         std::move(spec), stageSpecAsBSON, expCtx);
+}
+
+TEST_F(ChangeStreamStageTest, DSCSCheckInvalidateResumePointCarriedOnlyForBackfill) {
+    auto expCtx = getExpCtx();
+    const Timestamp resumeTs(150, 7);
+    auto resumeToken = ResumeToken::parse(
+        makeResumeToken(resumeTs, testUuid(), Value(), DSChangeStream::kInsertOpType));
+
+    DocumentSourceChangeStreamSpec spec;
+    spec.setResumeAfter(resumeToken);
+
+    // A stream that scans from its resume point does not carry a resume point.
+    auto normalSource = DocumentSourceChangeStreamCheckInvalidate::create(expCtx, spec);
+    DocumentSourceChangeStreamCheckInvalidateSpec emptySpec;
+    ASSERT_BSONOBJ_EQ(
+        normalSource->serialize().getDocument().toBson().firstElement().embeddedObject(),
+        emptySpec.toBSON());
+
+    // A stream rebuilt for an end-of-transaction lookback scans from an earlier point, so it
+    // carries the resume point.
+    spec.setBackfillingStartAtOperationTime(Timestamp(100, 1));
+    auto rebuiltSource = DocumentSourceChangeStreamCheckInvalidate::create(expCtx, spec);
+    DocumentSourceChangeStreamCheckInvalidateSpec expectedSpec;
+    expectedSpec.setResumePoint(resumeToken);
+    ASSERT_BSONOBJ_EQ(
+        rebuiltSource->serialize().getDocument().toBson().firstElement().embeddedObject(),
+        expectedSpec.toBSON());
+}
+
+// An event token at 'ts' with a trivial document key.
+ResumeToken makeEventToken(Timestamp ts) {
+    return ResumeToken(ResumeTokenData{ts,
+                                       ResumeTokenData::kDefaultTokenVersion,
+                                       /*txnOpIndex=*/0,
+                                       /*uuid=*/boost::none,
+                                       /*eventIdentifier=*/Value(Document{{"_id", 1}}),
+                                       ResumeTokenData::kNotFromInvalidate,
+                                       ResumeTokenData::kEventToken});
+}
+
+/**
+ * An event whose clusterTime is older than the start point is only expected for a stream the router
+ * rebuilt for an end-of-transaction lookback, which marks the spec with
+ * 'backfillingStartAtOperationTime'. Without that marker, the resumability stage trips the
+ * assertion when it compares such an event against the resume point.
+ */
+DEATH_TEST_REGEX_F(ChangeStreamStageTestDeathTest,
+                   AssertsOnEarlierClusterTimeWithoutBackfilling,
+                   "Tripwire assertion.*13679800") {
+    const auto clientToken = makeEventToken(Timestamp(100, 1));
+    const auto earlierToken = makeEventToken(Timestamp(50, 1));
+
+    // The scan produced an ordinary event that sorts before the client's resume point.
+    MutableDocument event;
+    event.addField("_id", Value(earlierToken.toDocument()));
+    event.metadata().setSortKey(Value(earlierToken.toDocument()), /*isSingleElementKey=*/true);
+
+    auto source = exec::agg::MockStage::createForTest(
+        std::deque<exec::agg::GetNextResult>{event.freeze()}, getExpCtx());
+
+    DocumentSourceChangeStreamSpec spec;
+    spec.setResumeAfter(clientToken);
+    auto resumabilityDS = DocumentSourceChangeStreamCheckResumability::create(getExpCtx(), spec);
+    auto stage = exec::agg::buildStageAndStitch(resumabilityDS, source);
+
+    ASSERT_THROWS_CODE(stage->getNext(), AssertionException, 13679800);
 }
 
 TEST_F(ChangeStreamStageTest, DSCSResumabilityStageSerialization) {

@@ -12,6 +12,7 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
+#include <compare>
 #include <string_view>
 
 namespace mongo {
@@ -47,7 +48,8 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamCheckInvalidate
     return make_intrusive<exec::agg::ChangeStreamCheckInvalidateStage>(
         changeStreamCheckInvalidateDS->kStageName,
         expCtx,
-        changeStreamCheckInvalidateDS->_startAfterInvalidate);
+        changeStreamCheckInvalidateDS->_startAfterInvalidate,
+        changeStreamCheckInvalidateDS->_resumePoint);
 }
 
 namespace exec::agg {
@@ -77,8 +79,11 @@ bool isInvalidationCommand(const boost::intrusive_ptr<ExpressionContext>& expCtx
 ChangeStreamCheckInvalidateStage::ChangeStreamCheckInvalidateStage(
     std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-    boost::optional<ResumeTokenData> startAfterInvalidate)
-    : Stage(stageName, pExpCtx), _startAfterInvalidate(std::move(startAfterInvalidate)) {}
+    boost::optional<ResumeTokenData> startAfterInvalidate,
+    boost::optional<ResumeTokenData> resumePoint)
+    : Stage(stageName, pExpCtx),
+      _startAfterInvalidate(std::move(startAfterInvalidate)),
+      _resumePoint(std::move(resumePoint)) {}
 
 GetNextResult ChangeStreamCheckInvalidateStage::doGetNext() {
     // To declare a change stream as invalidated, this stage first emits an invalidate event and
@@ -100,7 +105,19 @@ GetNextResult ChangeStreamCheckInvalidateStage::doGetNext() {
 
     const auto& doc = nextInput.getDocument();
 
-    ON_BLOCK_EXIT([this] { _startAfterInvalidate.reset(); });
+    // Without a resume point (a stream that was not rebuilt) the 'startAfter' state only matters
+    // for the first document, as it always has. A stream rebuilt for an end-of-transaction lookback
+    // scans the oplog from before its resume point, so the first documents it observes can be
+    // pre-resume history; clearing the state on such a document would make the resume-point
+    // invalidate look like a new invalidation and wrongly close the stream. The state is therefore
+    // kept until the stream reaches the resume point, and '_classifyInvalidation' clears it once it
+    // does, so that a command after the resume point is still treated as a genuinely new
+    // invalidation.
+    ON_BLOCK_EXIT([this] {
+        if (!_resumePoint) {
+            _startAfterInvalidate.reset();
+        }
+    });
 
     // If it's not an invalidation event, just forward the event.
     const auto& operationType = doc[FieldAccessors::kOperationType];
@@ -115,7 +132,7 @@ GetNextResult ChangeStreamCheckInvalidateStage::doGetNext() {
     auto resumeTokenData = ResumeToken::parse(doc.metadata().getSortKey().getDocument()).getData();
     resumeTokenData.fromInvalidate = ResumeTokenData::FromInvalidate::kFromInvalidate;
 
-    switch (_classifyInvalidationForStartAfter(resumeTokenData)) {
+    switch (_classifyInvalidation(resumeTokenData)) {
         case ClassificationType::kRethrowForResumeTokenVerification: {
             Document result = _buildInvalidateEvent(resumeTokenData, doc);
             uasserted(ChangeStreamStartAfterInvalidateInfo(result.toBsonWithMetaData()),
@@ -136,8 +153,39 @@ GetNextResult ChangeStreamCheckInvalidateStage::doGetNext() {
 }
 
 ChangeStreamCheckInvalidateStage::ClassificationType
-ChangeStreamCheckInvalidateStage::_classifyInvalidationForStartAfter(
-    const ResumeTokenData& resumeTokenData) const {
+ChangeStreamCheckInvalidateStage::_classifyInvalidation(const ResumeTokenData& resumeTokenData) {
+    // A stream rebuilt for an end-of-transaction lookback scans the oplog from before its resume
+    // point, so it can observe an invalidating command the stream has already moved past. Such an
+    // event is not an invalidation: the stream must not be closed by history it has already
+    // processed. This compares the full resume token, not only its cluster time, because a command
+    // at the same cluster time can still sort before the resume point (for example, an event
+    // ordered against a cross-shard high-water mark by its shard UUID).
+    bool reachedResumePoint = false;
+    if (_resumePoint) {
+        const std::partial_ordering ordering = resumeTokenData <=> *_resumePoint;
+        if (ordering == std::partial_ordering::less ||
+            ordering == std::partial_ordering::unordered) {
+            // Strictly before the resume point, or incomparable because the event identities use
+            // different versions: history the stream has already passed.
+            return ClassificationType::kSwallow;
+        }
+        reachedResumePoint = true;
+    }
+
+    // At or after the resume point: fall through to the shared 'startAfter' classification below so
+    // that a rebuilt stream behaves exactly like a stream that was not rebuilt. The resume point
+    // and the 'startAfter' token are the same client token in the rebuild path, so the ordering
+    // alone cannot tell the resume-point event apart from a different command at its cluster time.
+    // Once the stream has reached the resume point, drop the 'startAfter' state after the current
+    // event has been classified, so that a later command at the resume point's cluster time is a
+    // genuinely new invalidation; retaining it would suppress such a command for the whole rebuilt
+    // stream, unlike a stream that was not rebuilt.
+    ON_BLOCK_EXIT([this, reachedResumePoint] {
+        if (reachedResumePoint) {
+            _startAfterInvalidate.reset();
+        }
+    });
+
     if (!_startAfterInvalidate) {
         return ClassificationType::kGenerateInvalidateEvent;
     }

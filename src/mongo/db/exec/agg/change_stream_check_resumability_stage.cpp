@@ -10,6 +10,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <compare>
 #include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -53,9 +54,16 @@ boost::optional<ResumeTokenData> ChangeStreamCheckResumabilityStage::getClientRe
     return change_stream::resolveResumeTokenFromSpec(expCtx, *spec);
 }
 
+bool ChangeStreamCheckResumabilityStage::isBackfillingScan(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const auto& spec = expCtx->getChangeStreamSpec();
+    return spec && spec->getBackfillingStartAtOperationTime();
+}
+
 ChangeStreamResumeTokenTracker::ChangeStreamResumeTokenTracker(
-    boost::optional<ResumeTokenData> tokenFromClient)
-    : _tokenFromClient(std::move(tokenFromClient)) {}
+    boost::optional<ResumeTokenData> tokenFromClient, bool scanStartsBeforeResumePoint)
+    : _tokenFromClient(std::move(tokenFromClient)),
+      _scanStartsBeforeResumePoint(scanStartsBeforeResumePoint) {}
 
 ChangeStreamResumeTokenTracker::EventPosition ChangeStreamResumeTokenTracker::classify(
     const Document& event) {
@@ -66,7 +74,7 @@ ChangeStreamResumeTokenTracker::EventPosition ChangeStreamResumeTokenTracker::cl
     }
 
     switch (ChangeStreamCheckResumabilityStage::compareAgainstClientResumeToken(
-        event, *_tokenFromClient)) {
+        event, *_tokenFromClient, _scanStartsBeforeResumePoint)) {
         case ChangeStreamCheckResumabilityStage::ResumeStatus::kCheckNextDoc:
             // The event precedes the resume point; more events may still need to be checked.
             return EventPosition::kBeforeResumePoint;
@@ -89,6 +97,10 @@ GetNextResult ChangeStreamCheckResumabilityStage::doGetNext() {
         return pSource->getNext();
     }
 
+    // Constant for the life of the cursor: whether the scan may produce events that sort before the
+    // resume point.
+    const bool scanStartsBeforeResumePoint = isBackfillingScan(pExpCtx);
+
     while (_resumeStatus != ResumeStatus::kSurpassedToken) {
         // The underlying oplog scan will throw OplogQueryMinTsMissing if the minTs in the change
         // stream filter has fallen off the oplog. Catch this and throw a more explanatory error.
@@ -109,14 +121,19 @@ GetNextResult ChangeStreamCheckResumabilityStage::doGetNext() {
             }
         }();
 
-        // If we hit EOF, return it immediately.
+        // If we hit EOF or a control event, return it immediately. Control events are exempt from
+        // resume suppression: the router must observe every control event, including one whose
+        // token equals the resume token. A backfill rebuild starts a fresh cursor at an older scan
+        // point and relies on re-observing the control events the old cursor had already seen (for
+        // example, to rebuild its accounting state or to retarget shard cursors), so dropping one
+        // at the resume token would lose that state.
         if (!nextInput.isAdvanced()) {
             return nextInput;
         }
 
         // Determine whether the current event sorts before, equal to or after the resume token.
         _resumeStatus = ChangeStreamCheckResumabilityStage::compareAgainstClientResumeToken(
-            nextInput.getDocument(), _tokenFromClient);
+            nextInput.getDocument(), _tokenFromClient, scanStartsBeforeResumePoint);
         switch (_resumeStatus) {
             case ResumeStatus::kCheckNextDoc:
                 // If the result was kCheckNextDoc, we are resumable but must swallow this event.
@@ -146,7 +163,9 @@ GetNextResult ChangeStreamCheckResumabilityStage::doGetNext() {
 // that produced the resume token, but it was split in the original stream.
 ChangeStreamCheckResumabilityStage::ResumeStatus
 ChangeStreamCheckResumabilityStage::compareAgainstClientResumeToken(
-    const Document& eventFromResumedStream, const ResumeTokenData& tokenDataFromClient) {
+    const Document& eventFromResumedStream,
+    const ResumeTokenData& tokenDataFromClient,
+    bool scanStartsBeforeResumePoint) {
     const auto tokenFromResumedStream =
         eventFromResumedStream.metadata().getSortKey().getDocument();
 
@@ -156,61 +175,38 @@ ChangeStreamCheckResumabilityStage::compareAgainstClientResumeToken(
     const auto clusterTimeFromResumedStream =
         ResumeToken::extractClusterTime(tokenFromResumedStream);
 
-    // We start the resume with a $gte query on the timestamp, so we never expect it to be lower
-    // than our resume token's timestamp.
-    tassert(13679800,
-            "Expected the stream's resume token clusterTime to not be older than the client's "
-            "resume token clusterTime",
-            clusterTimeFromResumedStream >= tokenDataFromClient.clusterTime);
+    // The oplog scan normally starts at the resume point, so we never expect an event to be older
+    // than the client's resume token. The scan may start before the resume point when the router
+    // rebuilds the stream for an end-of-transaction lookback (the scan start is decoupled from the
+    // resume token); such an event is swallowed, and every event at or past the resume point is
+    // handled below.
+    if (clusterTimeFromResumedStream < tokenDataFromClient.clusterTime) {
+        tassert(13679800,
+                "Expected the stream's resume token clusterTime to not be older than the client's "
+                "resume token clusterTime, unless the scan starts before the resume point",
+                scanStartsBeforeResumePoint);
+        return ResumeStatus::kCheckNextDoc;
+    }
 
-    // If the clusterTime differs from the client's token, this stream cannot be resumed.
+    // If the clusterTime is strictly greater than the client's token, this stream cannot be
+    // resumed.
     if (clusterTimeFromResumedStream != tokenDataFromClient.clusterTime) {
         return ResumeStatus::kSurpassedToken;
     }
 
-    // The clusterTimes match, so the full token is needed for the remaining comparisons.
-    auto tokenDataFromResumedStream = ResumeToken::parse(tokenFromResumedStream).getData();
+    // The clusterTimes match, so the full token is needed for the remaining comparisons. Compare
+    // the two tokens by stream position with the same field order the change stream uses everywhere
+    // else, so the ordering is defined in one place (ResumeTokenData::compareStreamPosition).
+    const auto tokenDataFromResumedStream = ResumeToken::parse(tokenFromResumedStream).getData();
+    const auto position = tokenDataFromResumedStream.compareStreamPosition(tokenDataFromClient);
 
-    // If the tokenType exceeds the client token's type, then we have passed the resume token point.
-    // This can happen if the client resumes from a synthetic 'high water mark' token from another
-    // shard which happens to have the same clusterTime as an actual change on this shard.
-    if (tokenDataFromResumedStream.tokenType != tokenDataFromClient.tokenType) {
-        return tokenDataFromResumedStream.tokenType > tokenDataFromClient.tokenType
-            ? ResumeStatus::kSurpassedToken
-            : ResumeStatus::kCheckNextDoc;
-    }
-
-    // If the document's 'txnIndex' sorts before that of the client token, we must keep looking.
-    if (tokenDataFromResumedStream.txnOpIndex < tokenDataFromClient.txnOpIndex) {
-        return ResumeStatus::kCheckNextDoc;
-    } else if (tokenDataFromResumedStream.txnOpIndex > tokenDataFromClient.txnOpIndex) {
-        // This could happen if the client provided a txnOpIndex of 0, yet the 0th document in the
-        // applyOps was irrelevant (meaning it was an operation on a collection or DB not being
-        // watched). Signal that we have read beyond the resume token.
-        return ResumeStatus::kSurpassedToken;
-    }
-
-    // If 'fromInvalidate' exceeds the client's token value, then we have passed the resume point.
-    if (tokenDataFromResumedStream.fromInvalidate != tokenDataFromClient.fromInvalidate) {
-        return tokenDataFromResumedStream.fromInvalidate ? ResumeStatus::kSurpassedToken
-                                                         : ResumeStatus::kCheckNextDoc;
-    }
-
-    // It is acceptable for the stream UUID to differ from the client's, if this is a whole-database
-    // or cluster-wide stream and we are comparing operations from different shards at the same
-    // clusterTime. If the stream UUID sorts after the client's, however, then the stream is not
-    // resumable; we are past the point in the stream where the token should have appeared.
-    if (tokenDataFromResumedStream.uuid != tokenDataFromClient.uuid) {
-        return tokenDataFromResumedStream.uuid > tokenDataFromClient.uuid
-            ? ResumeStatus::kSurpassedToken
-            : ResumeStatus::kCheckNextDoc;
-    }
-
-    // If the eventIdentifier matches exactly, then we have found the resume point. However, this
-    // event may have been split by the original stream; we must check the value of the resume
-    // token's fragmentNum field to determine the correct return status.
-    if (ValueComparator::kInstance.evaluate(tokenDataFromResumedStream.eventIdentifier ==
-                                            tokenDataFromClient.eventIdentifier)) {
+    // The event carries the client token's event identifier, so it is the resume point. The match
+    // is by identifier, independent of the token version: the event at the resume point is emitted
+    // in the client's version, but endOfTransaction control events are minted in the stream's
+    // version.
+    if (position.sameEventIdentifier) {
+        // The event may have been split by the original stream; the value of the resume token's
+        // fragmentNum field determines the correct return status.
         if (tokenDataFromClient.fragmentNum && !tokenDataFromResumedStream.fragmentNum) {
             return ResumeStatus::kNeedsSplit;
         }
@@ -222,13 +218,14 @@ ChangeStreamCheckResumabilityStage::compareAgainstClientResumeToken(
             : ResumeStatus::kCheckNextDoc;
     }
 
-    // At this point, we know that the tokens differ only by eventIdentifier. The status we return
-    // will depend on whether the stream token is logically before or after the client token. If the
-    // latter, then we will never see the resume token and the stream cannot be resumed.
-    return ValueComparator::kInstance.evaluate(tokenDataFromResumedStream.eventIdentifier >
-                                               tokenDataFromClient.eventIdentifier)
-        ? ResumeStatus::kSurpassedToken
-        : ResumeStatus::kCheckNextDoc;
+    // The event does not carry the client token's event identifier. If it sorts after the client's
+    // token then we will never see the resume token. 'unordered' means the identifiers use
+    // different versions and cannot be ordered; treat such an event as preceding the resume point
+    // rather than risk mistaking it for the resume point.
+    if (position.ordering == std::partial_ordering::greater) {
+        return ResumeStatus::kSurpassedToken;
+    }
+    return ResumeStatus::kCheckNextDoc;
 }
 
 }  // namespace exec::agg

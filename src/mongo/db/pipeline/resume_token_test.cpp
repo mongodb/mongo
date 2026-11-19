@@ -618,5 +618,184 @@ TEST(ResumeToken, ExtractClusterTimeFromResumeTokenWorksWithValidInputs) {
     }
 }
 
+ResumeTokenData makeTokenForComparison(
+    Timestamp clusterTime,
+    int version = ResumeTokenData::kDefaultTokenVersion,
+    size_t txnOpIndex = 0,
+    boost::optional<UUID> uuid = boost::none,
+    Value eventIdentifier = Value(Document{{"operationType", "insert"sv}}),
+    ResumeTokenData::FromInvalidate fromInvalidate = ResumeTokenData::kNotFromInvalidate,
+    ResumeTokenData::TokenType tokenType = ResumeTokenData::kEventToken) {
+    return ResumeTokenData(clusterTime,
+                           version,
+                           txnOpIndex,
+                           uuid,
+                           std::move(eventIdentifier),
+                           fromInvalidate,
+                           tokenType);
+}
+
+TEST(ResumeTokenData, CompareOrdersByClusterTime) {
+    const auto a = makeTokenForComparison(Timestamp(100, 1));
+    const auto b = makeTokenForComparison(Timestamp(101, 1));
+    ASSERT_TRUE((a <=> b) == std::partial_ordering::less);
+    ASSERT_TRUE((b <=> a) == std::partial_ordering::greater);
+    ASSERT_TRUE((a <=> a) == std::partial_ordering::equivalent);
+}
+
+TEST(ResumeTokenData, CompareOrdersHighWaterMarkBeforeEventAtSameClusterTime) {
+    const auto highWaterMark = makeTokenForComparison(Timestamp(100, 1),
+                                                      ResumeTokenData::kDefaultTokenVersion,
+                                                      0,
+                                                      boost::none,
+                                                      Value(),
+                                                      ResumeTokenData::kNotFromInvalidate,
+                                                      ResumeTokenData::kHighWaterMarkToken);
+    const auto event = makeTokenForComparison(Timestamp(100, 1));
+    ASSERT_TRUE((highWaterMark <=> event) == std::partial_ordering::less);
+    ASSERT_TRUE((event <=> highWaterMark) == std::partial_ordering::greater);
+}
+
+TEST(ResumeTokenData, CompareOrdersByTxnOpIndex) {
+    const auto a =
+        makeTokenForComparison(Timestamp(100, 1), ResumeTokenData::kDefaultTokenVersion, 1);
+    const auto b =
+        makeTokenForComparison(Timestamp(100, 1), ResumeTokenData::kDefaultTokenVersion, 2);
+    ASSERT_TRUE((a <=> b) == std::partial_ordering::less);
+    ASSERT_TRUE((b <=> a) == std::partial_ordering::greater);
+}
+
+TEST(ResumeTokenData, CompareOrdersByInvalidateFlag) {
+    const auto normal = makeTokenForComparison(Timestamp(100, 1));
+    const auto invalidate = makeTokenForComparison(Timestamp(100, 1),
+                                                   ResumeTokenData::kDefaultTokenVersion,
+                                                   0,
+                                                   boost::none,
+                                                   Value(Document{{"operationType", "drop"sv}}),
+                                                   ResumeTokenData::kFromInvalidate);
+    ASSERT_TRUE((normal <=> invalidate) == std::partial_ordering::less);
+    ASSERT_TRUE((invalidate <=> normal) == std::partial_ordering::greater);
+}
+
+TEST(ResumeTokenData, CompareOrdersMissingUuidBeforePresentUuid) {
+    const auto missing = makeTokenForComparison(Timestamp(100, 1));
+    const auto present = makeTokenForComparison(
+        Timestamp(100, 1), ResumeTokenData::kDefaultTokenVersion, 0, UUID::gen());
+    ASSERT_TRUE((missing <=> present) == std::partial_ordering::less);
+    ASSERT_TRUE((present <=> missing) == std::partial_ordering::greater);
+}
+
+TEST(ResumeTokenData, CompareOrdersByUuid) {
+    const UUID first = UUID::gen();
+    const UUID second = UUID::gen();
+    const auto a =
+        makeTokenForComparison(Timestamp(100, 1), ResumeTokenData::kDefaultTokenVersion, 0, first);
+    const auto b =
+        makeTokenForComparison(Timestamp(100, 1), ResumeTokenData::kDefaultTokenVersion, 0, second);
+    const bool firstIsSmaller = first < second;
+    ASSERT_TRUE((a <=> b) ==
+                (firstIsSmaller ? std::partial_ordering::less : std::partial_ordering::greater));
+    ASSERT_TRUE((b <=> a) ==
+                (firstIsSmaller ? std::partial_ordering::greater : std::partial_ordering::less));
+}
+
+TEST(ResumeTokenData, CompareOrdersByEventIdentifier) {
+    const auto a = makeTokenForComparison(Timestamp(100, 1),
+                                          ResumeTokenData::kDefaultTokenVersion,
+                                          0,
+                                          boost::none,
+                                          Value(Document{{"operationType", "drop"sv}}));
+    const auto b = makeTokenForComparison(Timestamp(100, 1),
+                                          ResumeTokenData::kDefaultTokenVersion,
+                                          0,
+                                          boost::none,
+                                          Value(Document{{"operationType", "insert"sv}}));
+    ASSERT_TRUE((a <=> b) == std::partial_ordering::less);
+    ASSERT_TRUE((b <=> a) == std::partial_ordering::greater);
+}
+
+// The event identifier layout is version-specific, so tokens that differ only in their version
+// cannot be ordered by identity.
+TEST(ResumeTokenData, CompareIsUnorderedOnVersionMismatch) {
+    const auto v1 = makeTokenForComparison(
+        Timestamp(100, 1), 1, 0, boost::none, Value(Document{{"operationType", "drop"sv}}));
+    const auto v2 = makeTokenForComparison(
+        Timestamp(100, 1), 2, 0, boost::none, Value(Document{{"operationType", "drop"sv}}));
+    ASSERT_TRUE((v1 <=> v2) == std::partial_ordering::unordered);
+    ASSERT_TRUE((v2 <=> v1) == std::partial_ordering::unordered);
+}
+
+TEST(ResumeTokenData, CompareOrdersByFragmentNum) {
+    auto a = makeTokenForComparison(
+        Timestamp(100, 1), ResumeTokenData::kDefaultTokenVersion, 0, UUID::gen());
+    auto b = a;
+    a.fragmentNum = 0;
+    b.fragmentNum = 1;
+    ASSERT_TRUE((a <=> b) == std::partial_ordering::less);
+    ASSERT_TRUE((b <=> a) == std::partial_ordering::greater);
+    ASSERT_TRUE((a <=> a) == std::partial_ordering::equivalent);
+}
+
+// The ordering is consistent with 'operator==': equal tokens compare equivalent, and tokens that
+// differ only in the version compare unordered (not equivalent).
+TEST(ResumeTokenData, CompareIsConsistentWithEquality) {
+    const auto a = makeTokenForComparison(Timestamp(100, 1),
+                                          ResumeTokenData::kDefaultTokenVersion,
+                                          3,
+                                          UUID::gen(),
+                                          Value(Document{{"operationType", "insert"sv}}));
+    const auto b = a;
+    ASSERT_TRUE(a == b);
+    ASSERT_TRUE((a <=> b) == std::partial_ordering::equivalent);
+
+    auto c = a;
+    c.version = a.version + 1;
+    ASSERT_TRUE(a != c);
+    ASSERT_TRUE((a <=> c) == std::partial_ordering::unordered);
+}
+
+TEST(ResumeTokenData, CompareStreamPositionReportsSameEventIdentifier) {
+    const auto a = makeTokenForComparison(Timestamp(100, 1),
+                                          ResumeTokenData::kDefaultTokenVersion,
+                                          0,
+                                          UUID::gen(),
+                                          Value(Document{{"operationType", "insert"sv}}));
+
+    // Identical tokens carry the same identifier and compare equivalent.
+    {
+        const auto position = a.compareStreamPosition(a);
+        ASSERT_TRUE(position.ordering == std::partial_ordering::equivalent);
+        ASSERT_TRUE(position.sameEventIdentifier);
+    }
+
+    // Tokens that differ only in fragmentation still carry the same identifier.
+    {
+        auto b = a;
+        b.fragmentNum = 0;
+        const auto position = a.compareStreamPosition(b);
+        ASSERT_TRUE(position.ordering == std::partial_ordering::less);
+        ASSERT_TRUE(position.sameEventIdentifier);
+    }
+
+    // Tokens that differ by event identifier do not carry the same identifier.
+    {
+        auto b = a;
+        b.eventIdentifier = Value(Document{{"operationType", "drop"sv}});
+        const auto position = a.compareStreamPosition(b);
+        ASSERT_TRUE(position.ordering == std::partial_ordering::greater);
+        ASSERT_TRUE(!position.sameEventIdentifier);
+    }
+
+    // Tokens whose event identifiers are equal but whose versions differ cannot be ordered, but
+    // still carry the same identifier.
+    {
+        auto b = a;
+        b.version = a.version - 1;
+        const auto position = a.compareStreamPosition(b);
+        ASSERT_TRUE(position.ordering == std::partial_ordering::unordered);
+        ASSERT_TRUE(position.sameEventIdentifier);
+    }
+}
+
 }  // namespace
 }  // namespace mongo

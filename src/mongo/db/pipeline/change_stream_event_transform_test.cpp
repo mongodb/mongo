@@ -716,5 +716,68 @@ TEST(ChangeStreamEventTransformTest, ShowExpandedEventsEmitsCollectionUUIDWithou
     ASSERT_VALUE_EQ(event[DocumentSourceChangeStream::kCollectionUuidField], Value(testUuid()));
 }
 
+// Exposes the protected makeResumeToken() so its version selection can be tested directly.
+class ChangeStreamEventTransformationForTest final : public ChangeStreamEventTransformation {
+public:
+    ChangeStreamEventTransformationForTest(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                           const DocumentSourceChangeStreamSpec& spec)
+        : ChangeStreamEventTransformation(expCtx, spec) {}
+
+    using ChangeStreamEventTransformation::makeResumeToken;
+
+    Document applyTransformation(const Document&) const override {
+        return Document{};
+    }
+
+    std::set<std::string> getFieldNameDependencies() const override {
+        return {};
+    }
+};
+
+TEST(ChangeStreamEventTransformTest,
+     MakeResumeTokenAdoptsStreamVersionOnlyAfterSurpassingResumeToken) {
+    const Timestamp resumeClusterTime(100, 1);
+    const size_t resumeTxnOpIndex = 5;
+    const int resumeTokenVersion = 1;
+    const int streamTokenVersion = 2;
+
+    ResumeTokenData resumeData{resumeClusterTime,
+                               resumeTokenVersion,
+                               resumeTxnOpIndex,
+                               boost::optional<UUID>{testUuid()},
+                               Value(Document{{"_id", 1}}),
+                               ResumeTokenData::kNotFromInvalidate,
+                               ResumeTokenData::kEventToken};
+
+    DocumentSourceChangeStreamSpec spec;
+    spec.setResumeAfter(ResumeToken(resumeData));
+
+    auto expCtx = make_intrusive<ExpressionContextForTest>(nss);
+    expCtx->setChangeStreamTokenVersion(streamTokenVersion);
+    ChangeStreamEventTransformationForTest transformer(expCtx, spec);
+
+    auto tokenVersionFor = [&](Timestamp clusterTime, size_t txnOpIndex) {
+        return transformer
+            .makeResumeToken(Value(clusterTime),
+                             Value(static_cast<long long>(txnOpIndex)),
+                             Value(testUuid()),
+                             DocumentSourceChangeStream::kInsertOpType,
+                             Value(Document{{"_id", 1}}),
+                             Value())
+            .version;
+    };
+
+    // An event past the resume point adopts the stream's token version.
+    ASSERT_EQ(streamTokenVersion, tokenVersionFor(Timestamp(101, 1), 0));
+    ASSERT_EQ(streamTokenVersion, tokenVersionFor(resumeClusterTime, resumeTxnOpIndex + 1));
+
+    // An event at the resume point keeps the resume token's version.
+    ASSERT_EQ(resumeTokenVersion, tokenVersionFor(resumeClusterTime, resumeTxnOpIndex));
+
+    // An event with an older clusterTime keeps the resume token's version even when its txnOpIndex
+    // is higher, because txnOpIndex only orders events that share the resume token's clusterTime.
+    ASSERT_EQ(resumeTokenVersion, tokenVersionFor(Timestamp(99, 1), resumeTxnOpIndex + 1));
+}
+
 }  // namespace
 }  // namespace mongo

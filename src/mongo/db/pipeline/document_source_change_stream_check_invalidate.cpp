@@ -36,8 +36,19 @@ DocumentSourceChangeStreamCheckInvalidate::create(
     // If resuming from an "invalidate" using "startAfter", pass along the resume token data to
     // DSCSCheckInvalidate to signify that another invalidate should not be generated.
     auto resumeToken = change_stream::resolveResumeTokenFromSpec(expCtx, spec);
+
+    // The router rebuilds the stream for an end-of-transaction lookback by scanning the oplog from
+    // an earlier point than the resume point. Carry the resume point in that case so that an
+    // invalidating command the stream has already passed does not raise an invalidation.
+    boost::optional<ResumeTokenData> resumePoint;
+    if (spec.getBackfillingStartAtOperationTime()) {
+        resumePoint = resumeToken;
+    }
+
     return new DocumentSourceChangeStreamCheckInvalidate(
-        expCtx, boost::make_optional(resumeToken.fromInvalidate, std::move(resumeToken)));
+        expCtx,
+        boost::make_optional(resumeToken.fromInvalidate, std::move(resumeToken)),
+        resumePoint);
 }
 
 boost::intrusive_ptr<DocumentSourceChangeStreamCheckInvalidate>
@@ -52,7 +63,9 @@ DocumentSourceChangeStreamCheckInvalidate::createFromBson(
     return new DocumentSourceChangeStreamCheckInvalidate(
         expCtx,
         parsed.getStartAfterInvalidate() ? parsed.getStartAfterInvalidate()->getData()
-                                         : boost::optional<ResumeTokenData>());
+                                         : boost::optional<ResumeTokenData>(),
+        parsed.getResumePoint() ? parsed.getResumePoint()->getData()
+                                : boost::optional<ResumeTokenData>());
 }
 
 Value DocumentSourceChangeStreamCheckInvalidate::doSerialize(
@@ -66,6 +79,9 @@ Value DocumentSourceChangeStreamCheckInvalidate::doSerialize(
     DocumentSourceChangeStreamCheckInvalidateSpec spec;
     if (_startAfterInvalidate) {
         spec.setStartAfterInvalidate(ResumeToken(*_startAfterInvalidate));
+    }
+    if (_resumePoint) {
+        spec.setResumePoint(ResumeToken(*_resumePoint));
     }
     builder.append(DocumentSourceChangeStreamCheckInvalidate::kStageName, spec.toBSON());
     return Value(builder.obj());

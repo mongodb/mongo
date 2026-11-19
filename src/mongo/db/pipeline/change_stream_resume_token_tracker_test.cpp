@@ -95,6 +95,20 @@ TEST(ChangeStreamResumeTokenTrackerTest, BeforeResumePointDoesNotLatch) {
               EventPosition::kAfterResumePoint);
 }
 
+TEST(ChangeStreamResumeTokenTrackerTest, EventWithEarlierClusterTimeIsBeforeResumePoint) {
+    // The oplog scan may start before the resume point when the router rebuilds the stream for an
+    // end-of-transaction lookback, so an event with a clusterTime older than the client token is
+    // before the resume point and must be swallowed. The earlier clusterTime is only expected for
+    // such a backfilling scan.
+    const auto clientToken = makeToken(Timestamp(100, 5), 0);
+    const auto beforeToken = makeToken(Timestamp(90, 1), 0);
+    ChangeStreamResumeTokenTracker tracker(clientToken, /* scanStartsBeforeResumePoint */ true);
+
+    ASSERT_EQ(tracker.classify(makeEvent(beforeToken)), EventPosition::kBeforeResumePoint);
+    // Still comparing: the resume point itself is recognized next.
+    ASSERT_EQ(tracker.classify(makeEvent(clientToken)), EventPosition::kAtResumePoint);
+}
+
 TEST(ChangeStreamResumeTokenTrackerTest, BeforeResumePointByEventIdentifierDoesNotLatch) {
     // Same clusterTime and txnOpIndex, but the event's document key sorts before the client
     // token's.
@@ -104,6 +118,18 @@ TEST(ChangeStreamResumeTokenTrackerTest, BeforeResumePointByEventIdentifierDoesN
 
     ASSERT_EQ(tracker.classify(makeEvent(beforeToken)), EventPosition::kBeforeResumePoint);
     ASSERT_EQ(tracker.classify(makeEvent(clientToken)), EventPosition::kAtResumePoint);
+}
+
+TEST(ChangeStreamResumeTokenTrackerTest, VersionMismatchWithSameIdentifierIsAtResumePoint) {
+    // The event identifier layout is version-specific, but the resume point is recognized by the
+    // identifier value, so an event carrying the client token's identifier is the resume point even
+    // when its token version differs.
+    const auto clientToken = makeToken(Timestamp(100, 1), 0);
+    auto streamToken = clientToken;
+    streamToken.version = clientToken.version - 1;
+    ChangeStreamResumeTokenTracker tracker(clientToken);
+
+    ASSERT_EQ(tracker.classify(makeEvent(streamToken)), EventPosition::kAtResumePoint);
 }
 
 TEST(ChangeStreamResumeTokenTrackerTest, SurpassedTokenLatchesAfterResumePoint) {

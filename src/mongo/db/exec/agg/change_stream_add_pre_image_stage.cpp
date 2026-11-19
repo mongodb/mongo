@@ -44,7 +44,8 @@ ChangeStreamAddPreImageStage::ChangeStreamAddPreImageStage(
     const FullDocumentBeforeChangeModeEnum& fullDocumentBeforeChangeMode)
     : Stage(stageName, pExpCtx),
       _fullDocumentBeforeChangeMode(fullDocumentBeforeChangeMode),
-      _resumeTokenTracker(ChangeStreamCheckResumabilityStage::getClientResumeToken(pExpCtx)) {}
+      _resumeTokenTracker(ChangeStreamCheckResumabilityStage::getClientResumeToken(pExpCtx),
+                          ChangeStreamCheckResumabilityStage::isBackfillingScan(pExpCtx)) {}
 
 GetNextResult ChangeStreamAddPreImageStage::doGetNext() {
     auto input = pSource->getNext();

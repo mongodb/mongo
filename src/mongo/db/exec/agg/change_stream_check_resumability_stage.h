@@ -35,8 +35,15 @@ public:
                                        const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                        ResumeTokenData tokenFromClient);
 
+    /**
+     * Classifies 'eventFromResumedStream' relative to 'tokenDataFromClient'.
+     * 'scanStartsBeforeResumePoint' must be set when the oplog scan was configured to start before
+     * the resume point (an end-of-transaction backfilling rebuild), which is the only case in which
+     * an event may carry a clusterTime older than the client's resume token.
+     */
     static ResumeStatus compareAgainstClientResumeToken(const Document& eventFromResumedStream,
-                                                        const ResumeTokenData& tokenDataFromClient);
+                                                        const ResumeTokenData& tokenDataFromClient,
+                                                        bool scanStartsBeforeResumePoint = false);
 
     /**
      * Returns the resume token the client used to open or resume the change stream, read from the
@@ -45,6 +52,14 @@ public:
      */
     static boost::optional<ResumeTokenData> getClientResumeToken(
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    /**
+     * Returns true when the stream's oplog scan was configured to start before its resume point,
+     * which the router does when it transparently rebuilds a change stream after an end-of-
+     * transaction lookback (the 'backfillingStartAtOperationTime' change stream spec field). Only
+     * then may an event carry a clusterTime older than the client's resume token.
+     */
+    static bool isBackfillingScan(const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 protected:
     GetNextResult doGetNext() override;
@@ -76,7 +91,8 @@ public:
         kAfterResumePoint,   // Is at or past the resume point; the resume point does not skip it.
     };
 
-    explicit ChangeStreamResumeTokenTracker(boost::optional<ResumeTokenData> tokenFromClient);
+    explicit ChangeStreamResumeTokenTracker(boost::optional<ResumeTokenData> tokenFromClient,
+                                            bool scanStartsBeforeResumePoint = false);
 
     /**
      * Classifies 'event' relative to the client's resume point. Events must be classified in the
@@ -93,13 +109,16 @@ public:
      * amortized by the latch described above.
      *
      * Like compareAgainstClientResumeToken(), this requires every event to be at or after the
-     * resume point's clusterTime. That holds for change streams, whose oplog scan starts at the
-     * resume point's clusterTime.
+     * resume point's clusterTime, unless the scan starts before the resume point (an
+     * end-of-transaction backfilling rebuild, in which case 'scanStartsBeforeResumePoint' is set on
+     * the constructor). A change stream's oplog scan normally starts at the resume point's
+     * clusterTime.
      */
     EventPosition classify(const Document& event);
 
 private:
     boost::optional<ResumeTokenData> _tokenFromClient;
+    bool _scanStartsBeforeResumePoint = false;
     bool _atOrPastResumePoint = false;
 };
 }  // namespace mongo::exec::agg

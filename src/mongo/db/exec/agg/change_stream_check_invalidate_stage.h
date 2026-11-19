@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/change_stream_invalidation_info.h"
@@ -25,7 +26,8 @@ class ChangeStreamCheckInvalidateStage final : public Stage {
 public:
     ChangeStreamCheckInvalidateStage(std::string_view stageName,
                                      const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-                                     boost::optional<ResumeTokenData> startAfterInvalidate);
+                                     boost::optional<ResumeTokenData> startAfterInvalidate,
+                                     boost::optional<ResumeTokenData> resumePoint);
 
 private:
     GetNextResult doGetNext() final;
@@ -47,8 +49,7 @@ private:
         kSwallow,
     };
 
-    ClassificationType _classifyInvalidationForStartAfter(
-        const ResumeTokenData& resumeTokenData) const;
+    ClassificationType _classifyInvalidation(const ResumeTokenData& resumeTokenData);
 
     /**
      * Build an "invalidate" change event from an invalidation event (e.g. "drop", "dropDatabase",
@@ -58,6 +59,11 @@ private:
                                    const Document& doc) const;
 
     boost::optional<ResumeTokenData> _startAfterInvalidate;
+
+    // The stream's resume point, set only when the stream was rebuilt for an end-of-transaction
+    // lookback. An invalidating command at or before this token has already been passed by the
+    // stream and must not raise an invalidation.
+    boost::optional<ResumeTokenData> _resumePoint;
 
     boost::optional<Document> _queuedInvalidate;
     boost::optional<ChangeStreamInvalidationInfo> _queuedException;

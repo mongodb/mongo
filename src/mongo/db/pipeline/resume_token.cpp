@@ -76,6 +76,66 @@ bool ResumeTokenData::operator==(const ResumeTokenData& other) const {
         fragmentNum == other.fragmentNum;
 }
 
+ResumeTokenData::StreamPositionComparison ResumeTokenData::compareStreamPosition(
+    const ResumeTokenData& other) const {
+    if (const auto cmp = clusterTime <=> other.clusterTime; cmp != 0) {
+        // The two cluster times are different.
+        return {cmp, false};
+    }
+    // A high-water-mark token refers to a point in time and sorts before any event at the same
+    // cluster time.
+    if (const auto cmp = tokenType <=> other.tokenType; cmp != 0) {
+        // The two token types are different.
+        return {cmp, false};
+    }
+    if (const auto cmp = txnOpIndex <=> other.txnOpIndex; cmp != 0) {
+        // The two txnOpIndex values are different.
+        return {cmp, false};
+    }
+    // The invalidate flag is compared: the invalidate notification synthesized from a command
+    // carries it, and it sorts after a non-invalidate token at the same position, so such a command
+    // is a genuinely new invalidation rather than history the stream has already passed.
+    if (const auto cmp = fromInvalidate <=> other.fromInvalidate; cmp != 0) {
+        // The two fromInvalidate values are different.
+        return {cmp, false};
+    }
+    // A missing UUID sorts before a present one, matching the encoding.
+    if (uuid.has_value() != other.uuid.has_value()) {
+        return {uuid.has_value() ? std::partial_ordering::greater : std::partial_ordering::less,
+                false};
+    }
+    if (uuid.has_value()) {
+        if (const auto cmp = *uuid <=> *other.uuid; cmp != 0) {
+            return {cmp, false};
+        }
+    }
+    const int identityCmp = Value::compare(eventIdentifier, other.eventIdentifier, nullptr);
+    const bool sameEventIdentifier = identityCmp == 0;
+    // The event identities can only be ordered when both tokens share a version, because the
+    // identifier layout is version-specific. Tokens with different versions are incomparable.
+    if (version != other.version) {
+        return {std::partial_ordering::unordered, sameEventIdentifier};
+    }
+    if (identityCmp != 0) {
+        return {identityCmp <=> 0, false};
+    }
+    // The tokens carry the same event identifier. The fragment number orders the pieces of a split
+    // event.
+    if (fragmentNum.has_value() != other.fragmentNum.has_value()) {
+        return {fragmentNum.has_value() ? std::partial_ordering::greater
+                                        : std::partial_ordering::less,
+                true};
+    }
+    if (fragmentNum.has_value()) {
+        return {*fragmentNum <=> *other.fragmentNum, true};
+    }
+    return {std::partial_ordering::equivalent, true};
+}
+
+std::partial_ordering ResumeTokenData::operator<=>(const ResumeTokenData& other) const {
+    return compareStreamPosition(other).ordering;
+}
+
 BSONObj ResumeTokenData::toBSON() const {
     // TODO SERVER-96418: Make ResumeTokenData an IDL type so that this method is auto-generated.
     BSONObjBuilder builder;
