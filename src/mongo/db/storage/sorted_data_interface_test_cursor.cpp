@@ -211,6 +211,85 @@ TEST_F(SortedDataInterfaceTest, ExhaustKeyStringCursorReversed) {
     }
 }
 
+// Seek into the middle of the index, then read the rest of the keys with nextKeyValueView(),
+// saving and restoring between reads. The sequence must be the same regardless of maxBatch.
+TEST_F(SortedDataInterfaceTest, SaveRestoreAfterSeekWhileIterating) {
+    const auto sorted(
+        harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
+
+    const int nToInsert = 20;
+    for (int i = 0; i < nToInsert; ++i) {
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(),
+                           recoveryUnit(),
+                           makeKeyString(sorted.get(), BSON("" << i), RecordId(42, i * 2)),
+                           true));
+        txn.commit();
+    }
+
+    const int start = 5;
+    const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
+    auto seekKey = makeKeyStringForSeek(sorted.get(), BSON("" << start), true, true);
+    auto view = cursor->seekForKeyValueView(recoveryUnit(), seekKey.finishAndGetBuffer());
+    ASSERT_FALSE(view.isEmpty());
+    ASSERT_EQ(*view.getRecordId(), RecordId(42, start * 2));
+
+    cursor->save();
+    cursor->restore(recoveryUnit());
+
+    for (int i = start + 1; i < nToInsert; ++i) {
+        view = cursor->nextKeyValueView(recoveryUnit());
+        ASSERT_FALSE(view.isEmpty());
+        ASSERT_EQ(*view.getRecordId(), RecordId(42, i * 2));
+
+        if (i % 3 == 0) {
+            cursor->save();
+            cursor->restore(recoveryUnit());
+        }
+    }
+    ASSERT_TRUE(cursor->nextKeyValueView(recoveryUnit()).isEmpty());
+
+    cursor->save();
+    cursor->restore(recoveryUnit());
+    ASSERT_TRUE(cursor->nextKeyValueView(recoveryUnit()).isEmpty());
+}
+
+// Scan into the middle of the index, then seek to EOF, ensure the key is cleared.
+TEST_F(SortedDataInterfaceTest, SeekToEofClearsSavedKey) {
+    const auto sorted(
+        harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
+
+    const int nToInsert = 20;
+    for (int i = 0; i < nToInsert; ++i) {
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(),
+                           recoveryUnit(),
+                           makeKeyString(sorted.get(), BSON("" << i), RecordId(42, i * 2)),
+                           true));
+        txn.commit();
+    }
+
+    const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
+
+    for (int i = 0; i < nToInsert / 2; ++i) {
+        const auto view = cursor->nextKeyValueView(recoveryUnit());
+        ASSERT_FALSE(view.isEmpty());
+        ASSERT_EQ(*view.getRecordId(), RecordId(42, i * 2));
+    }
+
+    cursor->save();
+    cursor->restore(recoveryUnit());
+
+    auto seekKey = makeKeyStringForSeek(sorted.get(), BSON("" << nToInsert + 10), true, true);
+    ASSERT_TRUE(
+        cursor->seekForKeyValueView(recoveryUnit(), seekKey.finishAndGetBuffer()).isEmpty());
+
+    cursor->save();
+    cursor->restore(recoveryUnit());
+    ASSERT_TRUE(cursor->nextKeyValueView(recoveryUnit()).isEmpty());
+}
 
 TEST_F(SortedDataInterfaceTest, CursorIterate1) {
     const auto sorted(
