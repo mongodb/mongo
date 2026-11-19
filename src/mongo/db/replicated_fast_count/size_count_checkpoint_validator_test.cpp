@@ -25,6 +25,8 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
 
+#include <algorithm>
+
 namespace mongo {
 namespace replicated_fast_count {
 namespace {
@@ -651,7 +653,8 @@ TEST_F(CheckpointOplogParsingTest, SplitFlushEntriesAreNotClassifiedAsCheckpoint
     for (const auto& entry : applyOpsEntries) {
         validator.preprocessOplogEntry(entry);
     }
-    validator.mergeAndValidate(operationContext(), {}, UUID::gen());
+    validator.mergeAndValidate(
+        operationContext(), {}, UUID::gen(), applyOpsEntries.back().getTimestamp());
 
     if (capturer.canReadMetrics()) {
         // mergeAndValidate() should validate zero checkpoints because no checkpoint oplog entries
@@ -775,7 +778,9 @@ protected:
                 SizeCountCheckpointValidator::recordDelta(record.uuid, record.ts, record.delta);
             }
         }
-        validator.mergeAndValidate(operationContext(), {buffer}, oplogUuid);
+        const auto lastAppliedTs = std::max(ops.empty() ? Timestamp{} : ops.back().getTimestamp(),
+                                            records.empty() ? Timestamp{} : records.back().ts);
+        validator.mergeAndValidate(operationContext(), {buffer}, oplogUuid, lastAppliedTs);
     }
 
     std::unique_ptr<SizeCountStore> sizeCountStore;
@@ -1003,7 +1008,7 @@ protected:
                                 {{adoptUuid,
                                   CollectionReplicatedMetadata{
                                       .sizeCount = CollectionSizeCount{.size = 5, .count = 1}}}}));
-        validator.mergeAndValidate(operationContext(), {}, oplogUuid);
+        validator.mergeAndValidate(operationContext(), {}, oplogUuid, kAdopt);
     }
 
     const UUID adoptUuid = UUID::gen();
@@ -1020,6 +1025,51 @@ TEST_F(SizeCountCheckpointValidatorTest, NoWatermarkNoCheckpointPasses) {
                     .delta = ReplicatedMetadataDelta{
                         .metadata = {.sizeCount = CollectionSizeCount{.size = 10, .count = 1}}}}});
     expectValidatorMetrics(capturer, {.recorded = 0, .evicted = 0, .skipped = 0, .validated = 0});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, FutureCheckpointWaitsForAppliedThroughTimestamp) {
+    otel::metrics::OtelMetricsCapturer metrics;
+    const UUID uuid = UUID::gen();
+    validator.preprocessOplogEntry(makeWatermarkEntry(kT1));
+    validator.preprocessOplogEntry(
+        makeCheckpointEntry(kT1, {{uuid, makeSizeCount({.size = 10, .count = 1})}}));
+    validator.preprocessOplogEntry(makeWatermarkEntry(kT3));
+    validator.preprocessOplogEntry(
+        makeCheckpointEntry(kT3, {{uuid, makeSizeCount({.size = 15, .count = 2})}}));
+    validator.mergeAndValidate(
+        operationContext(), {{makeDelta(kT0, uuid, {10, 1})}}, oplogUuid, kT0);
+    expectValidatorMetrics(metrics, {.recorded = 2, .evicted = 0, .skipped = 0, .validated = 0});
+
+    // Equality at a watermark permits validation, while the next checkpoint remains pending.
+    validator.mergeAndValidate(operationContext(), {}, oplogUuid, kT1);
+    expectValidatorMetrics(metrics, {.recorded = 2, .evicted = 1, .skipped = 0, .validated = 1});
+    validator.mergeAndValidate(operationContext(), {}, oplogUuid, kT2);
+    expectValidatorMetrics(metrics, {.recorded = 2, .evicted = 1, .skipped = 0, .validated = 1});
+    validator.mergeAndValidate(
+        operationContext(), {{makeDelta(kT2, uuid, {5, 1})}}, oplogUuid, kT3);
+    expectValidatorMetrics(metrics, {.recorded = 2, .evicted = 2, .skipped = 0, .validated = 2});
+    validator.mergeAndValidate(operationContext(), {}, oplogUuid, kEnd);
+    expectValidatorMetrics(metrics, {.recorded = 2, .evicted = 2, .skipped = 0, .validated = 2});
+}
+
+TEST_F(SizeCountCheckpointValidatorRecoveryTest, AdoptionWaitsForCheckpointEntryToBeApplied) {
+    otel::metrics::OtelMetricsCapturer metrics;
+    const UUID uuid = UUID::gen();
+    test_helpers::insertSizeCountEntry(
+        operationContext(),
+        *sizeCountStore,
+        uuid,
+        SizeCountStore::Entry{.timestamp = kT1, .size = 10, .count = 1});
+    const auto checkpoint = makeCheckpointEntry(kT1, {{uuid, makeSizeCount({10, 1})}});
+    BSONObjBuilder builder;
+    builder.append("ts", kT3);
+    builder.appendElementsUnique(checkpoint.getEntry().toBSON());
+    validator.preprocessOplogEntry(makeWatermarkEntry(kT1));
+    validator.preprocessOplogEntry(repl::OplogEntry(builder.obj()));
+    validator.mergeAndValidate(operationContext(), {}, oplogUuid, kT1);
+    expectValidatorMetrics(metrics, {.recorded = 1, .evicted = 0, .skipped = 0, .validated = 0});
+    validator.mergeAndValidate(operationContext(), {}, oplogUuid, kT3);
+    expectValidatorMetrics(metrics, {.recorded = 1, .evicted = 1, .skipped = 1, .validated = 0});
 }
 
 TEST_F(SizeCountCheckpointValidatorTest, WatermarkThenCheckpointAcrossBatches) {
@@ -1538,7 +1588,7 @@ TEST_F(SizeCountCheckpointValidatorTest, DeltasFromMultipleWorkerBuffersAreMerge
         {makeDelta(kT0, uuid, {.size = 5, .count = 1}),
          makeDelta(kT2, uuid, {.size = 5, .count = 0})},
     };
-    validator.mergeAndValidate(operationContext(), buffers, oplogUuid);
+    validator.mergeAndValidate(operationContext(), buffers, oplogUuid, kT3);
 
     expectValidatorMetrics(capturer, {.recorded = 2, .evicted = 2, .skipped = 0, .validated = 1});
 }

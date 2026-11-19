@@ -681,7 +681,8 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
                 if (!_oplogUuid) {
                     _oplogUuid = getOplogUuid(opCtx);
                 }
-                _checkpointValidator.mergeAndValidate(opCtx, validatorBuffers.value(), *_oplogUuid);
+                _checkpointValidator.mergeAndValidate(
+                    opCtx, validatorBuffers.value(), *_oplogUuid, ops.back().getTimestamp());
             }
         }
 

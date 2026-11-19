@@ -1338,6 +1338,7 @@ mongo_cc_library(
         ":repl_server_parameters",
         "//src/mongo:base",
         "//src/mongo/db:multi_key_path_tracker",
+        "//src/mongo/db/replicated_fast_count:size_count_checkpoint_validator",
         "//src/mongo/db/validate:validate_state",
         "//src/mongo/stdx",
         "//src/mongo/util:fail_point",
@@ -1373,6 +1374,7 @@ mongo_cc_library(
     ],
     deps = [
         ":apply_ops_command_info",
+        ":internode_validation_hash_utils",
         ":oplog",
         ":oplog_application",
         ":oplog_application_interface",
@@ -1389,6 +1391,7 @@ mongo_cc_library(
         "//src/mongo/db:service_context",
         "//src/mongo/db/admission/execution_control:execution_admission_context",
         "//src/mongo/db/auth:authorization_manager_global",
+        "//src/mongo/db/replicated_fast_count:size_count_checkpoint_validator",
         "//src/mongo/db/validate:validate_state",
         "//src/mongo/util:fail_point",
         "//src/mongo/util/concurrency:thread_pool",
@@ -2265,6 +2268,7 @@ mongo_cc_unit_test(
     name = "pipelined_oplog_applier_test",
     srcs = [
         "pipelined_oplog_applier_test.cpp",
+        "pipelined_oplog_applier_validation_test.cpp",
     ],
     tags = ["mongo_unittest_second_group"],
     target_compatible_with = select({
@@ -2280,6 +2284,7 @@ mongo_cc_unit_test(
         ":oplog_entry",
         ":oplog_entry_test_helpers",
         ":pipelined_oplog_applier",
+        ":repl_server_parameters",
         ":storage_interface_impl",
         "//src/mongo:base",
         "//src/mongo/db:multi_key_path_tracker",
@@ -2288,6 +2293,8 @@ mongo_cc_unit_test(
         "//src/mongo/db/admission/ticketing:admission_context",
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/index:multikey_paths",
+        "//src/mongo/db/replicated_fast_count:replicated_fast_count_test_helpers",
+        "//src/mongo/db/replicated_fast_count:size_count_checkpoint_validator",
         "//src/mongo/db/shard_role",
         "//src/mongo/db/shard_role/shard_catalog:collection_options",
         "//src/mongo/db/shard_role/shard_catalog:index_catalog",

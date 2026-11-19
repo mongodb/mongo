@@ -22,15 +22,11 @@ MONGO_FAIL_POINT_DEFINE(hangBeforePipelinedApplierCapacityWait);
 
 }  // namespace
 
-std::shared_ptr<std::atomic<uint32_t>> PipelinedApplierBatchTracker::addBatch(
-    OpTimeAndWallTime lastOpTime,
-    uint32_t numWorkers,
-    std::vector<OplogEntry> ops,
-    std::vector<std::vector<OplogEntry>> derivedOps,
-    std::shared_ptr<std::vector<WorkerMultikeyPathInfo>> multikeyMetadata,
-    uint64_t batchBytes,
-    std::unique_ptr<collection_validation::BatchValidationLock> validateLock) {
+std::shared_ptr<std::atomic<uint32_t>> PipelinedApplierBatchTracker::addBatch(InflightBatch batch,
+                                                                              uint32_t numWorkers) {
+    invariant(!batch.remainingWorkers);
     auto remainingWorkers = std::make_shared<std::atomic<uint32_t>>(numWorkers);
+    batch.remainingWorkers = remainingWorkers;
     {
         std::unique_lock lk(_mutex);
         invariant(!_shutdown);
@@ -84,13 +80,8 @@ std::shared_ptr<std::atomic<uint32_t>> PipelinedApplierBatchTracker::addBatch(
                 return nullptr;
             }
         }
-        _inflightBatches.push_back({lastOpTime,
-                                    remainingWorkers,
-                                    std::move(ops),
-                                    std::move(derivedOps),
-                                    batchBytes,
-                                    std::move(multikeyMetadata),
-                                    std::move(validateLock)});
+        const auto batchBytes = batch.batchBytes;
+        _inflightBatches.push_back(std::move(batch));
         _inflightBytes += batchBytes;
     }
     // It's possible to enqueue a batch with zero remaining workers, with the intention of advancing
@@ -208,5 +199,3 @@ bool PipelinedApplierBatchTracker::hasAbandonedBatch() const {
 }
 
 }  // namespace mongo::repl
-
-

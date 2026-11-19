@@ -9,6 +9,7 @@
 #include "mongo/util/uuid.h"
 
 #include <deque>
+#include <mutex>
 #include <vector>
 
 #include <absl/container/flat_hash_map.h>
@@ -96,12 +97,14 @@ struct ValidatorInterval {
  *   zero or more collections at some valid-as-of timestamp.
  *
  * For each batch, the validation algorithm is as follows:
- * 1. Before oplog application, record each watermark and checkpoint in the batch using
- *    `preprocessOplogEntry()`. There can be zero or more watermarks and zero or more checkpoints.
+ * 1. Record watermarks and checkpoints in oplog order using `preprocessOplogEntry()`, which may
+ *    run ahead of application and concurrently with merging. Each batch can contain zero or more
+ *    watermarks and zero or more checkpoints.
  * 2. During oplog application, record deltas to replicated metadata in thread-local buffers
  *    using `recordDelta()`.
  * 3. After oplog application, merge the thread-local buffers and validate the checkpoints in
- *    the batch, if any, against the replicated metadata deltas recorded during step 2.
+ *    the batch, if any, against the replicated metadata deltas recorded during step 2, provided
+ *    their valid-as-of timestamps are at or below lastAppliedTs.
  *
  * If validation fails while the `fassertOnPerCollectionContinuousInternodeValidationFailure` server
  * parameter is enabled, the node crashes with an fassert.
@@ -136,15 +139,19 @@ public:
      * Merges the provided `threadRecords`. For each recorded checkpoint, computes the expected
      * `CheckpointContents` and then validates it.
      *
+     * `lastAppliedTs` is an inclusive upper bound on the valid-as-of timestamps of checkpoints
+     * that can be validated.
+     *
      * This function does not validate the primary's checkpoint entry for the oplog's replicated
      * metadata.
      */
     void mergeAndValidate(OperationContext* opCtx,
                           const ValidatorBuffers& threadRecords,
-                          UUID oplogUuid);
+                          UUID oplogUuid,
+                          Timestamp lastAppliedTs);
 
     /**
-     * Assigns `this` to a new `SizeCountCheckpointValidator` instance.
+     * Clears the validator's baseline, intervals, and pending checkpoints.
      *
      * This functiom must be called between secondary terms to ensure the
      * `SizeCountCheckpointValidator` does not contain stale state from a previous secondary term.
@@ -161,6 +168,7 @@ private:
 
     /**
      * Adopts the latest checkpoint from a batch into `_baseline`.
+     * lastAppliedTs excludes checkpoints whose metadata writes have not finished applying.
      *
      * The `SizeCountCheckpointValidator` must adopt a replicated metadata checkpoint from the
      * primary before it can begin validation because the standby does not apply all oplog since the
@@ -170,7 +178,7 @@ private:
      *
      * After a checkpoint is adopted, the `SizeCountCheckpointValidator` can begin validation.
      */
-    void adoptCheckpoint(OperationContext* opCtx);
+    void adoptCheckpoint(OperationContext* opCtx, Timestamp lastAppliedTs);
 
     /**
      * Computes the expected `CheckpointContents` for use in validation.
@@ -199,6 +207,9 @@ private:
      * `_ongoing`.
      */
     void recordRepairDelta(const BSONObj& o2, Timestamp ts);
+
+    // Protects validator state shared by preprocessing, merging, and reset.
+    std::mutex _mutex;
 
     /**
      * Absolute replicated metadata values since the last `mergeAndValidate()`. Checkpoints in the

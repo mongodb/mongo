@@ -194,16 +194,13 @@ protected:
             auto& item = owned.item;
             auto multikeyMetadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(1);
             item.multikeyPathInfo = &(*multikeyMetadata)[0];
-            item.batchRemainingWorkers = tracker.addBatch(
-                item.ops.empty() ? OpTimeAndWallTime{}
-                                 : OpTimeAndWallTime{item.ops.back()->getOpTime(),
-                                                     item.ops.back()->getWallClockTime()},
-                1,
-                {},
-                {},
-                multikeyMetadata,
-                0,
-                nullptr);
+            item.batchRemainingWorkers =
+                tracker.addBatch({.lastOpTime = item.ops.empty()
+                                      ? OpTimeAndWallTime{}
+                                      : OpTimeAndWallTime{item.ops.back()->getOpTime(),
+                                                          item.ops.back()->getWallClockTime()},
+                                  .multikeyMetadata = multikeyMetadata},
+                                 1);
             pool.enqueue(0, std::move(item));
         }
         pool.shutdownAndJoin();
@@ -504,12 +501,15 @@ TEST_F(PipelinedWorkItemTest, KeepsMultikeyResultsWithTheirBatchWhenALaterBatchF
     PipelinedApplierBatchTracker tracker;
     auto metadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(4);
     std::weak_ptr<std::vector<WorkerMultikeyPathInfo>> weakMetadata = metadata;
-    auto counter = tracker.addBatch(
-        {second.getOpTime(), second.getWallClockTime()}, 2, {}, {}, metadata, 0, nullptr);
+    auto counter = tracker.addBatch({.lastOpTime = {second.getOpTime(), second.getWallClockTime()},
+                                     .multikeyMetadata = metadata},
+                                    2);
     auto laterMetadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(4);
     std::weak_ptr<std::vector<WorkerMultikeyPathInfo>> weakLaterMetadata = laterMetadata;
-    auto laterCounter = tracker.addBatch(
-        {later.getOpTime(), later.getWallClockTime()}, 1, {}, {}, laterMetadata, 0, nullptr);
+    auto laterCounter =
+        tracker.addBatch({.lastOpTime = {later.getOpTime(), later.getWallClockTime()},
+                          .multikeyMetadata = laterMetadata},
+                         1);
     auto firstOwned = makeItem({first});
     firstOwned.item.batchRemainingWorkers = counter;
     firstOwned.item.multikeyPathInfo = &(*metadata)[0];
@@ -745,7 +745,8 @@ TEST_F(PipelinedWorkItemTest, BatchStaysIncompleteUntilTheWholeSliceIsApplied) {
                                        owned.item.ops.back()->getWallClockTime()};
     auto multikeyMetadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(1);
     owned.item.multikeyPathInfo = &(*multikeyMetadata)[0];
-    auto counter = tracker.addBatch(lastOpTime, 1, {}, {}, multikeyMetadata, 0, nullptr);
+    auto counter =
+        tracker.addBatch({.lastOpTime = lastOpTime, .multikeyMetadata = multikeyMetadata}, 1);
     owned.item.batchRemainingWorkers = counter;
     Notification<void> reached;
     Notification<void> release;
@@ -796,7 +797,8 @@ TEST_F(PipelinedWorkItemTest, RecordsMultikeyAfterTheWholeSliceIsApplied) {
                                        owned.item.ops.back()->getWallClockTime()};
     auto multikeyMetadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(1);
     owned.item.multikeyPathInfo = &(*multikeyMetadata)[0];
-    auto counter = tracker.addBatch(lastOpTime, 1, {}, {}, multikeyMetadata, 0, nullptr);
+    auto counter =
+        tracker.addBatch({.lastOpTime = lastOpTime, .multikeyMetadata = multikeyMetadata}, 1);
     owned.item.batchRemainingWorkers = counter;
     Notification<void> reached;
     Notification<void> release;
@@ -852,28 +854,20 @@ TEST_F(PipelinedWorkItemTest, ShutdownAbandonedSliceDoesNotCompleteItsBatch) {
     // owned and peer are slices of the first batch, so they share a counter initialized to two
     // workers.
     auto firstMetadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(2);
-    auto counter = tracker.addBatch(
-        {peer.item.ops.back()->getOpTime(), peer.item.ops.back()->getWallClockTime()},
-        2,
-        {},
-        {},
-        firstMetadata,
-        0,
-        nullptr);
+    auto counter = tracker.addBatch({.lastOpTime = {peer.item.ops.back()->getOpTime(),
+                                                    peer.item.ops.back()->getWallClockTime()},
+                                     .multikeyMetadata = firstMetadata},
+                                    2);
     owned.item.batchRemainingWorkers = counter;
     owned.item.multikeyPathInfo = &(*firstMetadata)[0];
     peer.item.batchRemainingWorkers = counter;
     peer.item.multikeyPathInfo = &(*firstMetadata)[1];
     // later belongs to a second batch that only needs one worker to finish.
     auto laterMetadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(2);
-    auto laterCounter = tracker.addBatch(
-        {later.item.ops.back()->getOpTime(), later.item.ops.back()->getWallClockTime()},
-        1,
-        {},
-        {},
-        laterMetadata,
-        0,
-        nullptr);
+    auto laterCounter = tracker.addBatch({.lastOpTime = {later.item.ops.back()->getOpTime(),
+                                                         later.item.ops.back()->getWallClockTime()},
+                                          .multikeyMetadata = laterMetadata},
+                                         1);
     later.item.batchRemainingWorkers = laterCounter;
     later.item.multikeyPathInfo = &(*laterMetadata)[1];
     // Interrupt the insert of _id: 0 with a shutdown error; the other inserts are allowed to
@@ -910,28 +904,20 @@ TEST_F(PipelinedWorkItemTest, ShutdownAbandonedSliceDoesNotRecordMultikeyWrites)
     // owned and peer are slices of the first batch, so they share a counter initialized to two
     // workers.
     auto firstMetadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(2);
-    auto counter = tracker.addBatch(
-        {peer.item.ops.back()->getOpTime(), peer.item.ops.back()->getWallClockTime()},
-        2,
-        {},
-        {},
-        firstMetadata,
-        0,
-        nullptr);
+    auto counter = tracker.addBatch({.lastOpTime = {peer.item.ops.back()->getOpTime(),
+                                                    peer.item.ops.back()->getWallClockTime()},
+                                     .multikeyMetadata = firstMetadata},
+                                    2);
     owned.item.batchRemainingWorkers = counter;
     owned.item.multikeyPathInfo = &(*firstMetadata)[0];
     peer.item.batchRemainingWorkers = counter;
     peer.item.multikeyPathInfo = &(*firstMetadata)[1];
     // later belongs to a second batch that only needs one worker to finish.
     auto laterMetadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(2);
-    auto laterCounter = tracker.addBatch(
-        {later.item.ops.back()->getOpTime(), later.item.ops.back()->getWallClockTime()},
-        1,
-        {},
-        {},
-        laterMetadata,
-        0,
-        nullptr);
+    auto laterCounter = tracker.addBatch({.lastOpTime = {later.item.ops.back()->getOpTime(),
+                                                         later.item.ops.back()->getWallClockTime()},
+                                          .multikeyMetadata = laterMetadata},
+                                         1);
     later.item.batchRemainingWorkers = laterCounter;
     later.item.multikeyPathInfo = &(*laterMetadata)[1];
     // Interrupt the insert of _id: 0 with a shutdown error; the other inserts are allowed to

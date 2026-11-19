@@ -6,6 +6,7 @@
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/replicated_fast_count/size_count_checkpoint_validator.h"
 #include "mongo/db/validate/validate_state.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/duration.h"
@@ -55,20 +56,14 @@ public:
         // Multiple batches of POA can hold the lock at once as the lock can be grabbed by several
         // callers in MODE_IX at the same time.
         std::unique_ptr<collection_validation::BatchValidationLock> validateLock;
+        boost::optional<replicated_fast_count::ValidatorBuffers> validatorBuffers;
     };
 
-    // Registers a batch before dispatch and returns the counter shared by its worker slices.
-    // Blocks if either the length of the queue or the total size of the queue in bytes is over the
-    // server parameter thresholds. Returns nullptr if a shutdown was requested while the dispatcher
-    // was waiting.
-    std::shared_ptr<std::atomic<uint32_t>> addBatch(
-        OpTimeAndWallTime lastOpTime,
-        uint32_t numWorkers,
-        std::vector<OplogEntry> ops,
-        std::vector<std::vector<OplogEntry>> derivedOps,
-        std::shared_ptr<std::vector<WorkerMultikeyPathInfo>> multikeyMetadata,
-        uint64_t batchBytes,
-        std::unique_ptr<collection_validation::BatchValidationLock> validateLock);
+    // Registers a batch before dispatch and returns the completion counter shared by its worker
+    // slices. Blocks if either the length of the queue or the total size of the queue in bytes is
+    // over the server parameter thresholds. Returns nullptr if a shutdown was requested while the
+    // dispatcher was waiting.
+    std::shared_ptr<std::atomic<uint32_t>> addBatch(InflightBatch batch, uint32_t numWorkers);
 
     struct BackpressureReason {
         uint64_t batchesOverThreshold;

@@ -9,6 +9,7 @@
 #include "mongo/db/repl/clang_checked/mutex.h"
 #include "mongo/db/repl/oplog_entry_or_grouped_inserts.h"
 #include "mongo/db/repl/serial_processor.h"
+#include "mongo/db/replicated_fast_count/size_count_checkpoint_validator.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
@@ -52,6 +53,9 @@ public:
         std::shared_ptr<std::atomic<uint32_t>> batchRemainingWorkers;
         // Points to this worker's slot, owned by the in-flight batch until completion.
         WorkerMultikeyPathInfo* multikeyPathInfo = nullptr;
+        // Records metadata deltas during application, owned by the in-flight batch until
+        // completion.
+        replicated_fast_count::ValidatorBuffers::value_type* validatorBuffer = nullptr;
     };
 
     /**

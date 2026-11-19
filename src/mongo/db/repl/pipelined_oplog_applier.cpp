@@ -7,6 +7,7 @@
 #include "mongo/db/admission/ticketing/admission_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/multi_key_path_tracker.h"
+#include "mongo/db/repl/internode_validation_hash_utils.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_applier_batcher.h"
 #include "mongo/db/repl/oplog_applier_dispatch.h"
@@ -244,17 +245,21 @@ void PipelinedOplogApplier::_dispatchBatch(OperationContext* opCtx, std::vector<
 
     pauseBatchApplicationAfterWritingOplogEntriesAndBeforeApplication(opCtx);
 
-    // A batch containing any entry that must apply alone — e.g. DDL, the new-primary noop, or a
-    // truncate — is applied serialized. This is done through a "drain, dispatch, drain" sequence:
-    // drain everything in flight, dispatch the batch, then drain and wait for it to be applied
-    // and published before resuming.
-    // If the batch doesn't require serialization, the batch is dispatched to the worker pool and
-    // pipelined with other batches.
-    // We pass in the current lastApplied opTime as a bound on the smallest opTime that can be run
-    // by a worker while this batch is executing. Since this is the LOWER bound, it's alright and
-    // expected if the lastApplied moves forward and the value passed in is stale.
+    PipelinedApplierBatchTracker::InflightBatch batch{
+        .lastOpTime = {ops.back().getOpTime(), ops.back().getWallClockTime()},
+        .ops = std::move(ops)};
+    // TODO SERVER-139269: Add adoption barriers and call preparePipelinedBatchValidation() here.
+
+    // A batch containing any entry that must apply alone — e.g. DDL, the new-primary
+    // noop, or a truncate — is applied serialized. This is done through a "drain, dispatch, drain"
+    // sequence: drain everything in flight, dispatch the batch, then drain and wait for it to be
+    // applied and published before resuming. If the batch doesn't require serialization, the batch
+    // is dispatched to the worker pool and pipelined with other batches. We pass in the current
+    // lastApplied opTime as a bound on the smallest opTime that can be run by a worker while this
+    // batch is executing. Since this is the LOWER bound, it's alright and expected if the
+    // lastApplied moves forward and the value passed in is stale.
     if (batchMustBeAppliedSerialized(
-            getOptions().mode, _replCoord->getMyLastAppliedOpTime().getTimestamp(), ops)) {
+            getOptions().mode, _replCoord->getMyLastAppliedOpTime().getTimestamp(), batch.ops)) {
         // A failed drain returns without dispatching the batch; the run loop observes the
         // abandonment in the batch tracker and stops dispatching.
         if (!_drainWorkers()) {
@@ -267,14 +272,14 @@ void PipelinedOplogApplier::_dispatchBatch(OperationContext* opCtx, std::vector<
         auto* splitSessManager = _replCoord->getSplitPrepareSessionManager();
         std::vector<std::pair<LogicalSessionId, TxnNumber>> splitReleases;
         if (getOptions().mode == OplogApplication::Mode::kSecondary) {
-            for (const auto& op : ops) {
+            for (const auto& op : batch.ops) {
                 if (op.isPreparedCommitOrAbort() &&
                     splitSessManager->isSessionSplit(*op.getSessionId(), *op.getTxnNumber())) {
                     splitReleases.emplace_back(*op.getSessionId(), *op.getTxnNumber());
                 }
             }
         }
-        _dispatchBatchToWorkers(opCtx, std::move(ops));
+        _dispatchBatchToWorkers(opCtx, std::move(batch));
         if (!_drainWorkers()) {
             return;
         }
@@ -282,72 +287,62 @@ void PipelinedOplogApplier::_dispatchBatch(OperationContext* opCtx, std::vector<
             splitSessManager->releaseSplitSessions(lsid, txnNumber);
         }
     } else {
-        _dispatchBatchToWorkers(opCtx, std::move(ops));
+        _dispatchBatchToWorkers(opCtx, std::move(batch));
     }
 }
 
-void PipelinedOplogApplier::_dispatchBatchToWorkers(OperationContext* opCtx,
-                                                    std::vector<OplogEntry> ops) {
+void PipelinedOplogApplier::_dispatchBatchToWorkers(
+    OperationContext* opCtx, PipelinedApplierBatchTracker::InflightBatch batch) {
     using WorkItem = PipelinedApplierWorkerPool::WorkItem;
     _workerPool.resizeWorkers(getThreadCountForReplWorkerPool());
     const size_t numWorkers = _workerPool.numWorkers();
-    invariant(!ops.empty());
+    invariant(!batch.ops.empty());
 
     // Take the validation lock (MODE_IX) for the entire duration of this batch to prevent
     // validate from running while the batch is in-flight.
-    auto validateLock = std::make_unique<collection_validation::BatchValidationLock>(
+    batch.validateLock = std::make_unique<collection_validation::BatchValidationLock>(
         cc().getServiceContext(), opCtx);
 
-    // Capture the last op time to publish lastApplied after all workers finish.
-    const OpTimeAndWallTime lastOpTime{ops.back().getOpTime(), ops.back().getWallClockTime()};
-
-    // Holds pseudo-operations (expanded applyOps, config.transactions session updates, expanded
-    // container ops, etc).
-    std::vector<std::vector<OplogEntry>> derivedOps;
-    // Note that writerVectors holds ApplierOperations, which simply has pointers to the OplogEntry
-    // objects in ops and derivedOps. The ApplierOperations do not own the OplogEntry objects; the
-    // inflight batch in the batch tracker owns them.
+    // Writer vectors hold pointers to entries owned by batch.ops and batch.derivedOps.
     std::vector<std::vector<ApplierOperation>> writerVectors(numWorkers);
-    // Continuous internode checkpoint validation is only implemented for the classic applier, so
-    // no validator is passed here.
+    // Preprocessing records checkpoints ahead of the advancer's applied-through frontier.
     fillWriterVectors(getOptions(),
                       _disableTransactionUpdateCoalescing,
                       opCtx,
-                      &ops,
+                      &batch.ops,
                       &writerVectors,
-                      &derivedOps,
-                      /*checkpointValidator=*/nullptr);
+                      &batch.derivedOps,
+                      batch.validatorBuffers ? &_checkpointValidator : nullptr);
 
     std::vector<WorkItem> items(numWorkers);
     uint32_t participatingWorkers = 0;
     int64_t opsDispatched = 0;
     // Tracks the total serialized byte size of the ops dispatched in this batch, used by the batch
     // tracker to apply byte-based backpressure.
-    uint64_t batchBytes = 0;
     for (size_t workerIdx = 0; workerIdx < numWorkers; ++workerIdx) {
         if (writerVectors[workerIdx].empty())
             continue;
         ++participatingWorkers;
         opsDispatched += writerVectors[workerIdx].size();
         for (const auto& applierOp : writerVectors[workerIdx]) {
-            batchBytes += applierOp->getRawObjSizeBytes();
+            batch.batchBytes += applierOp->getRawObjSizeBytes();
         }
         items[workerIdx].ops = std::move(writerVectors[workerIdx]);
     }
 
-    // Register the batch and move "ops" and "derivedOps" into the batch tracker. This is to
+    // Register the owned batch with the batch tracker. This is to
     // guarantee that the oplog entries in the batch are alive for the duration the workers apply
     // the batch. The original batch boundary is registered even when the dispatching routes no
     // operations to any worker, so lastApplied still reaches it. addBatch may also block here if
     // the tracker is applying backpressure due to the inflight-batches or inflight-bytes caps.
     auto multikeyMetadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(numWorkers);
-    auto remainingWorkers = _batchTracker.addBatch(lastOpTime,
-                                                   participatingWorkers,
-                                                   std::move(ops),
-                                                   std::move(derivedOps),
-                                                   multikeyMetadata,
-                                                   batchBytes,
-                                                   std::move(validateLock));
+    batch.multikeyMetadata = multikeyMetadata;
+    if (batch.validatorBuffers) {
+        for (size_t workerIdx = 0; workerIdx < numWorkers; ++workerIdx) {
+            items[workerIdx].validatorBuffer = &(*batch.validatorBuffers)[workerIdx];
+        }
+    }
+    auto remainingWorkers = _batchTracker.addBatch(std::move(batch), participatingWorkers);
     if (!remainingWorkers) {
         // Batch tracker shut down while we were waiting for capacity.
         return;
@@ -395,6 +390,13 @@ void PipelinedOplogApplier::_publishBatch(
         opCtx.get(), AdmissionContext::Priority::kExempt);
     UnreplicatedWritesBlock noRep(opCtx.get());
     setWorkerOpCtxStates(opCtx.get());
+    if (batch.validatorBuffers) {
+        if (!_oplogUuid) {
+            _oplogUuid = getOplogUuid(opCtx.get());
+        }
+        validatePipelinedBatch(opCtx.get(), batch, _checkpointValidator, *_oplogUuid);
+        // TODO SERVER-139269: Assert serialized adoption and update its flag.
+    }
     const Timestamp lastApplied = _replCoord->getMyLastAppliedOpTime().getTimestamp();
     for (const auto& infoVector : *batch.multikeyMetadata) {
         for (const auto& info : infoVector) {
@@ -418,6 +420,9 @@ Status applyWorkItem(OperationContext* opCtx,
                      const PipelinedApplierWorkerPool::WorkItem& item,
                      WorkerMultikeyPathInfo* multikeyPathInfo) {
     invariant(multikeyPathInfo);
+    invariant(!item.validatorBuffer || item.validatorBuffer->empty());
+    const replicated_fast_count::SizeCountCheckpointValidator::ScopedThreadBuffer validatorBuffer(
+        item.validatorBuffer);
     // Oplog application must not wait on execution tickets or flow control.
     ScopedAdmissionPriority<ExecutionAdmissionContext> skipTicketAcquisition(
         opCtx, AdmissionContext::Priority::kExempt);
@@ -450,6 +455,34 @@ Status applyWorkItem(OperationContext* opCtx,
         PipelinedApplyOtelMetrics::addOpsAppliedByWorkers(item.ops.size());
     }
     return status;
+}
+
+void preparePipelinedBatchValidation(OperationContext* opCtx,
+                                     const OplogApplier::Options& options,
+                                     PipelinedApplierBatchTracker::InflightBatch& batch,
+                                     size_t numWorkers) {
+    invariant(!batch.validatorBuffers);
+    const bool enabled = options.mode == OplogApplication::Mode::kSecondary &&
+        isContinuousInternodeValidationPerCollectionEnabled(opCtx);
+    if (!enabled) {
+        return;
+    }
+    batch.validatorBuffers.emplace(numWorkers);
+}
+
+void validatePipelinedBatch(OperationContext* opCtx,
+                            const PipelinedApplierBatchTracker::InflightBatch& batch,
+                            replicated_fast_count::SizeCountCheckpointValidator& validator,
+                            UUID oplogUuid) {
+    if (!batch.validatorBuffers) {
+        return;
+    }
+    invariant(batch.remainingWorkers);
+    invariant(batch.remainingWorkers->load(std::memory_order_acquire) == 0);
+    // By passing in the batch's last opTime, we ensure the validator will only validate checkpoints
+    // up to and at that timestamp.
+    validator.mergeAndValidate(
+        opCtx, *batch.validatorBuffers, oplogUuid, batch.lastOpTime.opTime.getTimestamp());
 }
 
 void consumeWorkItem(size_t workerIdx,

@@ -42,6 +42,9 @@ public:
 
     ~PipelinedOplogApplier() override;
 
+    // TODO SERVER-139269: Reset the baseline adoption flag alongside the validator during step-up.
+    // Clearing the flag restores adoption barriers for the next secondary term.
+
 private:
     void _run(OplogBuffer* oplogBuffer) override;
 
@@ -62,7 +65,8 @@ private:
      * Derives and routes one batch of oplog entries onto the workers and registers the batch with
      * the batch tracker.
      */
-    void _dispatchBatchToWorkers(OperationContext* opCtx, std::vector<OplogEntry> ops);
+    void _dispatchBatchToWorkers(OperationContext* opCtx,
+                                 PipelinedApplierBatchTracker::InflightBatch batch);
 
     // Waits for all queued and active worker tasks to finish. Returns true once all dispatched
     // batches are fully published, meaning worker threads and the advancer are idle. Returns false
@@ -83,6 +87,8 @@ private:
 
     bool _disableTransactionUpdateCoalescing = false;
 
+    boost::optional<UUID> _oplogUuid;
+
     // Tracks dispatched batches in FIFO order and signals when their workers finish.
     PipelinedApplierBatchTracker _batchTracker;
 
@@ -93,13 +99,23 @@ private:
     PipelinedApplierAdvancer _advancer;
 };
 
-/**
- * Applies the slice of ops in 'item' and captures deferred multikey writes in the supplied output.
- */
+// Applies a worker slice and records its multikey metadata and validation deltas.
 [[nodiscard]] Status applyWorkItem(OperationContext* opCtx,
                                    const OplogApplier::Options& options,
                                    const PipelinedApplierWorkerPool::WorkItem& item,
                                    WorkerMultikeyPathInfo* multikeyPathInfo);
+
+// Allocates a batch's worker buffers when checkpoint validation is enabled.
+void preparePipelinedBatchValidation(OperationContext* opCtx,
+                                     const OplogApplier::Options& options,
+                                     PipelinedApplierBatchTracker::InflightBatch& batch,
+                                     size_t numWorkers);
+
+// Merges and validates a completed batch's deltas through its final timestamp.
+void validatePipelinedBatch(OperationContext* opCtx,
+                            const PipelinedApplierBatchTracker::InflightBatch& batch,
+                            replicated_fast_count::SizeCountCheckpointValidator& validator,
+                            UUID oplogUuid);
 
 /**
  * Applies 'item' on the current worker thread, fasserting on any failure other than shutdown.
