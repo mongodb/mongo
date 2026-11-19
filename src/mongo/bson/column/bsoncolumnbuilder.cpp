@@ -147,6 +147,11 @@ void _validateNoNestedBSONColumn(const BSONElement& elem) {
         for (const auto& sub : elem.Obj()) {
             _validateNoNestedBSONColumn(sub);
         }
+    } else if (elem.type() == BSONType::codeWScope) {
+        // The scope document can hold arbitrary BSON, including BSONColumn binData.
+        for (const auto& sub : elem.codeWScopeObject()) {
+            _validateNoNestedBSONColumn(sub);
+        }
     }
 }
 

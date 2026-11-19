@@ -4055,6 +4055,23 @@ TEST_F(BSONColumnTest, BinDataColumnSubtypeNestedInArrayRejectedByBuilder) {
     ASSERT_THROWS_CODE(cb.append(bsonArr), DBException, 12506300);
 }
 
+TEST_F(BSONColumnTest, BinDataColumnSubtypeInCodeWScopeRejectedByBuilder) {
+    // A binData/Column field inside a CodeWScope scope document must be rejected, including when
+    // the CodeWScope is itself nested in an object or array.
+    std::vector<uint8_t> payload{'\0'};
+    BSONObjBuilder scope;
+    scope.appendBinData("c"sv, payload.size(), BinDataType::Column, payload.data());
+
+    BSONObjBuilder outer;
+    outer.appendCodeWScope("x"sv, "x"sv, scope.obj());
+    BSONObj obj = outer.obj();
+    ASSERT_THROWS_CODE(cb.append(obj.firstElement()), DBException, 12506300);
+    ASSERT_THROWS_CODE(cb.append(obj), DBException, 12506300);
+
+    BSONObj nested = BSON("o" << obj);
+    ASSERT_THROWS_CODE(cb.append(nested), DBException, 12506300);
+}
+
 TEST_F(BSONColumnTest, EmptyStringAfterUnencodable) {
     std::vector<BSONElement> elems = {createElementString("\0"sv), createElementString(""sv)};
 
