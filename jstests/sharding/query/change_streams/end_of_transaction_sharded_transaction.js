@@ -54,7 +54,18 @@ describe("endOfTransaction for a sharded transaction", function () {
     let shard1Name;
 
     before(function () {
-        st = new ShardingTest({shards: 2, rs: {nodes: 1}});
+        st = new ShardingTest({
+            shards: 2,
+            rs: {
+                nodes: 1,
+                setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1},
+            },
+            other: {
+                configOptions: {
+                    setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1},
+                },
+            },
+        });
         st.stopBalancer();
         mongos = st.s;
         shard0Name = st.shard0.shardName;
