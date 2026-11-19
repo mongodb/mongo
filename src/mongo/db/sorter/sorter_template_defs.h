@@ -27,6 +27,7 @@
 #include "mongo/util/str.h"
 
 #include <algorithm>
+#include <array>
 #include <cerrno>
 #include <cstdint>
 #include <cstdlib>
@@ -595,6 +596,7 @@ public:
                   const Settings& settings)
         : MergeableSorter<Key, Value, Comparator>(opts, comp, std::move(spiller), settings) {
         invariant(opts.limit == 0);
+        _setUpBuffers();
     }
 
     NoLimitSorter(const std::string& storageIdentifier,
@@ -618,6 +620,13 @@ public:
                                                                                  this->_settings);
                        });
         this->_stats.setSpilledRanges(iters.size());
+        _setUpBuffers();
+    }
+
+    SharedBufferFragmentBuilder& memPool() override {
+        auto* pool = _fillingBuffer->pool;
+        invariant(pool);
+        return *pool;
     }
 
     template <typename DataProducer>
@@ -626,12 +635,12 @@ public:
         invariant(!this->_spillsFinalized);
         invariant(!_paused);
 
-        auto& keyVal = _data.emplace_back(dataProducer());
+        auto& keyVal = _fillingBuffer->data.emplace_back(dataProducer());
 
-        auto& memPool = this->_memPool;
-        if (memPool) {
-            auto memUsedInsideSorter = (sizeof(Key) + sizeof(Value)) * (_data.size() + 1);
-            this->_stats.setMemUsage(memPool->memUsage() + memUsedInsideSorter);
+        if (_fillingBuffer->pool) {
+            auto memUsedInsideSorter = (sizeof(Key) + sizeof(Value)) *
+                (_fillingBuffer->data.size() + _sortedBuffer->data.size() + 1);
+            this->_stats.setMemUsage(_fillingBuffer->pool->memUsage() + memUsedInsideSorter);
         } else {
             auto memUsage = keyVal.first.memUsageForSorter() + keyVal.second.memUsageForSorter();
             this->_stats.incrementMemUsage(memUsage);
@@ -659,10 +668,11 @@ public:
         if (!this->_spiller || this->_spiller->iterators().empty()) {
             sort();
             if (this->_opts.moveSortedDataIntoIterator) {
-                return std::make_unique<InMemIterator<Key, Value, Comparator>>(std::move(_data),
-                                                                               this->_spiller);
+                return std::make_unique<InMemIterator<Key, Value, Comparator>>(
+                    std::move(_fillingBuffer->data), this->_spiller);
             }
-            return std::make_unique<InMemIterator<Key, Value, Comparator>>(_data, this->_spiller);
+            return std::make_unique<InMemIterator<Key, Value, Comparator>>(_fillingBuffer->data,
+                                                                           this->_spiller);
         }
 
         if (!this->_spillsFinalized) {
@@ -681,7 +691,8 @@ public:
         tassert(8248300,
                 "Spilled sort cannot be paused",
                 !this->_spiller || this->_spiller->iterators().empty());
-        return std::make_unique<InMemReadOnlyIterator<Key, Value, std::vector<Data>>>(_data);
+        return std::make_unique<InMemReadOnlyIterator<Key, Value, std::vector<Data>>>(
+            _fillingBuffer->data);
     }
 
     void resume() override {
@@ -706,22 +717,34 @@ private:
         const Comparator& _comp;
     };
 
+    // Unspilled entries and the pool their key bytes are allocated from.
+    struct Buffer {
+        std::vector<std::pair<Key, Value>> data;
+        SharedBufferFragmentBuilder* pool = nullptr;
+    };
+
+    // Gives the buffer that starts as the filling buffer the pool it allocates its keys from.
+    void _setUpBuffers() {
+        if (this->_memPool) {
+            _buffers[0].pool = &*this->_memPool;
+        }
+    }
+
     void sort() {
         STLComparator less(this->_comp);
-        std::sort(_data.begin(), _data.end(), less);
-        this->_stats.incrementNumSorted(_data.size());
-        auto& memPool = this->_memPool;
-        if (memPool) {
-            invariant(memPool->totalFragmentBytesUsed() >= this->_stats.bytesSorted());
-            this->_stats.incrementBytesSorted(memPool->totalFragmentBytesUsed() -
-                                              this->_stats.bytesSorted());
+        std::sort(_fillingBuffer->data.begin(), _fillingBuffer->data.end(), less);
+        this->_stats.incrementNumSorted(_fillingBuffer->data.size());
+        if (_fillingBuffer->pool) {
+            auto fragmentBytesUsed = _fillingBuffer->pool->totalFragmentBytesUsed();
+            invariant(fragmentBytesUsed >= this->_stats.bytesSorted());
+            this->_stats.incrementBytesSorted(fragmentBytesUsed - this->_stats.bytesSorted());
         } else {
             this->_stats.incrementBytesSorted(this->_stats.memUsage());
         }
     }
 
     void spill() override {
-        if (_data.empty()) {
+        if (_fillingBuffer->data.empty()) {
             return;
         }
 
@@ -744,19 +767,18 @@ private:
 
         sort();
 
-        this->_spiller->spill(this->_opts, this->_settings, _data);
+        this->_spiller->spill(this->_opts, this->_settings, _fillingBuffer->data);
 
-        this->_stats.incrementSpilledKeyValuePairs(_data.size());
-        _data.clear();
-        // _data may have grown very large. Even though it's clear()ed, we need to
+        this->_stats.incrementSpilledKeyValuePairs(_fillingBuffer->data.size());
+        _fillingBuffer->data.clear();
+        // The vector may have grown very large. Even though it's clear()ed, we need to
         // free the excess memory.
-        _data.shrink_to_fit();
+        _fillingBuffer->data.shrink_to_fit();
 
-        auto& memPool = this->_memPool;
-        if (memPool) {
+        if (_fillingBuffer->pool) {
             // We expect that all buffers are unused at this point.
-            memPool->freeUnused();
-            this->_stats.setMemUsage(memPool->memUsage());
+            _fillingBuffer->pool->freeUnused();
+            this->_stats.setMemUsage(_fillingBuffer->pool->memUsage());
         } else {
             this->_stats.resetMemUsage();
         }
@@ -771,7 +793,14 @@ private:
         }
     }
 
-    std::vector<Data> _data;  // Data that has not been spilled.
+    // Storage for both buffers; stable so the pointers into it stay valid.
+    std::array<Buffer, 2> _buffers;
+
+    // The buffer receiving added keys.
+    Buffer* _fillingBuffer = &_buffers[0];
+    // The buffer holding the sorted range being spilled a batch at a time.
+    Buffer* _sortedBuffer = &_buffers[1];
+
     bool _paused = false;
 };
 

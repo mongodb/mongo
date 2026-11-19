@@ -707,7 +707,7 @@ public:
         MONGO_UNREACHABLE;
     };
 
-    SharedBufferFragmentBuilder& memPool() {
+    virtual SharedBufferFragmentBuilder& memPool() {
         invariant(_memPool);
         return _memPool.get();
     }

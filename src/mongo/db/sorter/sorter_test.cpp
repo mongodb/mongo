@@ -1,7 +1,9 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
+#include "mongo/base/data_type_endian.h"
 #include "mongo/base/error_codes.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/sorter/sorter_template_defs.h"
@@ -15,6 +17,7 @@
 #include <algorithm>
 #include <ctime>
 #include <fstream>  // IWYU pragma: keep
+#include <limits>
 #include <memory>
 #include <string>
 #include <thread>  // IWYU pragma: keep
@@ -212,6 +215,155 @@ TEST_F(ContainerInMemIterTest, SpillDoesNotChangeResultAndUpdateStatistics) {
 
     EXPECT_EQ(sorterTracker.spilledRanges.loadRelaxed(), 1);
     EXPECT_EQ(sorterTracker.spilledKeyValuePairs.loadRelaxed(), 7);
+}
+
+// A test key that allocates its payload from the sorter's memory pool at construction, the same
+// way key_string::PooledBuilder allocates key bytes in getKeys(), so pool-mode accounting runs
+// with real fragments.
+class PooledIntWrapper {
+public:
+    struct SorterDeserializeSettings {};  // unused
+
+    PooledIntWrapper() = default;
+
+    PooledIntWrapper(int32_t value, SharedBufferFragmentBuilder& pool) {
+        PooledFragmentBuilder builder(pool);
+        builder.appendNum(value);
+        _fragment = builder.done();
+    }
+
+    int32_t value() const {
+        BufReader reader(_fragment.get(), _fragment.size());
+        return reader.read<LittleEndian<int32_t>>().value;
+    }
+
+    /// members for Sorter
+    void serializeForSorter(BufBuilder& buf) const {
+        buf.appendNum(value());
+    }
+    static PooledIntWrapper deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&) {
+        const int32_t value = buf.read<LittleEndian<int32_t>>().value;
+        BufBuilder heapBuilder(sizeof(int32_t));
+        heapBuilder.appendNum(value);
+        const int size = heapBuilder.len();
+        return PooledIntWrapper(SharedBufferFragment(heapBuilder.release(), size));
+    }
+    int memUsageForSorter() const {
+        return static_cast<int>(_fragment.size());
+    }
+    // The payload is pool-owned, so it transfers with the fragment's refcount.
+    PooledIntWrapper getOwned() const {
+        return *this;
+    }
+    void makeOwned() {}
+
+    std::string toString() const {
+        return std::to_string(value());
+    }
+
+private:
+    explicit PooledIntWrapper(SharedBufferFragment fragment) : _fragment(std::move(fragment)) {}
+
+    SharedBufferFragment _fragment;
+};
+
+class PooledIntWrapperComparator {
+public:
+    PooledIntWrapperComparator(Direction dir = ASC) : _dir(dir) {}
+    int operator()(const PooledIntWrapper& lhs, const PooledIntWrapper& rhs) const {
+        if (lhs.value() == rhs.value())
+            return 0;
+        if (lhs.value() < rhs.value())
+            return -1 * _dir;
+        return 1 * _dir;
+    }
+
+private:
+    Direction _dir;
+};
+
+using PIWIterator = Iterator<PooledIntWrapper, IntWrapper>;
+using PIWSorter = Sorter<PooledIntWrapper, IntWrapper>;
+
+class IncrementalSpillingSorterTest : public ServiceContextMongoDTest {
+    // TODO (SERVER-116165): Remove.
+    unittest::ServerParameterGuard _ffContainerWrites{"featureFlagContainerWrites", true};
+
+protected:
+    static constexpr size_t kBudgetBytes = 64 * 1024;
+    // A single add may push the sorter past the budget by one element's worth of accounting.
+    static constexpr size_t kMemAllowanceBytes = sizeof(PooledIntWrapper) + sizeof(IntWrapper);
+    static constexpr int kNumKeys = 20000;
+
+    // A bijection on [0, modulus) so that keys arrive unsorted but stay unique.
+    static int scrambledKey(int i, int modulus) {
+        return (i * 7919) % modulus;
+    }
+
+    // A sorter whose keys take their payload bytes from its memory pool, so the pool's fragments
+    // are part of its memory accounting.
+    struct PooledIncrementalSorter {
+        std::unique_ptr<ContainerTraits<PooledIntWrapper, IntWrapper, PooledIntWrapperComparator>>
+            traits;
+        std::unique_ptr<PIWSorter> sorter;
+    };
+
+    PooledIncrementalSorter makePooledIncrementalSorter(const boost::filesystem::path& spillDir) {
+        SortOptions opts =
+            SortOptions{}.MaxMemoryUsageBytes(kBudgetBytes).UseMemoryPool(/*usePool=*/true);
+        auto traits = std::make_unique<
+            ContainerTraits<PooledIntWrapper, IntWrapper, PooledIntWrapperComparator>>(
+            makeOperationContext());
+        auto spiller = traits->makeSpiller(opts, spillDir);
+        auto sorter =
+            PIWSorter::make(opts, PooledIntWrapperComparator(ASC), std::move(spiller), {});
+        return {std::move(traits), std::move(sorter)};
+    }
+
+    void expectSortedOutput(const std::unique_ptr<PIWIterator>& it, int expectedCount) {
+        int previous = std::numeric_limits<int>::min();
+        int count = 0;
+        while (it->more()) {
+            const auto [key, value] = it->next();
+            EXPECT_GT(key.value(), previous);
+            EXPECT_EQ(static_cast<int>(value), -key.value());
+            previous = key.value();
+            ++count;
+        }
+        EXPECT_EQ(count, expectedCount);
+    }
+};
+
+// While spilling still bursts whole buffers, the filling buffer keeps its pool across spills. The
+// keys take their payload bytes from that pool, so the sorter's accounting covers the pool's
+// fragments.
+TEST_F(IncrementalSpillingSorterTest, BurstSpillsStayWithinBudgetWithPools) {
+    auto spillDir = makeSpillDir();
+    auto incremental = makePooledIncrementalSorter(spillDir.path());
+
+    auto* poolBefore = &incremental.sorter->memPool();
+    size_t maxPoolUsage = 0;
+    for (int i = 0; i < kNumKeys; ++i) {
+        const int key = scrambledKey(i, kNumKeys);
+        // Keys take their bytes from the pool before add(), as getKeys() does for index builds.
+        PooledIntWrapper pooledKey(key, incremental.sorter->memPool());
+        maxPoolUsage = std::max(maxPoolUsage, incremental.sorter->memPool().memUsage());
+        incremental.sorter->add(pooledKey, -key);
+        EXPECT_LE(incremental.sorter->stats().memUsage(), kBudgetBytes + kMemAllowanceBytes);
+        // The reported usage must include the pool's bytes, not just the in-memory pairs.
+        EXPECT_GE(incremental.sorter->stats().memUsage(), incremental.sorter->memPool().memUsage());
+        if (i == kNumKeys / 2) {
+            EXPECT_GT(incremental.sorter->memPool().memUsage(), 0);
+        }
+    }
+
+    EXPECT_GT(incremental.sorter->stats().spilledRanges(), 1);
+    EXPECT_EQ(&incremental.sorter->memPool(), poolBefore);
+    // Each spill frees the blocks that held the spilled keys, so the pool reclaims memory.
+    EXPECT_LT(incremental.sorter->memPool().memUsage(), maxPoolUsage);
+
+    expectSortedOutput(incremental.sorter->done(), kNumKeys);
+    EXPECT_GT(incremental.sorter->stats().bytesSorted(), 0);
 }
 
 using SorterBatchGuardTest = unittest::Test;
