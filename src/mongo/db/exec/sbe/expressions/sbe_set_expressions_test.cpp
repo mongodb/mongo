@@ -114,6 +114,11 @@ protected:
         return makeSetOp(EFn::kSetEquals, EFn::kSetEqualsArray, std::move(lhs), std::move(rhs));
     }
 
+    std::unique_ptr<EExpression> makeIsSubset(std::unique_ptr<EExpression> lhs,
+                                              std::unique_ptr<EExpression> rhs) {
+        return makeSetOp(EFn::kSetIsSubset, EFn::kSetIsSubsetArray, std::move(lhs), std::move(rhs));
+    }
+
 private:
     std::unique_ptr<EExpression> makeSetOp(EFn legacyFn,
                                            EFn arrayFn,
@@ -322,13 +327,12 @@ TEST_P(SBEBuiltinArrayResultTest, ReturnsNothingSetEquals) {
     runAndAssertNothing(compiledExpr.get());
 }
 
-TEST_F(SBEBuiltinSetOpTest, ComputesSetIsSubset) {
+TEST_P(SBEBuiltinArrayResultTest, ComputesSetIsSubset) {
     value::OwnedValueAccessor slotAccessor1;
     value::OwnedValueAccessor slotAccessor2;
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
-    auto setIsSubsetExpr =
-        makeFunction(EFn::kSetIsSubset, makeVariable(arrSlot1), makeVariable(arrSlot2));
+    auto setIsSubsetExpr = makeIsSubset(makeVariable(arrSlot1), makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setIsSubsetExpr);
 
     // all elements are the same
@@ -374,13 +378,12 @@ TEST_F(SBEBuiltinSetOpTest, ComputesSetIsSubset) {
     runAndAssertBoolean(compiledExpr.get(), true);
 }
 
-TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetIsSubset) {
+TEST_P(SBEBuiltinArrayResultTest, ReturnsNothingSetIsSubset) {
     value::OwnedValueAccessor slotAccessor1;
     value::OwnedValueAccessor slotAccessor2;
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
-    auto setIsSubsetExpr =
-        makeFunction(EFn::kSetIsSubset, makeVariable(arrSlot1), makeVariable(arrSlot2));
+    auto setIsSubsetExpr = makeIsSubset(makeVariable(arrSlot1), makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setIsSubsetExpr);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2));
@@ -684,6 +687,50 @@ TEST_F(SBEBuiltinSetOpTest, SetEqualsArrayUsesPreparedSetsOnlyWithSameCollator) 
                  false);
 }
 
+TEST_F(SBEBuiltinSetOpTest, SetIsSubsetArrayAcceptsPreparedSetsAndBsonArrays) {
+    auto bson = BSON_ARRAY(3.0 << 2 << 2);
+    auto bsonArray = [&] {
+        return makeC(value::copyValue(value::TypeTags::bsonArray,
+                                      value::bitcastFrom<const char*>(bson.objdata())));
+    };
+    auto assertIsSubset =
+        [&](std::unique_ptr<EExpression> lhs, std::unique_ptr<EExpression> rhs, bool expected) {
+            auto expr =
+                makeFunction(EFn::kSetIsSubsetArray, noCollator(), std::move(lhs), std::move(rhs));
+            auto compiledExpr = compileExpression(*expr);
+            runAndAssertBoolean(compiledExpr.get(), expected);
+        };
+
+    assertIsSubset(bsonArray(), makeC(makeArraySet(BSON_ARRAY(1 << 2 << 3))), true);
+    assertIsSubset(makeC(makeArraySet(BSON_ARRAY(1 << 2 << 3))), bsonArray(), false);
+}
+
+TEST_F(SBEBuiltinSetOpTest, SetIsSubsetArrayUsesPreparedRhsOnlyWithSameCollator) {
+    CollatorInterfaceMock collator{CollatorInterfaceMock::MockType::kToLowerString};
+    value::ViewOfValueAccessor collatorAccessor;
+    collatorAccessor.reset(value::TypeTags::collator,
+                           value::bitcastFrom<CollatorInterface*>(&collator));
+    auto collatorSlot = bindAccessor(&collatorAccessor);
+    auto assertIsSubset =
+        [&](std::unique_ptr<EExpression> coll, std::unique_ptr<EExpression> rhs, bool expected) {
+            auto expr = makeFunction(
+                EFn::kSetIsSubsetArray, std::move(coll), arrayC(BSON_ARRAY("A")), std::move(rhs));
+            auto compiledExpr = compileExpression(*expr);
+            runAndAssertBoolean(compiledExpr.get(), expected);
+        };
+
+    assertIsSubset(makeVariable(collatorSlot), arrayC(BSON_ARRAY("a" << "b")), true);
+    // A prepared set with the same collator.
+    assertIsSubset(makeVariable(collatorSlot),
+                   makeC(makeArraySetWithCollator(BSON_ARRAY("a"), &collator)),
+                   true);
+    // A prepared set without a collator must not be used to look up collated values.
+    assertIsSubset(makeVariable(collatorSlot), makeC(makeArraySet(BSON_ARRAY("a"))), true);
+    // A prepared set with a collator must not be used to look up values without one.
+    assertIsSubset(
+        noCollator(), makeC(makeArraySetWithCollator(BSON_ARRAY("a"), &collator)), false);
+}
+
 class SBEBuiltinSetOpDeathTest : public SBEBuiltinSetOpTest {};
 
 DEATH_TEST_REGEX_F(SBEBuiltinSetOpDeathTest, SetUnionArrayInvalidCollator, "13889300") {
@@ -705,6 +752,13 @@ DEATH_TEST_REGEX_F(SBEBuiltinSetOpDeathTest, SetDifferenceArrayInvalidCollator, 
 
 DEATH_TEST_REGEX_F(SBEBuiltinSetOpDeathTest, SetEqualsArrayInvalidCollator, "13889300") {
     runExpression(*makeFunction(EFn::kSetEqualsArray,
+                                makeC(value::TypeTags::Null, 0),
+                                arrayC(BSONArray()),
+                                arrayC(BSONArray())));
+}
+
+DEATH_TEST_REGEX_F(SBEBuiltinSetOpDeathTest, SetIsSubsetArrayInvalidCollator, "13889300") {
+    runExpression(*makeFunction(EFn::kSetIsSubsetArray,
                                 makeC(value::TypeTags::Null, 0),
                                 arrayC(BSONArray()),
                                 arrayC(BSONArray())));

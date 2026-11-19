@@ -264,7 +264,23 @@ value::TagValueMaybeOwned ByteCode::builtinSetEqualsArray(ArityType arity) {
 }
 
 value::TagValueMaybeOwned ByteCode::builtinSetIsSubsetArray(ArityType arity) {
-    MONGO_UNREACHABLE_TASSERT(13890504);
+    // Compiling setIsSubsetArray already checks that it has three arguments: the collator and the
+    // two arrays.
+    tassert(13889303, "Unexpected arity value", arity == 3);
+    const CollatorInterface* collator = getSetCollator(viewFromStack(0));
+    // The result is a boolean, so the operands can stay on the stack as views.
+    auto lhs = viewFromStack(1);
+    auto rhs = viewFromStack(2);
+    if (!value::isArray(lhs.tag) || !value::isArray(rhs.tag)) {
+        return value::TagValueMaybeOwned::nothing();
+    }
+    return withHashTable(rhs, collator, [&](const value::ValueSetType& rhsValues) {
+        // Stop at the first LHS value that is missing from the RHS.
+        bool missing = value::arrayAny(lhs.tag, lhs.value, [&](auto tag, auto val) {
+            return !rhsValues.contains({tag, val});
+        });
+        return value::TagValueMaybeOwned::boolean(!missing);
+    });
 }
 
 value::TagValueMaybeOwned ByteCode::builtinAddToSet(ArityType arity) {
