@@ -27,17 +27,22 @@ describe("collMod upgrade to constraint validationLevel", function () {
                 collMod: collName,
                 validator: validator,
                 validationLevel: "strict",
-                validationAction: "warn",
+                validationAction: "error",
             }),
         );
-        // Insert a non-compliant document. Succeeds because validationAction is "warn".
-        assert.commandWorked(db[collName].insert({b: 1}));
+        // Insert a non-compliant document by bypassing validation.
+        assert.commandWorked(
+            db.runCommand({
+                insert: collName,
+                documents: [{b: 1}],
+                bypassDocumentValidation: true,
+            }),
+        );
 
         assert.commandWorked(
             db.runCommand({collMod: collName, prepareConstraintValidationLevel: true}),
         );
 
-        // 'constraint' requires action='error', so transition both fields together.
         const res = assert.commandFailedWithCode(
             db.runCommand({
                 collMod: collName,
@@ -73,10 +78,17 @@ describe("collMod upgrade to constraint validationLevel", function () {
                     collMod: collName,
                     validator: validator,
                     validationLevel: level,
-                    validationAction: "warn",
+                    validationAction: "error",
                 }),
             );
-            assert.commandWorked(db[collName].insert({b: 1}));
+            // Insert the non-compliant document by bypassing validation.
+            assert.commandWorked(
+                db.runCommand({
+                    insert: collName,
+                    documents: [{b: 1}],
+                    bypassDocumentValidation: true,
+                }),
+            );
             if (prepare) {
                 assert.commandWorked(
                     db.runCommand({collMod: collName, prepareConstraintValidationLevel: true}),
@@ -154,7 +166,7 @@ describe("collMod upgrade to constraint validationLevel", function () {
                 collMod: collName,
                 validator: validator,
                 validationLevel: "strict",
-                validationAction: "warn",
+                validationAction: "error",
             }),
         );
         assert.commandWorked(db[collName].insert({a: 1}));
@@ -203,7 +215,7 @@ describe("collMod upgrade to constraint validationLevel", function () {
                 collMod: collName,
                 validator: validator,
                 validationLevel: "strict",
-                validationAction: "warn",
+                validationAction: "error",
             }),
         );
         // Insert a document with both 'a' and 'b' so it satisfies the updated validator later.

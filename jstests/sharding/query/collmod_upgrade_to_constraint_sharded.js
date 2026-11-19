@@ -30,7 +30,7 @@ describe("collMod upgrade to constraint validationLevel on sharded collections",
             testDb.createCollection(collName, {
                 validator: validator,
                 validationLevel: "strict",
-                validationAction: "warn",
+                validationAction: "error",
             }),
         );
 
@@ -46,8 +46,15 @@ describe("collMod upgrade to constraint validationLevel on sharded collections",
     });
 
     it("blocks upgrade when a document on the non-coordinating shard violates the validator", function () {
-        // _id: 2 >= 0 routes to shard1 (non-coordinator). Succeeds because action is "warn".
-        assert.commandWorked(testDb[collName].insert({_id: 2, b: 1}));
+        // _id: 2 >= 0 routes to shard1 (non-coordinator). Insert the non-compliant document by
+        // bypassing validation, before the prepare flag blocks bypass.
+        assert.commandWorked(
+            testDb.runCommand({
+                insert: collName,
+                documents: [{_id: 2, b: 1}],
+                bypassDocumentValidation: true,
+            }),
+        );
 
         // The upgrade is rejected before any scan runs unless prepareConstraintValidationLevel is set.
         assert.commandWorked(
@@ -81,7 +88,7 @@ describe("collMod upgrade to constraint validationLevel on sharded collections",
             testDb.runCommand({
                 collMod: collName,
                 validationLevel: "strict",
-                validationAction: "warn",
+                validationAction: "error",
             }),
         );
         assert.commandWorked(
@@ -110,16 +117,24 @@ describe("collMod upgrade to constraint validationLevel on sharded collections",
             testDb.runCommand({
                 collMod: collName,
                 validationLevel: "strict",
-                validationAction: "warn",
+                validationAction: "error",
             }),
         );
 
+        // _id: -2 < 0 routes to shard0, which is the coordinator (primary) shard. Insert the
+        // non-compliant document by bypassing validation, before the prepare flag blocks bypass.
+        assert.commandWorked(
+            testDb.runCommand({
+                insert: collName,
+                documents: [{_id: -2, b: 1}],
+                bypassDocumentValidation: true,
+            }),
+        );
+
+        // The upgrade is rejected before any scan runs unless prepareConstraintValidationLevel is set.
         assert.commandWorked(
             testDb.runCommand({collMod: collName, prepareConstraintValidationLevel: true}),
         );
-
-        // _id: -2 < 0 routes to shard0, which is the coordinator (primary) shard.
-        assert.commandWorked(testDb[collName].insert({_id: -2, b: 1}));
 
         assert.commandFailedWithCode(
             testDb.runCommand({

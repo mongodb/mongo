@@ -111,7 +111,7 @@ describe("constraint validationLevel", () => {
             );
         });
 
-        it("fails when 'warn' validationAction is specified", () => {
+        it("cannot prepare while validationAction is 'warn'", () => {
             myDb.runCommand({drop: collName, writeConcern: {w: "majority"}});
             assert.commandWorked(myDb.createCollection(collName, {writeConcern: {w: "majority"}}));
 
@@ -123,14 +123,41 @@ describe("constraint validationLevel", () => {
                     writeConcern: {w: "majority"},
                 }),
             );
+            // 'warn' allows non-conforming documents, so the prepare phase is rejected.
+            assert.commandFailed(
+                myDb.runCommand({"collMod": collName, prepareConstraintValidationLevel: true}),
+            );
+        });
+
+        it("fails to upgrade when the current validationAction is 'warn'", () => {
+            myDb.runCommand({drop: collName, writeConcern: {w: "majority"}});
+            assert.commandWorked(myDb.createCollection(collName, {writeConcern: {w: "majority"}}));
+
+            assert.commandWorked(
+                myDb.runCommand({
+                    "collMod": collName,
+                    validationLevel: "strict",
+                    validator: validator,
+                    writeConcern: {w: "majority"},
+                }),
+            );
             assert.commandWorked(
                 myDb.runCommand({"collMod": collName, prepareConstraintValidationLevel: true}),
+            );
+            // Setting 'warn' while preparing is allowed, but the upgrade must then be rejected
+            // even when the same command switches the action back to 'error'.
+            assert.commandWorked(
+                myDb.runCommand({
+                    "collMod": collName,
+                    validationAction: "warn",
+                    writeConcern: {w: "majority"},
+                }),
             );
             assert.commandFailed(
                 myDb.runCommand({
                     "collMod": collName,
                     validationLevel: "constraint",
-                    validationAction: "warn",
+                    validationAction: "error",
                     writeConcern: {w: "majority"},
                 }),
             );
