@@ -3,13 +3,19 @@
 
 #include "mongo/db/query/stage_builder/sbe/sbe_stage_blueprint_dead_slot_elimination.h"
 
+#include "mongo/util/assert_util.h"
+
+#include <algorithm>
+#include <string_view>
 #include <variant>
 #include <vector>
+
+#include <absl/container/flat_hash_set.h>
 
 namespace mongo::stage_builder {
 namespace {
 /**
- * Removes dead project entries, scan fields, and scalar group accumulators from the plan.
+ * Removes dead project entries, scan fields, scalar group accumulators, and extracted paths.
  */
 class DeadSlotEliminationRule final : public SbBlueprintRewriteRule {
 public:
@@ -157,6 +163,49 @@ private:
                                                    SbDetachedNode& node,
                                                    SbBlueprintRewriteContext& ctx) {
         return removeDeadAccumulators(group.accumulators, true /* definesSpillSlots */, node, ctx);
+    }
+
+    static boost::optional<SbDetachedNode> applyTo(SbBlueprintExtractFieldPaths& extract,
+                                                   SbDetachedNode& node,
+                                                   SbBlueprintRewriteContext& ctx) {
+        auto& usage = ctx.slotUsage();
+        absl::flat_hash_set<std::string_view> liveFields;
+        const auto removedOutputs = std::erase_if(extract.outputs, [&](const auto& output) {
+            const auto& [path, slot] = output;
+            tassert(13969000,
+                    "Expected an extracted output path to start with Get",
+                    !path.empty() && std::holds_alternative<sbe::value::Get>(path.front()));
+            if (usage.numUses(slot) != 0) {
+                liveFields.insert(std::get<sbe::value::Get>(path.front()).field);
+                return false;
+            }
+            usage.removeDef(slot);
+            return true;
+        });
+
+        if (extract.outputs.empty()) {
+            for (const auto& [path, slot] : extract.inputs) {
+                removeUse(slot, node, ctx);
+            }
+            return node.takeChild(0);
+        }
+
+        // Inputs contain either the whole document (Id) or individual top-level fields
+        // (Get(field)/Id). Keep a field input only if some remaining output path starts with a
+        // Get() of that same field. Keep a whole-document input while any output remains.
+        const auto removedInputs = std::erase_if(extract.inputs, [&](const auto& input) {
+            const auto& [path, slot] = input;
+            if (path.empty() || !std::holds_alternative<sbe::value::Get>(path.front()) ||
+                liveFields.contains(std::get<sbe::value::Get>(path.front()).field)) {
+                return false;
+            }
+            removeUse(slot, node, ctx);
+            return true;
+        });
+        if (removedOutputs == 0 && removedInputs == 0) {
+            return boost::none;
+        }
+        return std::move(node);
     }
 };
 }  // namespace

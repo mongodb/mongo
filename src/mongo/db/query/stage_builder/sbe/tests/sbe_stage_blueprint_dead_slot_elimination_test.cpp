@@ -8,10 +8,12 @@
 #include "mongo/db/query/stage_builder/sbe/sbe_stage_lowering.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
 
 #include <functional>
+#include <initializer_list>
 #include <string>
 
 namespace mongo::stage_builder {
@@ -26,6 +28,18 @@ protected:
 
     SbBlueprint& blueprint() {
         return _state->blueprint();
+    }
+
+    sbe::value::Path path(std::initializer_list<std::string> fields) {
+        sbe::value::Path result;
+        for (const auto& field : fields) {
+            if (!result.empty()) {
+                result.emplace_back(sbe::value::Traverse{});
+            }
+            result.emplace_back(sbe::value::Get{field});
+        }
+        result.emplace_back(sbe::value::Id{});
+        return result;
     }
 
     SbHashAggAccumulator sum(SbBuilder& b, SbExpr input) {
@@ -387,6 +401,122 @@ TEST_F(SbBlueprintDeadSlotEliminationTest, StreamingGroupKeepsUnreadKeysAndClust
             VariableTypes{}, std::move(scan), {fields[0]}, {fields[1]}, accumulators, boost::none);
         return Plan{std::move(group), {}};
     });
+}
+
+TEST_F(SbBlueprintDeadSlotEliminationTest, DeadExtractedPathBetweenLiveOnesIsRemoved) {
+    // Both live paths share an input. Removing the dead path also makes input 'b' dead.
+    runGoldenTest([&](SbBuilder& b) {
+        auto [scan, recordSlot, recordIdSlot, fields] =
+            b.makeScan(_uuid, DatabaseName::kAdmin, true, {"a", "b"});
+        auto first = _state->slotId();
+        auto dead = _state->slotId();
+        auto last = _state->slotId();
+        auto extract = b.makeExtractFieldPaths(
+            std::move(scan),
+            {{path({"a"}), fields[0].getId()}, {path({"b"}), fields[1].getId()}},
+            {{path({"a", "x"}), first}, {path({"b", "x"}), dead}, {path({"a", "y"}), last}},
+            1);
+        return Plan{std::move(extract), {first, last}};
+    });
+}
+
+TEST_F(SbBlueprintDeadSlotEliminationTest, ExtractWithOnlyDeadOutputsIsReplacedByChild) {
+    runGoldenTest([&](SbBuilder& b) {
+        auto [scan, recordSlot, recordIdSlot, fields] =
+            b.makeScan(_uuid, DatabaseName::kAdmin, true, {"a", "b"});
+        auto extract = b.makeExtractFieldPaths(
+            std::move(scan),
+            {{path({"a"}), fields[0].getId()}, {path({"b"}), fields[1].getId()}},
+            {{path({"a", "x"}), _state->slotId()}, {path({"b", "x"}), _state->slotId()}},
+            1);
+        return Plan{std::move(extract), {recordSlot.getId(), fields[0].getId()}};
+    });
+}
+
+TEST_F(SbBlueprintDeadSlotEliminationTest, RemovingProjectEntryQueuesExtractAndItsInput) {
+    runGoldenTest([&](SbBuilder& b) {
+        auto [scan, recordSlot, recordIdSlot, fields] =
+            b.makeScan(_uuid, DatabaseName::kAdmin, true, {"a", "b"});
+        auto [input, inputs] = b.makeProject(std::move(scan), b.makeFillEmptyNull(fields[1]));
+        auto live = SbSlot{_state->slotId()};
+        auto dead = SbSlot{_state->slotId()};
+        auto extract = b.makeExtractFieldPaths(
+            std::move(input),
+            {{path({"a"}), fields[0].getId()}, {path({"b"}), inputs[0].getId()}},
+            {{path({"a", "x"}), live.getId()}, {path({"b", "x"}), dead.getId()}},
+            1);
+        auto filter = b.makeFilter(std::move(extract), b.makeBoolConstant(true));
+        auto [project, outputs] =
+            b.makeProject(std::move(filter),
+                          b.makeBinaryOp(abt::Operations::Add, live, b.makeInt32Constant(1)),
+                          b.makeBinaryOp(abt::Operations::Add, dead, b.makeInt32Constant(1)));
+        return Plan{std::move(project), {outputs[0].getId()}};
+    });
+}
+
+TEST_F(SbBlueprintDeadSlotEliminationTest, ExtractPrunesInputsEvenWhenEveryOutputIsLive) {
+    SbBuilder b{*_state, 1};
+    auto [scan, recordSlot, recordIdSlot, fields] =
+        b.makeScan(_uuid, DatabaseName::kAdmin, true, {"a", "ab", "unused"});
+    auto live = _state->slotId();
+    auto extract = b.makeExtractFieldPaths(std::move(scan),
+                                           {{path({"a"}), fields[0].getId()},
+                                            {path({"ab"}), fields[1].getId()},
+                                            {path({"unused"}), fields[2].getId()}},
+                                           {{path({"ab", "x"}), live}},
+                                           1);
+    auto result = eliminateDeadSlots(std::move(extract), {live});
+    ASSERT_TRUE(result.converged);
+    const auto& rewritten = std::get<SbBlueprintExtractFieldPaths>(blueprint()[result.root]);
+    ASSERT_EQ(rewritten.outputs.size(), 1);
+    ASSERT_EQ(rewritten.inputs.size(), 1);
+    ASSERT_EQ(rewritten.inputs[0].second, fields[1].getId());
+    const auto& rewrittenScan = std::get<SbBlueprintScan>(blueprint()[rewritten.child]);
+    ASSERT_EQ(rewrittenScan.info->scanFieldNames, (std::vector<std::string>{"ab"}));
+
+    auto again = eliminateDeadSlots(SbStage{result.root}, {live});
+    ASSERT_TRUE(again.converged);
+    ASSERT_EQ(again.firings, 0);
+}
+
+TEST_F(SbBlueprintDeadSlotEliminationTest,
+       ExtractFromWholeDocumentKeepsInputUntilAllOutputsAreDead) {
+    SbBuilder b{*_state, 1};
+    auto [scan, recordSlot, recordIdSlot, fields] =
+        b.makeScan(_uuid, DatabaseName::kAdmin, true, {});
+    auto live = _state->slotId();
+    auto extract =
+        b.makeExtractFieldPaths(std::move(scan),
+                                {{path({}), recordSlot.getId()}},
+                                {{path({"a", "x"}), live}, {path({"b", "x"}), _state->slotId()}},
+                                1);
+    auto result = eliminateDeadSlots(std::move(extract), {live});
+    ASSERT_TRUE(result.converged);
+    const auto& rewritten = std::get<SbBlueprintExtractFieldPaths>(blueprint()[result.root]);
+    ASSERT_EQ(rewritten.outputs.size(), 1);
+    ASSERT_EQ(rewritten.inputs.size(), 1);
+    ASSERT_EQ(rewritten.inputs[0].second, recordSlot.getId());
+
+    auto allDead = eliminateDeadSlots(SbStage{result.root}, {});
+    ASSERT_TRUE(allDead.converged);
+    ASSERT_TRUE(std::holds_alternative<SbBlueprintScan>(blueprint()[allDead.root]));
+}
+using SbBlueprintDeadSlotEliminationDeathTest = SbBlueprintDeadSlotEliminationTest;
+
+DEATH_TEST_F(SbBlueprintDeadSlotEliminationDeathTest, EmptyExtractedOutputPathFails, "13969000") {
+    SbBuilder b{*_state, 1};
+    auto output = _state->slotId();
+    auto extract = b.makeExtractFieldPaths(b.makeCoScan(1), {}, {{sbe::value::Path{}, output}}, 1);
+    eliminateDeadSlots(std::move(extract), {output});
+}
+
+DEATH_TEST_F(SbBlueprintDeadSlotEliminationDeathTest,
+             IdentityExtractedOutputPathFails,
+             "13969000") {
+    SbBuilder b{*_state, 1};
+    auto output = _state->slotId();
+    auto extract = b.makeExtractFieldPaths(b.makeCoScan(1), {}, {{path({}), output}}, 1);
+    eliminateDeadSlots(std::move(extract), {output});
 }
 }  // namespace
 }  // namespace mongo::stage_builder

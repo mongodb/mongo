@@ -3,6 +3,12 @@ filters:
   - "*":
     approvers:
       - 10gen/query-optimization
+  - "sbe_extract_field_paths_dead_slot_elimination_md.js":
+    approvers:
+      - 10gen/query-execution-sbe
+  - "/expected_output/sbe_extract_field_paths_dead_slot_elimination.md":
+    approvers:
+      - 10gen/query-execution-sbe
   - "/join_opt/":
     approvers:
       - 10gen/query-optimization-join-ordering

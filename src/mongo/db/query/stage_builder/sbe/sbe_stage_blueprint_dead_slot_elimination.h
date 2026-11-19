@@ -12,8 +12,10 @@ namespace mongo::stage_builder {
  * Returns a rule that removes project entries whose outputs nothing reads, and replaces a project
  * left with no entries by its child. It also removes the fields of a scan whose slots nothing
  * reads and unread accumulators from scalar hash, compact, and streaming groups. Grouping and
- * cluster keys, and groups left with no accumulators, are preserved. The rule needs the slot
- * summary in the rewrite context and keeps it up to date.
+ * cluster keys, and groups left with no accumulators, are preserved. It also removes unread
+ * extract_field_paths outputs and inputs that no remaining path needs, replacing an extraction
+ * left with no outputs by its child. The rule needs the slot summary in the rewrite context and
+ * keeps it up to date.
  */
 std::unique_ptr<SbBlueprintRewriteRule> makeDeadSlotEliminationRule();
 }  // namespace mongo::stage_builder

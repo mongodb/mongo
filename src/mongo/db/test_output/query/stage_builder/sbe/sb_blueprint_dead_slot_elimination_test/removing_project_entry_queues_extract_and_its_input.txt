@@ -1,0 +1,35 @@
+# Golden test output of SbBlueprintDeadSlotEliminationTest/RemovingProjectEntryQueuesExtractAndItsInput
+Live slots: s8
+
+Before:
+[1] project [s8 = (s6 + 1), s9 = (s7 + 1)] 
+[1] filter {true} 
+[1] extract_field_paths inputs[s3 = Get(a)/Id, s5 = Get(b)/Id] outputs[s6 = Get(a)/Traverse/Get(x)/Id, s7 = Get(b)/Traverse/Get(x)/Id] 
+[1] project [s5 = (s4 ?: null)] 
+[1] scan generic [s1 = record, s2 = recordId] [s3 = a, s4 = b] @"UUID" 
+
+After firing 1:
+[1] project [s8 = (s6 + 1)] 
+[1] filter {true} 
+[1] extract_field_paths inputs[s3 = Get(a)/Id, s5 = Get(b)/Id] outputs[s6 = Get(a)/Traverse/Get(x)/Id, s7 = Get(b)/Traverse/Get(x)/Id] 
+[1] project [s5 = (s4 ?: null)] 
+[1] scan generic [s1 = record, s2 = recordId] [s3 = a, s4 = b] @"UUID" 
+
+After firing 2:
+[1] project [s8 = (s6 + 1)] 
+[1] filter {true} 
+[1] extract_field_paths inputs[s3 = Get(a)/Id] outputs[s6 = Get(a)/Traverse/Get(x)/Id] 
+[1] project [s5 = (s4 ?: null)] 
+[1] scan generic [s1 = record, s2 = recordId] [s3 = a, s4 = b] @"UUID" 
+
+After firing 3:
+[1] project [s8 = (s6 + 1)] 
+[1] filter {true} 
+[1] extract_field_paths inputs[s3 = Get(a)/Id] outputs[s6 = Get(a)/Traverse/Get(x)/Id] 
+[1] scan generic [s1 = record, s2 = recordId] [s3 = a, s4 = b] @"UUID" 
+
+After firing 4:
+[1] project [s8 = (s6 + 1)] 
+[1] filter {true} 
+[1] extract_field_paths inputs[s3 = Get(a)/Id] outputs[s6 = Get(a)/Traverse/Get(x)/Id] 
+[1] scan generic [s1 = record, s2 = recordId] [s3 = a] @"UUID" 

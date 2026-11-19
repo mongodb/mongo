@@ -1,0 +1,12 @@
+# Golden test output of SbBlueprintDeadSlotEliminationTest/ExtractWithOnlyDeadOutputsIsReplacedByChild
+Live slots: s1 s3
+
+Before:
+[1] extract_field_paths inputs[s3 = Get(a)/Id, s4 = Get(b)/Id] outputs[s5 = Get(a)/Traverse/Get(x)/Id, s6 = Get(b)/Traverse/Get(x)/Id] 
+[1] scan generic [s1 = record, s2 = recordId] [s3 = a, s4 = b] @"UUID" 
+
+After firing 1:
+[1] scan generic [s1 = record, s2 = recordId] [s3 = a, s4 = b] @"UUID" 
+
+After firing 2:
+[1] scan generic [s1 = record, s2 = recordId] [s3 = a] @"UUID" 
