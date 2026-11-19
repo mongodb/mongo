@@ -4721,6 +4721,48 @@ TEST_F(PipelineDependencyGraphTest, GetTypeDoesNotSkipMatchesOnOtherBaseDocument
     });
 }
 
+TEST_F(PipelineDependencyGraphTest, GetTypeUsesKnownMissingMetadata) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline("[{$project: {a: 1}}]");
+    ASSERT_EQ(graph->getType_forTest(nullptr, "b").toDebugString(), "missing");
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeKeepsUnknownRootField) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline("[{$replaceWith: '$a'}]");
+    ASSERT_EQ(graph->getType_forTest(nullptr, "b").toDebugString(), "any");
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeUsesRemovedFieldMetadata) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline("[{$unset: 'a'}]");
+    ASSERT_EQ(graph->getType_forTest(nullptr, "a.b").toDebugString(), "missing");
+    ASSERT_EQ(graph->getType_forTest(nullptr, "a.b").toDebugString(), "missing");
+    ASSERT_EQ(graph->getType_forTest(nullptr, "x").toDebugString(), "any");
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeUsesConstantMetadata) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline("[{$set: {a: 'str'}}]");
+    ASSERT_EQ(graph->getType_forTest(nullptr, "a").toDebugString(), "string(S)");
+    ASSERT_EQ(graph->getType_forTest(nullptr, "a.b").toDebugString(), "missing");
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeOfNestedConstantField) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline("[{$set: {a: {$literal: {b: {c: 'str'}}}}}]");
+    ASSERT_EQ(graph->getType_forTest(nullptr, "a").toDebugString(), "{b: {c: string(S)}}");
+    ASSERT_EQ(graph->getType_forTest(nullptr, "a.b").toDebugString(), "{c: string(S)}");
+    ASSERT_EQ(graph->getType_forTest(nullptr, "a.b.c").toDebugString(), "string(S)");
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeOfSubpathThroughConstantArray) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline("[{$set: {a: {$literal: [{b: 42}]}}}]");
+    ASSERT_EQ(graph->getType_forTest(nullptr, "a").toDebugString(), "array(S)");
+    ASSERT_EQ(graph->getType_forTest(nullptr, "a.b").toDebugString(), "array(S)");
+}
+
 TEST_F(PipelineDependencyGraphTest, GetTypeFlowsThroughRename) {
     unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
     setPipeline(R"([
@@ -4769,8 +4811,8 @@ TEST_F(PipelineDependencyGraphTest, GetTypeAfterInclusionProjectionWithMissingPr
     // The $project removes the 'p' from the document, but declares 'p' with 'a' embedded field in
     // the graph. Therefore, the types here are missing and the 'p' is not existent.
     runTest([&] {
-        ASSERT_EQ(graph->getType_forTest(stages.back().get(), "p").toDebugString(), "any");
-        ASSERT_EQ(graph->getType_forTest(stages.back().get(), "p.a").toDebugString(), "any");
+        ASSERT_EQ(graph->getType_forTest(stages.back().get(), "p").toDebugString(), "~array");
+        ASSERT_EQ(graph->getType_forTest(stages.back().get(), "p.a").toDebugString(), "missing");
         ASSERT_EQ(graph->getType_forTest(nullptr, "p").toDebugString(), "missing");
         ASSERT_EQ(graph->getType_forTest(nullptr, "p.a").toDebugString(), "missing");
     });
@@ -4788,7 +4830,7 @@ TEST_F(PipelineDependencyGraphTest, GetTypeAfterInclusionRenameWithMissingPrefix
     // missing, unlike with inclusion.
     // TODO(SERVER-137963): 'p' should be object only, and p.a cannot be missing after the project.
     runTest([&] {
-        ASSERT_EQ(graph->getType_forTest(stages.back().get(), "p").toDebugString(), "any");
+        ASSERT_EQ(graph->getType_forTest(stages.back().get(), "p").toDebugString(), "~array");
         ASSERT_EQ(graph->getType_forTest(stages.back().get(), "p.a").toDebugString(),
                   "missing|number");
         ASSERT_EQ(graph->getType_forTest(nullptr, "p").toDebugString(), "missing");
@@ -4805,8 +4847,7 @@ TEST_F(PipelineDependencyGraphTest, GetTypeIgnoresRenameTypeUnderPossiblyArrayPr
     // TODO(SERVER-137963): 'p' cannot be missing in this case, and neither can 'p.a'.
     runTest([&] {
         ASSERT_EQ(graph->getType_forTest(stages[1].get(), "x").toDebugString(), "number");
-        // TODO(SERVER-137963): 'x' should be 'missing' after the project.
-        ASSERT_EQ(graph->getType_forTest(nullptr, "x").toDebugString(), "any");
+        ASSERT_EQ(graph->getType_forTest(nullptr, "x").toDebugString(), "missing");
         // TODO(SERVER-137963): 'p' should have some sort of object|array type.
         ASSERT_EQ(graph->getType_forTest(nullptr, "p").toDebugString(), "any");
         ASSERT_EQ(graph->getType_forTest(nullptr, "p.a").toDebugString(),
@@ -4858,8 +4899,8 @@ TEST_F(PipelineDependencyGraphTest, GetTypeOfSubpathUnderScalarPrefix) {
     ])");
     // The exclusion $project does nothing, since there is no 'x.y' path to remove.
     runTest([&] {
-        ASSERT_EQ(graph->getType_forTest(nullptr, "x").toDebugString(), "any");
-        ASSERT_EQ(graph->getType_forTest(nullptr, "x.y").toDebugString(), "any");
+        ASSERT_EQ(graph->getType_forTest(nullptr, "x").toDebugString(), "~array");
+        ASSERT_EQ(graph->getType_forTest(nullptr, "x.y").toDebugString(), "missing");
     });
 }
 
@@ -5147,6 +5188,23 @@ TEST_F(PipelineDependencyGraphTest, GetTypeHasDebugLogging) {
     ASSERT_TRUE(logCapture.countBSONContainingSubset(BSON("id" << 13907004)));
     ASSERT_TRUE(logCapture.countBSONContainingSubset(BSON("id" << 13907005)));
     ASSERT_TRUE(logCapture.countBSONContainingSubset(BSON("id" << 13907006)));
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeOfUnknownSubfieldOfProjectedThenDottedSetField) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$project: {a: '$b'}},
+        {$set: {'a.d': 1}},
+        {$match: {'a.c': {$exists: true}}}
+    ])");
+
+    ASSERT_EQ(graph->getType_forTest(stages[2].get(), "a").toDebugString(), "any");
+    ASSERT_EQ(graph->getType_forTest(stages[2].get(), "a.d").toDebugString(),
+              "missing|int(S)|array(S)");
+    ASSERT_EQ(graph->getType_forTest(stages[2].get(), "a.c").toDebugString(), "any");
+    ASSERT_EQ(graph->getType_forTest(nullptr, "a").toDebugString(), "any");
+    ASSERT_EQ(graph->getType_forTest(nullptr, "a.d").toDebugString(), "missing|int(S)|array(S)");
+    ASSERT_EQ(graph->getType_forTest(nullptr, "a.c").toDebugString(), "~missing");
 }
 
 }  // namespace

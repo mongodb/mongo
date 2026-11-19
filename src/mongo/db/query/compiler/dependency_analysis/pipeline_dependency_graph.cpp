@@ -1286,6 +1286,27 @@ private:
     }
 
     /**
+     * Returns the type cached for the field, if there is one, or the type determined by the
+     * associated FieldMetadata.
+     */
+    Type getFieldTypeFromMetadata(FieldId fieldId) const {
+        if (auto cachedType = getCachedType(fieldId); cachedType) {
+            return *cachedType;
+        }
+        if (auto constant = getConstantForField(fieldId); constant) {
+            return Type::fromValue(*constant);
+        }
+        const auto& metadata = _fields[fieldId].metadata;
+        if (metadata.knownToBeMissing) {
+            return Type::missing();
+        }
+        if (!metadata.canFieldBeArray) {
+            return complement(Type::anyArray());
+        }
+        return Type::any();
+    }
+
+    /**
      * Takes the type for a field and constructs a nested object type, where the field type is
      * nested inside the matched path.
      */
@@ -1301,15 +1322,18 @@ private:
         auto leafName = components[match.prefix.size()];
         Type currentType = objectWithField(leafName, leafType);
 
+        // The loop builds the prefix of the path, e.g. for 'a.b.c', it starts with
+        // {c: leafType}, and adds the non-object alternatives of the prefix.
+        // for i = 1: {b: {c: leafType}|alternatives}
+        // for i = 0: {a: {b: {c: leafType}|alternatives}|alternatives}
         for (auto i = std::ssize(prefix) - 1; i >= 0; --i) {
-            const auto& field = _fields[prefix[i]];
             auto fieldName = components[i];
-            // A declared subpath does not imply an object-valued prefix.
-            currentType = unionType(std::move(currentType), Type::anyScalar());
-            // And of course, if the field may be array we need to also keep that.
-            if (field.metadata.canFieldBeArray) {
-                currentType = unionType(std::move(currentType), Type::someArray());
-            }
+            // The type of the field *without* the shape - the shape will come from currentType.
+            auto prefixType = unionType(getFieldTypeFromMetadata(prefix[i]), Type::anyObject());
+            // The shape + all other non-object types.
+            currentType = unionType(std::move(currentType), complement(Type::anyObject()));
+            // Intersect to keep the currentType's shape and the alternatives from prefixType.
+            currentType = intersectType(std::move(currentType), std::move(prefixType));
             currentType = objectWithField(fieldName, std::move(currentType));
         }
         return currentType;
@@ -1323,22 +1347,20 @@ private:
         Type fieldType = Type::any();
         switch (pathMatch.field.type) {
             case FieldMatchType::kExact:
-            case FieldMatchType::kShadowed: {
-                // If the matched path is a rename, we can narrow its type further based on the type
-                // of the rename source.
-                if (auto cached = getCachedType(pathMatch.field.fieldId); cached) {
-                    fieldType = std::move(*cached);
-                    break;
-                }
+                fieldType = getFieldTypeFromMetadata(pathMatch.field.fieldId);
+                break;
+            case FieldMatchType::kShadowed:
+                fieldType = getFieldTypeFromMetadata(pathMatch.field.fieldId);
                 if (auto* subGraph = getSubpipelineForValuePreservingPath(pathMatch)) {
-                    fieldType = subGraph->_impl->getDocumentType(
-                        subGraph->_impl->lookupPath(nullptr, pathMatch.suffix()), arraynessOnly);
-                    break;
+                    fieldType =
+                        intersectType(std::move(fieldType),
+                                      subGraph->_impl->getDocumentType(
+                                          subGraph->_impl->lookupPath(nullptr, pathMatch.suffix()),
+                                          arraynessOnly));
                 }
                 break;
-            }
             case FieldMatchType::kMissing:
-                // TODO(SERVER-137963): Use missing information.
+                fieldType = getFieldTypeFromMetadata(pathMatch.field.fieldId);
                 break;
             case FieldMatchType::kBaseDocument: {
                 auto rootType = getDocumentTypeFromCollection(pathMatch);

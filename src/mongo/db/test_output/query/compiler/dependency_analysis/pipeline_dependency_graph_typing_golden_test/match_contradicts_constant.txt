@@ -19,7 +19,7 @@ input: {
 }
 output:
   after $set:0
-    y: any
+    y: string(S)
   end of pipeline
-    y: array
+    y: never
 
