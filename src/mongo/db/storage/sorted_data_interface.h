@@ -390,7 +390,14 @@ public:
         virtual boost::optional<IndexKeyEntry> next(
             RecoveryUnit& ru, KeyInclusion keyInclusion = KeyInclusion::kInclude) = 0;
         virtual boost::optional<KeyStringEntry> nextKeyString(RecoveryUnit& ru) = 0;
-        virtual SortedDataKeyValueView nextKeyValueView(RecoveryUnit& ru) = 0;
+
+        /**
+         * Returns the next key-value pair from the table. Passing a value other than 1 or 0 to this
+         * function internally buffers up to maxBatch rows from the table, and key-value pairs will
+         * be returned from there if any are available. Passing 0 forces row-by-row cursor reads,
+         * and discards any remaining values in the buffer.
+         */
+        virtual SortedDataKeyValueView nextKeyValueView(RecoveryUnit& ru, size_t maxBatch = 1) = 0;
 
         //
         // Seeking

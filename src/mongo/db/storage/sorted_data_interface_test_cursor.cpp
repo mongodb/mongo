@@ -19,9 +19,13 @@
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
+#include <gtest/gtest.h>
 
 namespace mongo {
 namespace {
+
+class SortedDataInterfaceTestWithBatching : public SortedDataInterfaceTest,
+                                            public testing::WithParamInterface<size_t> {};
 
 // Verify that a forward cursor is positioned at EOF when the index is empty.
 TEST_F(SortedDataInterfaceTest, CursorIsEOFWhenEmpty) {
@@ -84,7 +88,8 @@ TEST_F(SortedDataInterfaceTest, ExhaustCursor) {
     ASSERT(!cursor->next(recoveryUnit()));
 }
 
-TEST_F(SortedDataInterfaceTest, ExhaustKeyStringCursor) {
+TEST_P(SortedDataInterfaceTestWithBatching, ExhaustKeyStringCursor) {
+    const auto maxBatch = GetParam();
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
@@ -120,14 +125,14 @@ TEST_F(SortedDataInterfaceTest, ExhaustKeyStringCursor) {
     {
         const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
         for (int i = 0; i < nToInsert; i++) {
-            auto entry = cursor->nextKeyValueView(recoveryUnit());
+            auto entry = cursor->nextKeyValueView(recoveryUnit(), maxBatch);
             ASSERT(!entry.isEmpty());
             ASSERT_EQ(entry.getValueCopy(), keyStrings.at(i));
         }
-        ASSERT(cursor->nextKeyValueView(recoveryUnit()).isEmpty());
+        ASSERT(cursor->nextKeyValueView(recoveryUnit(), maxBatch).isEmpty());
 
         // Cursor at EOF should remain at EOF when advanced
-        ASSERT(cursor->nextKeyValueView(recoveryUnit()).isEmpty());
+        ASSERT(cursor->nextKeyValueView(recoveryUnit(), maxBatch).isEmpty());
     }
 }
 
@@ -164,7 +169,8 @@ TEST_F(SortedDataInterfaceTest, ExhaustCursorReversed) {
     }
 }
 
-TEST_F(SortedDataInterfaceTest, ExhaustKeyStringCursorReversed) {
+TEST_P(SortedDataInterfaceTestWithBatching, ExhaustKeyStringCursorReversed) {
+    const auto maxBatch = GetParam();
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
@@ -200,20 +206,21 @@ TEST_F(SortedDataInterfaceTest, ExhaustKeyStringCursorReversed) {
     {
         const auto cursor(sorted->newCursor(opCtx(), recoveryUnit(), false));
         for (int i = nToInsert - 1; i >= 0; i--) {
-            auto entry = cursor->nextKeyValueView(recoveryUnit());
+            auto entry = cursor->nextKeyValueView(recoveryUnit(), maxBatch);
             ASSERT(!entry.isEmpty());
             ASSERT_EQ(entry.getValueCopy(), keyStrings.at(i));
         }
-        ASSERT(cursor->nextKeyValueView(recoveryUnit()).isEmpty());
+        ASSERT(cursor->nextKeyValueView(recoveryUnit(), maxBatch).isEmpty());
 
         // Cursor at EOF should remain at EOF when advanced
-        ASSERT(cursor->nextKeyValueView(recoveryUnit()).isEmpty());
+        ASSERT(cursor->nextKeyValueView(recoveryUnit(), maxBatch).isEmpty());
     }
 }
 
 // Seek into the middle of the index, then read the rest of the keys with nextKeyValueView(),
 // saving and restoring between reads. The sequence must be the same regardless of maxBatch.
-TEST_F(SortedDataInterfaceTest, SaveRestoreAfterSeekWhileIterating) {
+TEST_P(SortedDataInterfaceTestWithBatching, SaveRestoreAfterSeekWhileIterating) {
+    const auto maxBatch = GetParam();
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
@@ -239,7 +246,7 @@ TEST_F(SortedDataInterfaceTest, SaveRestoreAfterSeekWhileIterating) {
     cursor->restore(recoveryUnit());
 
     for (int i = start + 1; i < nToInsert; ++i) {
-        view = cursor->nextKeyValueView(recoveryUnit());
+        view = cursor->nextKeyValueView(recoveryUnit(), maxBatch);
         ASSERT_FALSE(view.isEmpty());
         ASSERT_EQ(*view.getRecordId(), RecordId(42, i * 2));
 
@@ -248,15 +255,16 @@ TEST_F(SortedDataInterfaceTest, SaveRestoreAfterSeekWhileIterating) {
             cursor->restore(recoveryUnit());
         }
     }
-    ASSERT_TRUE(cursor->nextKeyValueView(recoveryUnit()).isEmpty());
+    ASSERT_TRUE(cursor->nextKeyValueView(recoveryUnit(), maxBatch).isEmpty());
 
     cursor->save();
     cursor->restore(recoveryUnit());
-    ASSERT_TRUE(cursor->nextKeyValueView(recoveryUnit()).isEmpty());
+    ASSERT_TRUE(cursor->nextKeyValueView(recoveryUnit(), maxBatch).isEmpty());
 }
 
 // Scan into the middle of the index, then seek to EOF, ensure the key is cleared.
-TEST_F(SortedDataInterfaceTest, SeekToEofClearsSavedKey) {
+TEST_P(SortedDataInterfaceTestWithBatching, SeekToEofClearsSavedKey) {
+    const auto maxBatch = GetParam();
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
@@ -274,7 +282,7 @@ TEST_F(SortedDataInterfaceTest, SeekToEofClearsSavedKey) {
     const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
 
     for (int i = 0; i < nToInsert / 2; ++i) {
-        const auto view = cursor->nextKeyValueView(recoveryUnit());
+        const auto view = cursor->nextKeyValueView(recoveryUnit(), maxBatch);
         ASSERT_FALSE(view.isEmpty());
         ASSERT_EQ(*view.getRecordId(), RecordId(42, i * 2));
     }
@@ -290,6 +298,63 @@ TEST_F(SortedDataInterfaceTest, SeekToEofClearsSavedKey) {
     cursor->restore(recoveryUnit());
     ASSERT_TRUE(cursor->nextKeyValueView(recoveryUnit()).isEmpty());
 }
+
+// Save and detach mid-scan, then reattach to a new operation context and restore, the same
+// sequence a plan executor uses between getMores. The scan must continue from the last returned
+// key regardless of maxBatch.
+TEST_P(SortedDataInterfaceTestWithBatching, DetachAndReattachWhileIterating) {
+    const auto maxBatch = GetParam();
+    const auto sorted(
+        harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
+
+    const int nToInsert = 20;
+    for (int i = 0; i < nToInsert; i++) {
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(),
+                           recoveryUnit(),
+                           makeKeyString(sorted.get(), BSON("" << i), RecordId(42, i * 2)),
+                           true));
+        txn.commit();
+    }
+
+    const int start = 5;
+    const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
+    auto seekKey = makeKeyStringForSeek(sorted.get(), BSON("" << start), true, true);
+    auto view = cursor->seekForKeyValueView(recoveryUnit(), seekKey.finishAndGetBuffer());
+    ASSERT_FALSE(view.isEmpty());
+    ASSERT_EQ(*view.getRecordId(), RecordId(42, start * 2));
+
+    for (int i = start + 1; i < 9; ++i) {
+        view = cursor->nextKeyValueView(recoveryUnit(), maxBatch);
+        ASSERT_FALSE(view.isEmpty());
+        ASSERT_EQ(*view.getRecordId(), RecordId(42, i * 2));
+    }
+
+    cursor->save();
+    cursor->detachFromOperationContext();
+
+    auto client = harnessHelper()->serviceContext()->getService()->makeClient("reattach");
+    auto newOpCtx = harnessHelper()->newOperationContext(client.get());
+    auto& newRu = *shard_role_details::getRecoveryUnit(newOpCtx.get());
+    cursor->reattachToOperationContext(newOpCtx.get());
+    cursor->restore(newRu);
+
+    for (int i = 9; i < nToInsert; ++i) {
+        view = cursor->nextKeyValueView(newRu, maxBatch);
+        ASSERT_FALSE(view.isEmpty());
+        ASSERT_EQ(*view.getRecordId(), RecordId(42, i * 2));
+    }
+    ASSERT_TRUE(cursor->nextKeyValueView(newRu, maxBatch).isEmpty());
+
+    cursor->save();
+    cursor->detachFromOperationContext();
+}
+
+INSTANTIATE_TEST_SUITE_P(CursorTests,
+                         SortedDataInterfaceTestWithBatching,
+                         testing::Values(0, 1, 5, 10, 1000),
+                         testing::PrintToStringParamName());
 
 TEST_F(SortedDataInterfaceTest, CursorIterate1) {
     const auto sorted(

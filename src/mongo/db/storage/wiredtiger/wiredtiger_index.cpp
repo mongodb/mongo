@@ -852,7 +852,7 @@ public:
         return getKeyStringEntry();
     }
 
-    SortedDataKeyValueView nextKeyValueView(RecoveryUnit& ru) override {
+    SortedDataKeyValueView nextKeyValueView(RecoveryUnit& ru, size_t /*maxBatch*/) override {
         advanceNext(ru);
         return getKeyValueView();
     }

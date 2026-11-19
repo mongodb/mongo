@@ -191,6 +191,24 @@ void BM_SDIAdvance(benchmark::State& state,
     state.SetItemsProcessed(fix.itemsProcessed);
 };
 
+void BM_SDIAdvanceKeyValueView(benchmark::State& state,
+                               Direction direction,
+                               Uniqueness uniqueness,
+                               size_t maxBatch) {
+
+    Fixture fix(uniqueness, direction, 100'000, KeyFormat::Long);
+
+    auto& ru = *shard_role_details::getRecoveryUnit(fix.opCtx.get());
+    for (auto _ : state) {
+        fix.cursor->seek(ru, fix.firstKey.finishAndGetBuffer());
+        for (int i = 1; i < fix.nToInsert; i++)
+            fix.cursor->nextKeyValueView(ru, maxBatch);
+        fix.itemsProcessed += fix.nToInsert;
+    }
+    ASSERT(fix.cursor->nextKeyValueView(ru, maxBatch).isEmpty());
+    state.SetItemsProcessed(fix.itemsProcessed);
+};
+
 void BM_SDISeek(benchmark::State& state,
                 Direction direction,
                 Cursor::KeyInclusion keyInclusion,
@@ -260,6 +278,19 @@ BENCHMARK_CAPTURE(
     BM_SDIAdvance, AdvanceBackwardKeyAndLocUnique, kBackward, kRecordIdAndKey, kUnique);
 BENCHMARK_CAPTURE(
     BM_SDIAdvance, AdvanceBackwardStringLoc, kForward, kRecordId, kNonUnique, KeyFormat::String);
+
+BENCHMARK_CAPTURE(BM_SDIAdvanceKeyValueView, AdvanceForwardBatch1, kForward, kNonUnique, 1);
+BENCHMARK_CAPTURE(BM_SDIAdvanceKeyValueView, AdvanceForwardBatch1K, kForward, kNonUnique, 1'000);
+BENCHMARK_CAPTURE(
+    BM_SDIAdvanceKeyValueView, AdvanceForwardBatch1M, kForward, kNonUnique, 1'000'000);
+BENCHMARK_CAPTURE(BM_SDIAdvanceKeyValueView, AdvanceForwardUniqueBatch1, kForward, kUnique, 1);
+BENCHMARK_CAPTURE(BM_SDIAdvanceKeyValueView, AdvanceForwardUniqueBatch1K, kForward, kUnique, 1'000);
+BENCHMARK_CAPTURE(
+    BM_SDIAdvanceKeyValueView, AdvanceForwardUniqueBatch1M, kForward, kUnique, 1'000'000);
+BENCHMARK_CAPTURE(BM_SDIAdvanceKeyValueView, AdvanceBackwardBatch1, kBackward, kNonUnique, 1);
+BENCHMARK_CAPTURE(BM_SDIAdvanceKeyValueView, AdvanceBackwardBatch1K, kBackward, kNonUnique, 1'000);
+BENCHMARK_CAPTURE(
+    BM_SDIAdvanceKeyValueView, AdvanceBackwardBatch1M, kBackward, kNonUnique, 1'000'000);
 
 BENCHMARK_CAPTURE(BM_SDISeek, SeekForwardKey, kForward, kRecordId, kNonUnique);
 BENCHMARK_CAPTURE(BM_SDISeek, SeekForwardKeyAndLoc, kForward, kRecordIdAndKey, kNonUnique);
