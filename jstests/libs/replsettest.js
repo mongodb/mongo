@@ -6,6 +6,7 @@ import {
     persistenceProviderRequiresReplicatedTruncates,
 } from "jstests/libs/query/replicated_truncates_utils.js";
 import {setFCVWithRetryOnBackgroundOpInProgress} from "jstests/libs/set_fcv_helpers.js";
+import {isDisagg} from "jstests/libs/oplog_truncation_util.js";
 
 // Symbol used to override the constructor. Please do not use this, it's only meant to aid
 // in migrating the jstest corpus to proper module usage.
@@ -2696,6 +2697,7 @@ export class ReplSetTest {
             skipTempCollections: false,
         },
     ) {
+        const includeReplicatedRecordIds = isDisagg(sessions[0].getDatabase("admin"));
         return sessions.map((session) => {
             const commandObj = {dbHash: 1};
             const db = session.getDatabase(dbName);
@@ -2722,7 +2724,15 @@ export class ReplSetTest {
 
             // If recordIds are replicated on a collection, always include them for testing.
             // This should have no impact on collections without replicated recordIds.
-            commandObj.includeReplicatedRecordIds = 1;
+            //
+            // TODO (SERVER-138127): Opt in on all deployments again once the set-wide groupId
+            // design lands. Until then, intermediate states (out-of-group nodes, nodes
+            // mid-conversion) can legitimately have equal document data with different RecordId
+            // spaces, so only opt in on disaggregated storage, where the provider keeps setting
+            // recordIdsReplicated per collection.
+            if (includeReplicatedRecordIds) {
+                commandObj.includeReplicatedRecordIds = 1;
+            }
             return assert.commandWorked(db.runCommand(commandObj));
         });
     }

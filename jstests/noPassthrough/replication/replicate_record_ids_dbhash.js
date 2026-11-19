@@ -3,6 +3,10 @@
  *
  * @tags: [
  *   featureFlagRecordIdsReplicated,
+ *   # TODO SERVER-139449 - Re-enable once the fixture dbHash rid opt-in is restored. This test
+ *   # asserts the opt-in behavior of checkReplicatedDataHashes on attached storage and fails
+ *   # there without it.
+ *   __TEMPORARILY_DISABLED__,
  * ]
  */
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
