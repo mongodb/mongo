@@ -171,7 +171,14 @@ void addDelta(ReplicatedMetadataDelta& entry, const ReplicatedMetadataDelta& del
 void validateCheckpoint(const CheckpointContents& standby,
                         const CheckpointContents& primary,
                         ReportingStrategy reportingStrategy) {
+    int64_t entriesValidated = 0;
+    int64_t hashesValidated = 0;
     for (const auto& [uuid, metadata] : primary) {
+        entriesValidated++;
+        if (metadata.has_value() && metadata->hash.has_value()) {
+            hashesValidated++;
+        }
+
         // Check each entry in `primary` exists in `standby`, i.e., `primary` ⊆ `standby`.
         const auto standbyIt = standby.find(uuid);
         if (standbyIt == standby.end()) {
@@ -221,6 +228,9 @@ void validateCheckpoint(const CheckpointContents& standby,
             }
         }
     }
+
+    incrementEntriesValidatedCount(entriesValidated);
+    incrementHashesValidatedCount(hashesValidated);
 
     // `primary` ⊆ `standby` ∧ |`standby`| == |`primary`| ⇒ `standby` == `primary`. This early
     // return is an optimization. If the sizes are not equal, we will discover the missing

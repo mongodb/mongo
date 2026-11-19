@@ -58,16 +58,25 @@ DEATH_TEST(ValidateCheckpointDeathTest, UnobservedWriteFasserts, "13626001") {
 }
 
 TEST(ValidateCheckpointTest, UnobservedWriteLogsError) {
+    otel::metrics::OtelMetricsCapturer capturer;
     CheckpointContents expected;
     CheckpointContents actual;
-    actual[UUID::gen()] =
-        CollectionReplicatedMetadata{.sizeCount = CollectionSizeCount{.size = 5, .count = 1}};
+    actual[UUID::gen()] = CollectionReplicatedMetadata{
+        .sizeCount = CollectionSizeCount{.size = 5, .count = 1}, .hash = 42};
 
     unittest::LogCaptureGuard logs;
     validateCheckpoint(expected, actual, ReportingStrategy::kLogError);
     logs.stop();
 
     EXPECT_EQ(logs.countBSONContainingSubset(BSON("id" << 13626001)), 1);
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kReplicatedFastCountValidationEntriesValidated),
+                  1);
+        EXPECT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kReplicatedFastCountValidationHashesValidated),
+                  1);
+    }
 }
 
 DEATH_TEST(ValidateCheckpointDeathTest, UnobservedRemovalFasserts, "13626002") {
@@ -78,6 +87,7 @@ DEATH_TEST(ValidateCheckpointDeathTest, UnobservedRemovalFasserts, "13626002") {
 }
 
 TEST(ValidateCheckpointTest, UnobservedRemovalLogsError) {
+    otel::metrics::OtelMetricsCapturer capturer;
     CheckpointContents expected;
     CheckpointContents actual;
     actual[UUID::gen()] = boost::none;
@@ -87,6 +97,14 @@ TEST(ValidateCheckpointTest, UnobservedRemovalLogsError) {
     logs.stop();
 
     EXPECT_EQ(logs.countBSONContainingSubset(BSON("id" << 13626002)), 1);
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kReplicatedFastCountValidationEntriesValidated),
+                  1);
+        EXPECT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kReplicatedFastCountValidationHashesValidated),
+                  0);
+    }
 }
 
 DEATH_TEST(ValidateCheckpointDeathTest, RemovalForLiveCollectionFasserts, "13626003") {
@@ -100,6 +118,7 @@ DEATH_TEST(ValidateCheckpointDeathTest, RemovalForLiveCollectionFasserts, "13626
 }
 
 TEST(ValidateCheckpointTest, RemovalForLiveCollectionLogsError) {
+    otel::metrics::OtelMetricsCapturer capturer;
     const UUID uuid = UUID::gen();
     CheckpointContents expected;
     expected[uuid] =
@@ -112,6 +131,14 @@ TEST(ValidateCheckpointTest, RemovalForLiveCollectionLogsError) {
     logs.stop();
 
     EXPECT_EQ(logs.countBSONContainingSubset(BSON("id" << 13626003)), 1);
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kReplicatedFastCountValidationEntriesValidated),
+                  1);
+        EXPECT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kReplicatedFastCountValidationHashesValidated),
+                  0);
+    }
 }
 
 DEATH_TEST(ValidateCheckpointDeathTest, WriteForObservedDropFasserts, "13626004") {
@@ -125,18 +152,27 @@ DEATH_TEST(ValidateCheckpointDeathTest, WriteForObservedDropFasserts, "13626004"
 }
 
 TEST(ValidateCheckpointTest, WriteForObservedDropLogsError) {
+    otel::metrics::OtelMetricsCapturer capturer;
     const UUID uuid = UUID::gen();
     CheckpointContents expected;
     expected[uuid] = boost::none;
     CheckpointContents actual;
-    actual[uuid] =
-        CollectionReplicatedMetadata{.sizeCount = CollectionSizeCount{.size = 5, .count = 1}};
+    actual[uuid] = CollectionReplicatedMetadata{
+        .sizeCount = CollectionSizeCount{.size = 5, .count = 1}, .hash = 42};
 
     unittest::LogCaptureGuard logs;
     validateCheckpoint(expected, actual, ReportingStrategy::kLogError);
     logs.stop();
 
     EXPECT_EQ(logs.countBSONContainingSubset(BSON("id" << 13626004)), 1);
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kReplicatedFastCountValidationEntriesValidated),
+                  1);
+        EXPECT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kReplicatedFastCountValidationHashesValidated),
+                  1);
+    }
 }
 
 DEATH_TEST(ValidateCheckpointDeathTest, SizeMismatchFasserts, "13626005") {
@@ -292,6 +328,73 @@ TEST(ValidateCheckpointTest, HashAbsentOnBothPasses) {
         .sizeCount = CollectionSizeCount{.size = 10, .count = 1}, .hash = boost::none};
     CheckpointContents actual = expected;
     validateCheckpoint(expected, actual, ReportingStrategy::kFassert);
+}
+
+TEST(ValidateCheckpointTest, ValidationCountsMetrics) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    const UUID hashedUuid = UUID::gen();
+    const UUID plainUuid = UUID::gen();
+    const UUID droppedUuid = UUID::gen();
+
+    CheckpointContents expected;
+    expected[hashedUuid] = CollectionReplicatedMetadata{
+        .sizeCount = CollectionSizeCount{.size = 10, .count = 1}, .hash = 42};
+    expected[plainUuid] = CollectionReplicatedMetadata{
+        .sizeCount = CollectionSizeCount{.size = 20, .count = 2}, .hash = boost::none};
+    expected[droppedUuid] = boost::none;
+
+    CheckpointContents actual;
+    actual[hashedUuid] = CollectionReplicatedMetadata{
+        .sizeCount = CollectionSizeCount{.size = 10, .count = 1}, .hash = 42};
+    actual[plainUuid] = CollectionReplicatedMetadata{
+        .sizeCount = CollectionSizeCount{.size = 20, .count = 2}, .hash = boost::none};
+    actual[droppedUuid] = boost::none;
+
+    validateCheckpoint(expected, actual, ReportingStrategy::kFassert);
+
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kReplicatedFastCountValidationEntriesValidated),
+                  3);
+        EXPECT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kReplicatedFastCountValidationHashesValidated),
+                  1);
+    }
+}
+
+TEST(ValidateCheckpointTest, HashMismatchCountsHashComparisons) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    const UUID mismatchedHashUuid = UUID::gen();
+    const UUID absentHashUuid = UUID::gen();
+
+    CheckpointContents expected;
+    expected[mismatchedHashUuid] = CollectionReplicatedMetadata{
+        .sizeCount = CollectionSizeCount{.size = 10, .count = 1}, .hash = 42};
+    // This expected hash does not increment the number of hashes validated because the hash is not
+    // present in the actual checkpoint, i.e., the primary's checkpoint.
+    expected[absentHashUuid] = CollectionReplicatedMetadata{
+        .sizeCount = CollectionSizeCount{.size = 20, .count = 2}, .hash = 43};
+
+    CheckpointContents actual;
+    actual[mismatchedHashUuid] = CollectionReplicatedMetadata{
+        .sizeCount = CollectionSizeCount{.size = 10, .count = 1}, .hash = 43};
+    actual[absentHashUuid] = CollectionReplicatedMetadata{
+        .sizeCount = CollectionSizeCount{.size = 20, .count = 2}, .hash = boost::none};
+
+    unittest::LogCaptureGuard logs;
+    validateCheckpoint(expected, actual, ReportingStrategy::kLogError);
+    logs.stop();
+
+    EXPECT_EQ(logs.countBSONContainingSubset(BSON("id" << 13626005)), 2);
+    if (capturer.canReadMetrics()) {
+        // The number of entries validated is incremented regardless of validation passing.
+        EXPECT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kReplicatedFastCountValidationEntriesValidated),
+                  2);
+        EXPECT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kReplicatedFastCountValidationHashesValidated),
+                  1);
+    }
 }
 
 DEATH_TEST(ValidateCheckpointDeathTest, MissingWriteFasserts, "13626006") {
@@ -1261,6 +1364,45 @@ TEST_F(SizeCountCheckpointValidatorTest, CheckpointsValidatedCounterIncrementsWh
                         .metadata = {.sizeCount = CollectionSizeCount{.size = 10, .count = 1}}}}});
     // Eviction does not depend on the parameter, so memory is bounded even with validation off.
     expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, ValidationCountsIncludeHashComparisons) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    const UUID hashedUuid = UUID::gen();
+    const UUID plainUuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeWatermarkEntry(kT2),
+        makeCheckpointEntry(
+            kT2,
+            {{hashedUuid,
+              CollectionReplicatedMetadata{.sizeCount = CollectionSizeCount{.size = 10, .count = 1},
+                                           .hash = 42}},
+             {plainUuid,
+              CollectionReplicatedMetadata{.sizeCount = CollectionSizeCount{.size = 20, .count = 2},
+                                           .hash = boost::none}}})};
+    applyBatch(validator,
+               ops,
+               std::vector<ValidatorDeltaRecord>{
+                   {.ts = kT0,
+                    .uuid = hashedUuid,
+                    .delta =
+                        ReplicatedMetadataDelta{
+                            .metadata = {.sizeCount = CollectionSizeCount{.size = 10, .count = 1},
+                                         .hash = 42}}},
+                   {.ts = kT1,
+                    .uuid = plainUuid,
+                    .delta = ReplicatedMetadataDelta{
+                        .metadata = {.sizeCount = CollectionSizeCount{.size = 20, .count = 2},
+                                     .hash = boost::none}}}});
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kReplicatedFastCountValidationEntriesValidated),
+                  2);
+        EXPECT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kReplicatedFastCountValidationHashesValidated),
+                  1);
+    }
 }
 
 TEST_F(SizeCountCheckpointValidatorTest, WatermarksWithoutCheckpointsAreNotEvicted) {

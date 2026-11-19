@@ -42,6 +42,8 @@ void incrementUpdateCount();
 void incrementWatermarksWrittenCount();
 void incrementTailerWatermarksSeenCount();
 void incrementCheckpointsValidatedCount();
+void incrementEntriesValidatedCount(int64_t count);
+void incrementHashesValidatedCount(int64_t count);
 void incrementWatermarksRecordedCount();
 void incrementWatermarksEvictedCount(int64_t count);
 void incrementCheckpointsSkippedCount(int64_t count);

@@ -128,6 +128,24 @@ auto& checkpointsValidatedCounter = MetricsService::instance().createInt64Counte
     {.serverStatusOptions = ServerStatusOptions{
          .dottedPath = "replicatedFastCount.checkpointsValidated", .role = ClusterRole::None}});
 
+auto& entriesValidatedCounter = MetricsService::instance().createInt64Counter(
+    MetricNames::kReplicatedFastCountValidationEntriesValidated,
+    "Total number of entries in replicated metadata checkpoints emitted by the primary that have "
+    "been validated by the standby",
+    MetricUnit::kEvents,
+    {.serverStatusOptions =
+         ServerStatusOptions{.dottedPath = "replicatedFastCount.validation.entriesValidated",
+                             .role = ClusterRole::None}});
+
+auto& hashesValidatedCounter = MetricsService::instance().createInt64Counter(
+    MetricNames::kReplicatedFastCountValidationHashesValidated,
+    "Total number of entries that contain hashes in replicated metadata checkpoints emitted by the "
+    "primary that have been validated by the standby",
+    MetricUnit::kEvents,
+    {.serverStatusOptions =
+         ServerStatusOptions{.dottedPath = "replicatedFastCount.validation.hashesValidated",
+                             .role = ClusterRole::None}});
+
 // The number of watermarks recorded and evicted by the checkpoint validator. On a healthy node
 // these are approximately equal; a growing gap means matching checkpoints are not arriving and
 // deltas are accumulating in memory.
@@ -249,6 +267,14 @@ void incrementTailerWatermarksSeenCount() {
 
 void incrementCheckpointsValidatedCount() {
     checkpointsValidatedCounter.add(1);
+}
+
+void incrementEntriesValidatedCount(int64_t count) {
+    entriesValidatedCounter.add(count);
+}
+
+void incrementHashesValidatedCount(int64_t count) {
+    hashesValidatedCounter.add(count);
 }
 
 void incrementWatermarksRecordedCount() {

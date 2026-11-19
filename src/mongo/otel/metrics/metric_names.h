@@ -710,6 +710,12 @@ public:
             "sizeCountEntriesProcessed");
     static constexpr MetricName kReplicatedFastCountCheckpointsValidated = MetricNameMaker::make(
         "mongodb.serverStatus.metrics.replicatedFastCount.checkpointsValidated");
+    static constexpr MetricName kReplicatedFastCountValidationEntriesValidated =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.replicatedFastCount.validation.entriesValidated");
+    static constexpr MetricName kReplicatedFastCountValidationHashesValidated =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.replicatedFastCount.validation.hashesValidated");
     static constexpr MetricName kReplicatedFastCountOplogLagSecs =
         MetricNameMaker::make("mongodb.serverStatus.metrics.replicatedFastCount.oplogLagSecs");
     static constexpr MetricName kReplicatedFastCountTailerIsRunning =
