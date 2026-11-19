@@ -100,6 +100,7 @@ mongo_cc_fuzztest(
     srcs = ["bson_spatial_safety_fuzz_test.cpp"],
     tags = ["server-programmability"],
     deps = [
+        ":bson_validate",
         "//src/mongo:base",
     ],
 )

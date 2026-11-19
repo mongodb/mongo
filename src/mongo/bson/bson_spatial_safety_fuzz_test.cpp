@@ -1,6 +1,7 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
+#include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonelementvalue.h"
 #include "mongo/bson/bsonobj.h"
@@ -52,11 +53,31 @@ void invokeAndIgnoreDBExceptions(Fn&& fn, Args&&... args) {
     }
 }
 
+template <typename Fn, typename... Args>
+void invokeAndApplyBsonObjDBExceptionBehavior(Fn&& fn, const BSONObj& obj, Args&&... args) {
+    try {
+        if constexpr (std::is_void_v<std::invoke_result_t<Fn, const BSONObj&, Args...>>) {
+            std::invoke(std::forward<Fn>(fn), obj, std::forward<Args>(args)...);
+        } else {
+            doNotOptimize(std::invoke(std::forward<Fn>(fn), obj, std::forward<Args>(args)...));
+        }
+    } catch (const DBException&) {
+        /* if a throw happens ensure the bson obj is considered invalid */
+        EXPECT_FALSE(mongo::validateBSON(obj).isOK());
+    }
+}
+
 /**
  * Multiple call variant of `invokeAndIgnoreDBExceptions`.
  */
 template <typename Target, typename... Calls>
 void exerciseCalls(Target&& target, Calls&&... calls) {
+    if constexpr (std::same_as<std::remove_cvref_t<Target>(), BSONObj>) {
+        (invokeAndApplyBsonObjDBExceptionBehavior(std::forward<Calls>(calls),
+                                                  std::forward<Target>(target)),
+         ...);
+        return;
+    }
     (invokeAndIgnoreDBExceptions(std::forward<Calls>(calls), std::forward<Target>(target)), ...);
 }
 
