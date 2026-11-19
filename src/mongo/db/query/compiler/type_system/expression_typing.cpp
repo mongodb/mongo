@@ -61,6 +61,10 @@ struct GetOutputTypeExpressionVisitor final
         returnsBoolean();
     }
 
+    void visit(const ExpressionAllElementsTrue*) override {
+        returnsBoolean();
+    }
+
     void returnsBoolean() {
         outputType = Type(BSONType::boolean, Extent::kSubset);
     }
@@ -193,6 +197,16 @@ struct NarrowTypeExpressionVisitor final
     void visit(const ExpressionOr* expr) override {
         type = assumeTrue ? narrowBySomeChild(std::move(type), expr->getChildren(), true)
                           : narrowByEveryChild(std::move(type), expr->getChildren(), false);
+    }
+
+    void visit(const ExpressionAllElementsTrue* expr) override {
+        const auto* array = dynamic_cast<const ExpressionArray*>(expr->getChildren().front().get());
+        if (!array) {
+            return;
+        }
+
+        type = assumeTrue ? narrowByEveryChild(std::move(type), array->getChildren(), true)
+                          : narrowBySomeChild(std::move(type), array->getChildren(), false);
     }
 
     void visit(const ExpressionCompare* expr) override {

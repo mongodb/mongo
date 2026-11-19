@@ -84,6 +84,13 @@ TEST(ExpressionTypingTest, LogicalOutputTypeIsBoolean) {
     ASSERT_EQ(outputTypeDebugString("{$or: []}"), "bool(S)");
 }
 
+TEST(ExpressionTypingTest, AllElementsTrueOutputTypeIsBoolean) {
+    ASSERT_EQ(outputTypeDebugString("{$allElementsTrue: ['$array']}"), "bool(S)");
+    ASSERT_EQ(
+        narrowedDebugString("{$eq: ['$flag', {$allElementsTrue: ['$array']}]}", Type::anyObject()),
+        "{flag: bool(S), ...}");
+}
+
 TEST(ExpressionTypingTest, ConstantOutputType) {
     ASSERT_EQ(outputTypeDebugString("{$const: 5}"), "int(S)");
     ASSERT_EQ(outputTypeDebugString("{$const: null}"), "null");
@@ -1066,6 +1073,34 @@ TEST(ExpressionTypingTest, LogicalNarrowingWithConstantsAndUnsupportedChildren) 
     ASSERT_EQ(narrowType(input, unknownAnd.get(), false).toDebugString(), "object");
     ASSERT_EQ(narrowType(input, unknownAnd.get(), true).toDebugString(), "{a: number(S), ...}");
     ASSERT_EQ(narrowType(input, unknownOr.get(), false).toDebugString(), "object");
+}
+
+TEST(ExpressionTypingTest, AllElementsTrueNarrowsArrayElements) {
+    ASSERT_EQ(narrowedDebugString("{$allElementsTrue: [[{$eq: ['$a', 1]}, {$eq: ['$b', 'x']}]]}",
+                                  Type::anyObject()),
+              "{a: number(S), b: string(S)|symbol(S), ...}");
+    ASSERT_EQ(narrowedDebugString(
+                  "{$allElementsTrue: [[{$eq: ['$a', null]}]]}", Type::anyObject(), false),
+              "{a: ~null, ...}");
+}
+
+TEST(ExpressionTypingTest, AllElementsTrueEmptyAndDynamicArrays) {
+    ASSERT_EQ(narrowedDebugString("{$allElementsTrue: [[]]}", Type::anyObject()), "object");
+    ASSERT_EQ(narrowedDebugString("{$allElementsTrue: [[]]}", Type::anyObject(), false), "never");
+    ASSERT_EQ(narrowedDebugString("{$allElementsTrue: ['$array']}", Type::anyObject()), "object");
+    ASSERT_EQ(narrowedDebugString("{$allElementsTrue: ['$array']}", Type::anyObject(), false),
+              "object");
+}
+
+TEST(ExpressionTypingTest, AllElementsTrueFalseNarrowingIncludesAnyFalseElement) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    auto expr = parseExpr(
+        fromjson("{$allElementsTrue: [[{$eq: ['$a', null]}, {$eq: ['$b', null]}]]}"), *expCtx);
+    const auto narrowed = narrowType(Type::anyObject(), expr.get(), false);
+    for (const auto& doc :
+         {Document{{"a", 1}, {"b", BSONNULL}}, Document{{"a", BSONNULL}, {"b", 1}}}) {
+        ASSERT_TRUE(narrowed.hasValue(Value(doc))) << doc.toString();
+    }
 }
 
 /// Returns the type the field path expression evaluates to.
