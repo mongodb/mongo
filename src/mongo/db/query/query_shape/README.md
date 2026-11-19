@@ -36,6 +36,11 @@ insert command has no query predicate, so its shape is just the collection name 
 field, which is always shapified to a fixed placeholder (`?array<?object>`); all other insert fields
 are excluded.
 
+Each op of a bulkWrite command has its own shape. It holds the components of the matching standalone
+write command, but its `command` is `bulkWrite`, an `op` field holds the op type (`insert`,
+`update`, or `delete`), and the op's fields keep their bulkWrite names (`filter`, `updateMods`), so
+a bulkWrite op never shares a shape with a standalone write.
+
 You can see which components are considered part of the query shape or not for each specific shape
 type in their respective "shape component" classes, whose purpose is to determine which components
 are relevant and should be included for determining the shape for specific type of command.
@@ -46,6 +51,7 @@ The structure is as follows:
 
 - [`CmdSpecificShapeComponents`](query_shape.h)
   - [`AggCmdShapeComponents`](agg_cmd_shape.h)
+  - [`BulkWriteCmdShapeComponents`](bulk_write_cmd_shape.h)
   - [`CountCmdShapeComponents`](count_cmd_shape.h)
   - [`DistinctCmdShapeComponents`](distinct_cmd_shape.h)
   - [`FindCmdShapeComponents`](find_cmd_shape.h)
@@ -58,6 +64,9 @@ See more information for the different shapes in their respective classes, struc
 
 - [`Shape`](query_shape.h)
   - [`AggCmdShape`](agg_cmd_shape.h)
+  - [`BulkWriteDeleteCmdShape`](bulk_write_cmd_shape.h)
+  - [`BulkWriteInsertCmdShape`](bulk_write_cmd_shape.h)
+  - [`BulkWriteUpdateCmdShape`](bulk_write_cmd_shape.h)
   - [`CountCmdShape`](count_cmd_shape.h)
   - [`DeleteCmdShape`](delete_cmd_shape.h)
   - [`DistinctCmdShape`](distinct_cmd_shape.h)

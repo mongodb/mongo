@@ -8,6 +8,7 @@
 #include "mongo/db/query/query_shape/let_shape_component.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/write_ops/parsed_update.h"
+#include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/util/modules.h"
 
@@ -90,6 +91,14 @@ protected:
 private:
     UpdateCmdShapeComponents _components;
 };
+
+/**
+ * Rebuilds the UpdateRequest from the representative shapes in 'components', so the caller can
+ * re-parse and re-shapify it with other SerializationOptions. Also used by the bulkWrite op shape.
+ */
+UpdateRequest makeRepresentativeUpdateRequest(const NamespaceStringOrUUID& nssOrUUID,
+                                              const UpdateCmdShapeComponents& components);
+
 static_assert(sizeof(UpdateCmdShape) == sizeof(Shape) + sizeof(UpdateCmdShapeComponents),
               "If the class' members have changed, this assert and the extraSize() calculation may "
               "need to be updated with a new value.");

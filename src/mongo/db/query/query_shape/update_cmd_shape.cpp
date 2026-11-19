@@ -115,29 +115,33 @@ void UpdateCmdShape::appendCmdSpecificShapeComponents(
 
     // Slow path: we need to re-parse from our representative shapes and re-shapify with 'opts'.
     expCtx->setIsReparsingRepresentativeQueryShape(true);
+    auto updateRequest = makeRepresentativeUpdateRequest(nssOrUUID, _components);
+    auto parsedUpdate = uassertStatusOK(parsed_update_command::parse(
+        expCtx, &updateRequest, makeExtensionsCallback<ExtensionsCallbackNoop>()));
 
+    UpdateCmdShapeComponents{parsedUpdate, _components.let, opts}.appendTo(bob, opts, expCtx);
+}
+
+UpdateRequest makeRepresentativeUpdateRequest(const NamespaceStringOrUUID& nssOrUUID,
+                                              const UpdateCmdShapeComponents& components) {
     // Prepare UpdateOpEntry and UpdateRequest to reconstruct ParsedUpdate.
     write_ops::UpdateOpEntry op;
-    op.setQ(_components.representativeQ);
-    op.setU(_components.getRepresentativeU());
-    op.setC(_components.representativeC);
-    op.setArrayFilters(_components.representativeArrayFilters);
-    op.setMulti(_components.multi);
-    op.setUpsert(_components.upsert);
+    op.setQ(components.representativeQ);
+    op.setU(components.getRepresentativeU());
+    op.setC(components.representativeC);
+    op.setArrayFilters(components.representativeArrayFilters);
+    op.setMulti(components.multi);
+    op.setUpsert(components.upsert);
 
     UpdateRequest updateRequest(op);
     tassert(11034202,
             "nssOrUUID for an update must be a namespace string",
             nssOrUUID.isNamespaceString());
     updateRequest.setNamespaceString(nssOrUUID.nss());
-    if (_components.let.hasLet) {
-        updateRequest.setLetParameters(_components.let.shapifiedLet);
+    if (components.let.hasLet) {
+        updateRequest.setLetParameters(components.let.shapifiedLet);
     }
-
-    auto parsedUpdate = uassertStatusOK(parsed_update_command::parse(
-        expCtx, &updateRequest, makeExtensionsCallback<ExtensionsCallbackNoop>()));
-
-    UpdateCmdShapeComponents{parsedUpdate, _components.let, opts}.appendTo(bob, opts, expCtx);
+    return updateRequest;
 }
 
 QueryShapeHash UpdateCmdShape::sha256Hash(OperationContext*, const SerializationContext&) const {

@@ -4,12 +4,15 @@
 #include "mongo/db/query/query_shape/write_cmd_shape_test_util.h"
 
 #include "mongo/bson/json.h"
+#include "mongo/db/commands/query_cmd/bulk_write_common.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/query/query_shape/bulk_write_cmd_shape.h"
 #include "mongo/db/query/query_shape/insert_cmd_shape.h"
 #include "mongo/db/query/write_ops/parsed_delete.h"
 #include "mongo/db/query/write_ops/parsed_update.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/overloaded_visitor.h"
 
 namespace mongo::query_shape {
 
@@ -91,6 +94,61 @@ DeleteCmdShape makeOneDeleteShape(OperationContext* opCtx, std::string_view dele
 InsertCmdShape makeInsertShape(std::string_view insertCmd) {
     return InsertCmdShape(
         write_ops::InsertCommandRequest::parseOwned(fromjson(insertCmd)).getNamespace());
+}
+
+UpdateRequest makeBulkWriteUpdateRequest(OperationContext* opCtx,
+                                         const BulkWriteCommandRequest& cmd,
+                                         size_t opIdx) {
+    const auto& op = std::get<BulkWriteUpdateOp>(cmd.getOps()[opIdx]);
+    return bulk_write_common::makeUpdateRequestFromUpdateOp(opCtx,
+                                                            cmd.getNsInfo()[op.getNsInfoIdx()],
+                                                            &op,
+                                                            0 /* stmtId */,
+                                                            cmd.getLet(),
+                                                            cmd.getBypassEmptyTsReplacement());
+}
+
+DeleteRequest makeBulkWriteDeleteRequest(OperationContext* opCtx,
+                                         const BulkWriteCommandRequest& cmd,
+                                         size_t opIdx) {
+    const auto& op = std::get<BulkWriteDeleteOp>(cmd.getOps()[opIdx]);
+    return bulk_write_common::makeDeleteRequestFromDeleteOp(
+        opCtx, cmd.getNsInfo()[op.getNsInfoIdx()], &op, 0 /* stmtId */, cmd.getLet());
+}
+
+std::unique_ptr<BulkWriteUpdateCmdShape> makeBulkWriteUpdateShape(OperationContext* opCtx,
+                                                                  std::string_view bulkCmd,
+                                                                  size_t opIdx) {
+    auto cmd = BulkWriteCommandRequest::parseOwned(fromjson(bulkCmd));
+    auto updateRequest = makeBulkWriteUpdateRequest(opCtx, cmd, opIdx);
+    auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx, updateRequest).build();
+    auto parsedUpdate = uassertStatusOK(parsed_update_command::parse(
+        expCtx, &updateRequest, makeExtensionsCallback<ExtensionsCallbackNoop>()));
+    // The shape copies the representative BSONs, but its constructor dereferences the parsed
+    // request, so 'updateRequest' must still be alive here.
+    return std::make_unique<BulkWriteUpdateCmdShape>(parsedUpdate, expCtx);
+}
+
+std::unique_ptr<BulkWriteDeleteCmdShape> makeBulkWriteDeleteShape(OperationContext* opCtx,
+                                                                  std::string_view bulkCmd,
+                                                                  size_t opIdx) {
+    auto cmd = BulkWriteCommandRequest::parseOwned(fromjson(bulkCmd));
+    auto deleteRequest = makeBulkWriteDeleteRequest(opCtx, cmd, opIdx);
+    auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx, deleteRequest).build();
+    auto parsedDelete = uassertStatusOK(parsed_delete_command::parse(
+        expCtx, &deleteRequest, makeExtensionsCallback<ExtensionsCallbackNoop>()));
+    // The shape copies the representative BSONs, but its constructor dereferences the parsed
+    // request, so 'deleteRequest' must still be alive here.
+    return std::make_unique<BulkWriteDeleteCmdShape>(parsedDelete, expCtx);
+}
+
+std::unique_ptr<BulkWriteInsertCmdShape> makeBulkWriteInsertShape(OperationContext* opCtx,
+                                                                  std::string_view bulkCmd,
+                                                                  size_t opIdx) {
+    auto request = BulkWriteCommandRequest::parseOwned(fromjson(bulkCmd));
+    const auto& op = std::get<BulkWriteInsertOp>(request.getOps()[opIdx]);
+    return std::make_unique<BulkWriteInsertCmdShape>(
+        request.getNsInfo()[op.getNsInfoIdx()].getNs());
 }
 
 }  // namespace mongo::query_shape

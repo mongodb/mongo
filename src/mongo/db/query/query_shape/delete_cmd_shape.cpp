@@ -80,25 +80,30 @@ void DeleteCmdShape::appendCmdSpecificShapeComponents(
 
     // Slow path: we need to re-parse from our representative shapes and re-shapify with 'opts'.
     expCtx->setIsReparsingRepresentativeQueryShape(true);
+    auto deleteRequest = makeRepresentativeDeleteRequest(nssOrUUID, _components, collation);
+    auto parsedDelete = uassertStatusOK(parsed_delete_command::parse(
+        expCtx, &deleteRequest, makeExtensionsCallback<ExtensionsCallbackNoop>()));
 
+    DeleteCmdShapeComponents{parsedDelete, _components.let, opts}.appendTo(bob, opts, expCtx);
+}
+
+DeleteRequest makeRepresentativeDeleteRequest(const NamespaceStringOrUUID& nssOrUUID,
+                                              const DeleteCmdShapeComponents& components,
+                                              const BSONObj& collation) {
     DeleteRequest deleteRequest;
     tassert(12205301,
             "nssOrUUID for a delete must be a namespace string",
             nssOrUUID.isNamespaceString());
     deleteRequest.setNsString(nssOrUUID.nss());
-    deleteRequest.setQuery(_components.representativeQ);
-    deleteRequest.setMulti(_components.multi);
+    deleteRequest.setQuery(components.representativeQ);
+    deleteRequest.setMulti(components.multi);
     if (!collation.isEmpty()) {
         deleteRequest.setCollation(collation.getOwned());
     }
-    if (_components.let.hasLet) {
-        deleteRequest.setLet(_components.let.shapifiedLet);
+    if (components.let.hasLet) {
+        deleteRequest.setLet(components.let.shapifiedLet);
     }
-
-    auto parsedDelete = uassertStatusOK(parsed_delete_command::parse(
-        expCtx, &deleteRequest, makeExtensionsCallback<ExtensionsCallbackNoop>()));
-
-    DeleteCmdShapeComponents{parsedDelete, _components.let, opts}.appendTo(bob, opts, expCtx);
+    return deleteRequest;
 }
 
 QueryShapeHash DeleteCmdShape::sha256Hash(OperationContext*, const SerializationContext&) const {

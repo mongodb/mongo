@@ -7,6 +7,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/query_shape/let_shape_component.h"
 #include "mongo/db/query/query_shape/query_shape.h"
+#include "mongo/db/query/write_ops/delete_request_gen.h"
 #include "mongo/db/query/write_ops/parsed_delete.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/util/modules.h"
@@ -62,6 +63,14 @@ protected:
 private:
     DeleteCmdShapeComponents _components;
 };
+
+/**
+ * Rebuilds the DeleteRequest from the representative shapes in 'components', so the caller can
+ * re-parse and re-shapify it with other SerializationOptions. Also used by the bulkWrite op shape.
+ */
+DeleteRequest makeRepresentativeDeleteRequest(const NamespaceStringOrUUID& nssOrUUID,
+                                              const DeleteCmdShapeComponents& components,
+                                              const BSONObj& collation);
 
 static_assert(sizeof(DeleteCmdShape) == sizeof(Shape) + sizeof(DeleteCmdShapeComponents),
               "If the class' members have changed, this assert and the extraSize() calculation may "

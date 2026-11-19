@@ -3,7 +3,9 @@
 
 #pragma once
 
+#include "mongo/db/commands/query_cmd/bulk_write_gen.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/query_shape/bulk_write_cmd_shape.h"
 #include "mongo/db/query/query_shape/delete_cmd_shape.h"
 #include "mongo/db/query/query_shape/insert_cmd_shape.h"
 #include "mongo/db/query/query_shape/query_shape.h"
@@ -55,5 +57,29 @@ DeleteCmdShape makeOneDeleteShape(OperationContext* opCtx, std::string_view dele
  * plural variant.
  */
 InsertCmdShape makeInsertShape(std::string_view insertCmd);
+
+/**
+ * Builds the per-op request for the op at 'opIdx' of a bulkWrite command, the way the bulkWrite
+ * execution path does (the command-level 'let' and the op's collation are applied).
+ */
+UpdateRequest makeBulkWriteUpdateRequest(OperationContext* opCtx,
+                                         const BulkWriteCommandRequest& cmd,
+                                         size_t opIdx);
+DeleteRequest makeBulkWriteDeleteRequest(OperationContext* opCtx,
+                                         const BulkWriteCommandRequest& cmd,
+                                         size_t opIdx);
+
+/**
+ * Builds the shape of the op at 'opIdx' of a bulkWrite command.
+ */
+std::unique_ptr<BulkWriteUpdateCmdShape> makeBulkWriteUpdateShape(OperationContext* opCtx,
+                                                                  std::string_view bulkCmd,
+                                                                  size_t opIdx = 0);
+std::unique_ptr<BulkWriteDeleteCmdShape> makeBulkWriteDeleteShape(OperationContext* opCtx,
+                                                                  std::string_view bulkCmd,
+                                                                  size_t opIdx = 0);
+std::unique_ptr<BulkWriteInsertCmdShape> makeBulkWriteInsertShape(OperationContext* opCtx,
+                                                                  std::string_view bulkCmd,
+                                                                  size_t opIdx = 0);
 
 }  // namespace mongo::query_shape
