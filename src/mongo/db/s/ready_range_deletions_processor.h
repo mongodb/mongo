@@ -4,9 +4,9 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/operation_context_group.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/modules.h"
 
@@ -15,10 +15,6 @@
 
 namespace mongo {
 
-struct InFlightEntry {
-    RangeDeletionTask task;
-    OperationContext* opCtx = nullptr;
-};
 /*
  * Class enclosing a thread continuously processing "ready" range deletions, meaning tasks
  * that are allowed to be processed (already drained ongoing queries and already waited for
@@ -60,10 +56,10 @@ private:
     bool _isStateTransitionValid(State oldState, State newState) const;
 
     /*
-     * Remove a range deletion from the head of the queue. Supposed to be called only once a
-     * range deletion successfully finishes.
+     * Releases one in-flight slot and wakes the dispatcher. Called when
+     * _processRangeDeletion returns, including completion, reschedule, stepdown, and throws.
      */
-    void _completedRangeDeletion(mongo::UUID taskId);
+    void _dropInFlightTask();
 
     /*
      * Code executed by the dispatcher thread
@@ -71,21 +67,21 @@ private:
     void _dispatchRangeDeletions();
 
     /*
-     * Takes the top element of the ready queue and creates its in-flight entry.
+     * Pops the front of the ready queue and counts the task as in flight.
      */
-    InFlightEntry _peekFrontAndAddToInFlight();
+    RangeDeletionTask _peekFrontAndAddToInFlight();
 
     /*
      * Code executed by the worker threads.
      */
-    void _processRangeDeletion(InFlightEntry taskEntry);
+    void _processRangeDeletion(RangeDeletionTask task);
 
     bool _shouldDeferRangeDeletionForResharding(NamespaceString nss);
 
     /**
-     * Pops the current task from the queue and re-enqueues it after the given delay. If the
-     * executor is shutting down, the task is not re-enqueued (it will be recovered from disk on
-     * the next step-up).
+     * Enqueues the task again after the given delay. The in-flight slot is released when
+     * _processRangeDeletion returns. If the executor is shutting down, the task is not enqueued
+     * (it will be recovered from disk on the next step-up).
      */
     void _rescheduleRangeDeletion(const RangeDeletionTask& task,
                                   Seconds delay,
@@ -99,20 +95,23 @@ private:
 
     /*
      * Condition variable notified when:
-     * - The component has been initialized (the operation context has been instantiated)
-     * - The instance is shutting down (the operation context has been marked killed)
      * - A new range deletion is scheduled (the queue size has increased by one)
+     * - An inflight task has been dropped
+     * - The rangeDeleterThreadsCount server parameter has been changed
      */
     stdx::condition_variable _condVar;
 
     /* Queue containing scheduled range deletions */
     std::queue<RangeDeletionTask> _queue;
 
-    /* Map containing the dispatched range deletions */
-    stdx::unordered_map<mongo::UUID, InFlightEntry, UUID::Hash> _inflightMap;
+    /*
+     * Operation contexts of the dispatcher and the workers, so shutdown can interrupt them
+     * together.
+     */
+    OperationContextGroup _opCtxGroup;
 
-    /* Pointer to the (one and only) operation context used by the thread */
-    ServiceContext::UniqueOperationContext _threadOpCtxHolder;
+    /* Counter that keeps track of how many tasks are currently in-flight*/
+    size_t _inflightCounter{0};
 
     SharedPromise<void> _beginProcessingSignal;
 

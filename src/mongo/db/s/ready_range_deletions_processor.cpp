@@ -27,6 +27,7 @@ using namespace std::literals::string_view_literals;
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(rangeDeleterWaitingForWorkerCapacity);
+MONGO_FAIL_POINT_DEFINE(hangBeforeAdoptingRangeDeletionOpCtx);
 
 constexpr auto kRangeDeletionThreadName = "range-deleter"sv;
 const Seconds kCheckForEnabledServiceInterval(10);
@@ -106,8 +107,6 @@ ReadyRangeDeletionsProcessor::~ReadyRangeDeletionsProcessor() {
     shutdown();
     invariant(_thread.joinable());
     _thread.join();
-    invariant(!_threadOpCtxHolder,
-              "Thread operation context is still alive after joining main thread");
     _workerPool->join();
 }
 
@@ -129,18 +128,9 @@ void ReadyRangeDeletionsProcessor::shutdown() {
                                                "ReadyRangeDeletionsProcessor is shutting down"});
     }
 
-    if (_threadOpCtxHolder) {
-        std::lock_guard<Client> scopedClientLock(*_threadOpCtxHolder->getClient());
-        _threadOpCtxHolder->markKilled(ErrorCodes::Interrupted);
-    }
-
-    for (auto& [taskId, entry] : _inflightMap) {
-        if (entry.opCtx) {
-            std::lock_guard<Client> scopedClientLock(*entry.opCtx->getClient());
-            entry.opCtx->markKilled(ErrorCodes::Interrupted);
-        }
-    }
-
+    // Kill every operation context already in the group. A context
+    // adopted after this returns is left alive and will have to be marked killed manually.
+    _opCtxGroup.interrupt(ErrorCodes::Interrupted);
     _workerPool->shutdown();
 
     // Clear the count so a former primary does not keep reporting tasks that are no longer being
@@ -208,16 +198,16 @@ void ReadyRangeDeletionsProcessor::emplaceRangeDeletion(const RangeDeletionTask&
     _condVar.notify_all();
 }
 
-void ReadyRangeDeletionsProcessor::_completedRangeDeletion(mongo::UUID taskId) {
+void ReadyRangeDeletionsProcessor::_dropInFlightTask() {
     std::unique_lock<std::mutex> lock(_mutex);
     tassert(ErrorCodes::InternalError,
-            "Map cannot lack a task entry",
-            _inflightMap.find(taskId) != _inflightMap.end());
-    _inflightMap.erase(taskId);
+            "Number of inflight tasks cannot be decremented with no task inflight.",
+            _inflightCounter > 0);
+    _inflightCounter--;
     _condVar.notify_all();
 }
 
-InFlightEntry ReadyRangeDeletionsProcessor::_peekFrontAndAddToInFlight() {
+RangeDeletionTask ReadyRangeDeletionsProcessor::_peekFrontAndAddToInFlight() {
     std::unique_lock<std::mutex> lock(_mutex);
     tassert(ErrorCodes::InternalError,
             "Queue cannot be empty while peeking at front element",
@@ -232,13 +222,8 @@ InFlightEntry ReadyRangeDeletionsProcessor::_peekFrontAndAddToInFlight() {
         shardingStats.rangeDeleterReadyQueueSize.fetchAndAdd(-1);
     }
 
-    // Create the InFlight entry
-    InFlightEntry taskEntry = InFlightEntry{task, nullptr};
-    auto emplaceResult = _inflightMap.emplace(task.getId(), taskEntry);
-    tassert(ErrorCodes::InternalError,
-            "Range deletion task is already in flight",
-            emplaceResult.second);
-    return taskEntry;
+    _inflightCounter++;
+    return task;
 }
 
 // TODO: SERVER-123812 refactor connection between range deleter and resharding
@@ -249,8 +234,6 @@ bool ReadyRangeDeletionsProcessor::_shouldDeferRangeDeletionForResharding(Namesp
 void ReadyRangeDeletionsProcessor::_rescheduleRangeDeletion(const RangeDeletionTask& task,
                                                             Seconds delay,
                                                             std::string_view reason) {
-    _completedRangeDeletion(task.getId());
-
     sleepFor(_executor, delay).getAsync([this, task, reason](Status status) {
         if (!status.isOK()) {
             LOGV2_WARNING(9962300,
@@ -270,23 +253,16 @@ void ReadyRangeDeletionsProcessor::_rescheduleRangeDeletion(const RangeDeletionT
 
 void ReadyRangeDeletionsProcessor::_dispatchRangeDeletions() {
     ThreadClient threadClient(kRangeDeletionThreadName, _service->getService());
-
+    boost::optional<OperationContextGroup::Context> opCtxHolder;
     {
         std::lock_guard<std::mutex> lock(_mutex);
         if (_state != kInitializing) {
             return;
         }
         _transitionState(lock, kRunning);
-        _threadOpCtxHolder = cc().makeOperationContext();
+        opCtxHolder.emplace(_opCtxGroup.makeOperationContext(cc()));
     }
-
-    auto opCtx = _threadOpCtxHolder.get();
-
-    ON_BLOCK_EXIT([this]() {
-        std::lock_guard<std::mutex> lock(_mutex);
-        _threadOpCtxHolder.reset();
-    });
-
+    auto opCtx = opCtxHolder->opCtx();
     // The MaxKey orphan guard's blocked set must be populated before any task is deleted (see
     // RangeDeleterService::classifyBlockedMaxKeyTasks). Classify lazily below, after the disabled
     // gate and before processing the first task, retrying on transient failure.
@@ -299,7 +275,7 @@ void ReadyRangeDeletionsProcessor::_dispatchRangeDeletions() {
                 opCtx->waitForConditionOrInterrupt(_condVar, lock, [&] {
                     const bool hasQueuedWork = !_queue.empty();
                     const bool hasAvailableWorker =
-                        _inflightMap.size() < static_cast<size_t>(rangeDeleterThreadsCount.load());
+                        _inflightCounter < static_cast<size_t>(rangeDeleterThreadsCount.load());
                     if (hasQueuedWork && !hasAvailableWorker) {
                         // Record that queued work is waiting for worker capacity.
                         rangeDeleterWaitingForWorkerCapacity.shouldFail();
@@ -340,29 +316,30 @@ void ReadyRangeDeletionsProcessor::_dispatchRangeDeletions() {
             }
         }
 
-        const InFlightEntry taskEntry = _peekFrontAndAddToInFlight();
+        const RangeDeletionTask task = _peekFrontAndAddToInFlight();
 
-        _workerPool->schedule([this, taskEntry = taskEntry](Status status) {
+        _workerPool->schedule([this, task = task](Status status) {
             if (!status.isOK()) {
                 return;
             }
-            _processRangeDeletion(taskEntry);
+            _processRangeDeletion(task);
         });
     }
 }
 
-void ReadyRangeDeletionsProcessor::_processRangeDeletion(InFlightEntry taskEntry) {
+void ReadyRangeDeletionsProcessor::_processRangeDeletion(RangeDeletionTask task) {
     auto& shardingStats = ShardingStatistics::get(_service);
     shardingStats.rangeDeleterRunningWorkers.fetchAndAdd(1);
-    ON_BLOCK_EXIT([&] { shardingStats.rangeDeleterRunningWorkers.fetchAndAdd(-1); });
-
-    const RangeDeletionTask task = taskEntry.task;
+    ON_BLOCK_EXIT([&] {
+        shardingStats.rangeDeleterRunningWorkers.fetchAndAdd(-1);
+        // Decrease the inflight counter on any exit path.
+        _dropInFlightTask();
+    });
 
     const auto dbName = task.getNss().dbName();
     const auto collectionUuid = task.getCollectionUuid();
     const auto range = task.getRange();
     const auto optKeyPattern = task.getKeyPattern();
-    const auto taskId = task.getId();
 
     // A task is considered completed when all the following conditions are met:
     // - All orphans have been deleted
@@ -370,26 +347,19 @@ void ReadyRangeDeletionsProcessor::_processRangeDeletion(InFlightEntry taskEntry
     // - The range deletion task document has been deleted
     bool taskCompleted = false;
     while (!taskCompleted) {
-        auto opCtxHolder = cc().makeOperationContext();
-        auto opCtx = opCtxHolder.get();
+        // Before the context joins the group, so a test can step down in the window interrupt()
+        // does not cover.
+        hangBeforeAdoptingRangeDeletionOpCtx.pauseWhileSet();
+        auto opCtx = _opCtxGroup.makeOperationContext(cc());
         {
             std::unique_lock<std::mutex> lock(_mutex);
-            auto it = _inflightMap.find(taskId);
-            invariant(it != _inflightMap.end());
 
+            // This context was adopted after shutdown() may already have interrupted the group.
+            // If the processor has stopped, kill the context manually.
             if (_state == kStopped) {
                 opCtx->markKilled(ErrorCodes::Interrupted);
-            } else {
-                it->second.opCtx = opCtx;
             }
         }
-        ON_BLOCK_EXIT([this, taskId, opCtx] {
-            std::unique_lock<std::mutex> lock(_mutex);
-            auto it = _inflightMap.find(taskId);
-            if (it != _inflightMap.end() && it->second.opCtx == opCtx) {
-                it->second.opCtx = nullptr;
-            }
-        });
         try {
             bool orphansRemovalCompleted = false;
             NamespaceString possiblyStaleNss;
@@ -578,7 +548,6 @@ void ReadyRangeDeletionsProcessor::_processRangeDeletion(InFlightEntry taskEntry
         }
 
         taskCompleted = true;
-        _completedRangeDeletion(task.getId());
     }
 }
 

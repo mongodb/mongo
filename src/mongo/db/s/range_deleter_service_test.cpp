@@ -24,6 +24,7 @@
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
+#include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/platform/atomic.h"
@@ -1707,10 +1708,60 @@ TEST_F(RangeDeleterServiceTest, StepDownKillsAllWorkers) {
         verifyProcessingFlag(opCtx, uuidCollA, task0->getTask().getRange(), true);
         verifyProcessingFlag(opCtx, uuidCollA, task1->getTask().getRange(), true);
 
+        // Both deletions are in progress. Check that onStepDown makes both threads return from the
+        // deletion.
+        ASSERT_EQ(2, ShardingStatistics::get(opCtx).rangeDeleterRunningWorkers.load());
         rds->onStepDown();
+        const auto deadline = Date_t::now() + Seconds(30);
+        while (ShardingStatistics::get(opCtx).rangeDeleterRunningWorkers.load() != 0 &&
+               Date_t::now() < deadline) {
+            sleepmillis(10);
+        }
+        ASSERT_EQ(0, ShardingStatistics::get(opCtx).rangeDeleterRunningWorkers.load());
     }
 
     ASSERT_THROWS_CODE(completionFuture0.get(opCtx), DBException, ErrorCodes::Interrupted);
     ASSERT_THROWS_CODE(completionFuture1.get(opCtx), DBException, ErrorCodes::Interrupted);
+}
+
+TEST_F(RangeDeleterServiceTest, StepDownKillsWorkerThatAdoptsContextAfterInterrupt) {
+    auto rds = RangeDeleterService::get(opCtx);
+
+    unittest::ServerParameterGuard threadCount{"rangeDeleterThreadsCount", 1};
+
+    auto task = createRangeDeletionTaskWithOngoingQueries(
+        uuidCollA, BSON(kShardKey << 0), BSON(kShardKey << 10));
+    auto completionFuture =
+        registerAndCreatePersistentTask(opCtx, task->getTask(), task->getOngoingQueriesFuture());
+
+    ASSERT_EQ(1, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
+
+    {
+        // Kept enabled so a worker that misses the manual kill blocks in the deletion instead of
+        // finishing.
+        FailPointEnableBlock hangBeforeDoingDeletionFp("hangBeforeDoingDeletion");
+        {
+            FailPointEnableBlock hangBeforeAdoptionFp("hangBeforeAdoptingRangeDeletionOpCtx");
+            task->drainOngoingQueries();
+
+            // The worker has taken the task but has not created its operation context yet.
+            hangBeforeAdoptionFp.wait();
+            ASSERT_EQ(1, ShardingStatistics::get(opCtx).rangeDeleterRunningWorkers.load());
+
+            rds->onStepDown();
+        }
+
+        // interrupt() has already returned. The worker now adopts a context the group did not
+        // kill, and must stop without reaching the deletion.
+        const auto deadline = Date_t::now() + Seconds(30);
+        while (ShardingStatistics::get(opCtx).rangeDeleterRunningWorkers.load() != 0 &&
+               Date_t::now() < deadline) {
+            sleepmillis(10);
+        }
+        ASSERT_EQ(0, ShardingStatistics::get(opCtx).rangeDeleterRunningWorkers.load());
+        ASSERT_EQ(hangBeforeDoingDeletionFp.wait(0), 0);
+    }
+
+    ASSERT_THROWS_CODE(completionFuture.get(opCtx), DBException, ErrorCodes::Interrupted);
 }
 }  // namespace mongo
