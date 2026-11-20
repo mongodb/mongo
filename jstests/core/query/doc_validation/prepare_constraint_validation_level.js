@@ -69,26 +69,11 @@ describe("upgrade to constraint preconditions", function () {
         );
     });
 
-    it("cannot set prepareConstraintValidationLevel while validationAction is warn", function () {
-        // 'warn' lets non-conforming documents into the collection, so preparing for 'constraint'
-        // is rejected until the action is changed.
+    it("fails if validationAction is warn", function () {
+        // 'warn' is compatible with 'strict' but not with 'constraint'.
         create({validator, validationLevel: "strict", validationAction: "warn"});
-        assert.commandFailed(collMod({prepareConstraintValidationLevel: true}));
-
-        // Changing the action in the same command unblocks preparing.
-        assert.commandWorked(
-            collMod({prepareConstraintValidationLevel: true, validationAction: "error"}),
-        );
-        assert.commandWorked(collMod({validationLevel: "constraint"}));
-    });
-
-    it("fails to upgrade when validationAction was warn at the time of the upgrade", function () {
-        create({validator, validationLevel: "strict"});
         assert.commandWorked(collMod({prepareConstraintValidationLevel: true}));
-        // 'warn' may be set while preparing (the collection is still 'strict'); the upgrade must
-        // then be rejected even though the same command switches the action back to 'error'.
-        assert.commandWorked(collMod({validationAction: "warn"}));
-        assert.commandFailed(collMod({validationLevel: "constraint", validationAction: "error"}));
+        assert.commandFailed(collMod({validationLevel: "constraint"}));
     });
 
     it("succeeds when validationAction is error", function () {

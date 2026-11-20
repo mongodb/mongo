@@ -71,23 +71,14 @@ describe("constraint validation scan with concurrent chunk migrations", function
             testDb.createCollection(collName, {
                 validator: validator,
                 validationLevel: "strict",
-                validationAction: "error",
+                validationAction: "warn",
             }),
         );
         // 10 documents on shard1 (_id 0-9). The invalid doc is at _id 7.
         for (let i = 0; i < 10; i++) {
-            if (i === 7) {
-                // Insert the non-compliant document by bypassing validation.
-                assert.commandWorked(
-                    testDb.runCommand({
-                        insert: collName,
-                        documents: [{_id: 7, b: 1}],
-                        bypassDocumentValidation: true,
-                    }),
-                );
-            } else {
-                assert.commandWorked(testDb[collName].insert({_id: i, a: 1}));
-            }
+            assert.commandWorked(
+                testDb[collName].insert(i === 7 ? {_id: 7, b: 1} : {_id: i, a: 1}),
+            );
         }
         assert.commandWorked(
             testDb.runCommand({collMod: collName, prepareConstraintValidationLevel: true}),

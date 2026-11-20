@@ -46,30 +46,18 @@ Status checkValidationOptionsCanBeUsed(const CollectionOptions& opts,
             ", prepareConstraintValidationLevel: false})");
     }
 
-    // The prepare phase is only meaningful when the collection already rejects non-conforming
-    // documents, i.e. validationAction is not 'warn'. With 'warn' the collection keeps accepting
-    // non-conforming documents while preparing, defeating the purpose of the flag.
-    if (newPrepareConstraintValidationLevel.value_or(false) &&
-        validationAction == ValidationActionEnum::warn) {
-        return Status(
-            ErrorCodes::BadValue,
-            "Cannot set prepareConstraintValidationLevel to true when Validation action is 'warn'");
-    }
-
-    // Restrictions when validationLevel is (or becomes) 'constraint':
-    // - validationAction must not be 'warn', either before or after the change; 'warn' admits
-    //   non-conforming documents that the upgrade to 'constraint' would leave in place.
-    // - When starting from constraint, the validator cannot be changed.
-    // Upgrade to 'constraint' preconditions (existing collections only):
+    // Upgrade to 'constraint' restrictions:
+    // - validationAction must not be 'warn'
     // - validationLevel must be 'strict'
-    // - the validator cannot be changed in the upgrading collMod
-    // - prepareConstraintValidationLevel must already be set
+    // - cannot change validator in the upgrading collmod
+    // Restrictions when starting from constraint:
+    // - validator cannot be changed
+    // - validationAction cannot be set to 'warn'
     if (validationLevel == ValidationLevelEnum::constraint) {
-        if (validationAction == ValidationActionEnum::warn ||
-            opts.validationAction == ValidationActionEnum::warn) {
-            return Status(ErrorCodes::BadValue,
-                          "Validation action of 'warn' is not allowed when Validation level is "
-                          "'constraint'. Change validationAction to 'error' before upgrading");
+        if (validationAction == ValidationActionEnum::warn) {
+            return Status(
+                ErrorCodes::BadValue,
+                "Validation action of 'warn' is not allowed when Validation level is 'constraint'");
         }
 
         if (opts.uuid) {  // existing collection

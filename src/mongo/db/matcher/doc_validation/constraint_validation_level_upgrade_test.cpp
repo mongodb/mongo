@@ -10,7 +10,6 @@
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options_gen.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
-#include "mongo/db/shard_role/shard_catalog/document_validation.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/unittest.h"
@@ -46,21 +45,17 @@ Status scanForUpgrade(OperationContext* opCtx,
                                          hasNewValidator);
 }
 
-// Inserts 'doc' as an internal write so it lands even when it violates the validator.
 void insertDocument(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& doc) {
     auto coll = acquireForWrite(opCtx, nss);
-    DisableDocumentValidationForInternalOp disabler{opCtx};
     WriteUnitOfWork wuow(opCtx);
     ASSERT_OK(Helpers::insert(opCtx, coll.getCollectionPtr(), doc));
     wuow.commit();
 }
 
-CollectionOptions makeUpgradeOptions(ValidationLevelEnum level,
-                                     bool prepare,
-                                     ValidationActionEnum action = ValidationActionEnum::error) {
+CollectionOptions makeUpgradeOptions(ValidationLevelEnum level, bool prepare) {
     CollectionOptions options;
     options.validator = fromjson("{a: {$exists: true}}");
-    options.validationAction = action;
+    options.validationAction = ValidationActionEnum::warn;
     options.validationLevel = level;
     if (prepare) {
         options.prepareConstraintValidationLevel = true;
@@ -104,14 +99,18 @@ TEST_F(ConstraintValidationLevelUpgradeTest, ReturnsErrorWhenDocumentViolatesVal
 
     CollectionOptions options;
     options.validator = fromjson("{a: {$exists: true}}");
-    options.validationAction = ValidationActionEnum::error;
+    // 'warn' lets the test insert violating documents; the upgrade request passes 'error'.
+    options.validationAction = ValidationActionEnum::warn;
     options.validationLevel = ValidationLevelEnum::strict;
     options.prepareConstraintValidationLevel = true;
     options.uuid = UUID::gen();
 
     {
         ASSERT_OK(createCollection(opCtx, nss, options, boost::none));
-        insertDocument(opCtx, nss, BSON("_id" << 1 << "b" << 1));
+        auto coll = acquireForWrite(opCtx, nss);
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_OK(Helpers::insert(opCtx, coll.getCollectionPtr(), BSON("_id" << 1 << "b" << 1)));
+        wuow.commit();
     }
 
     ASSERT_EQ(scanForUpgrade(opCtx, nss, ValidationActionEnum::error).code(), 12370902);
@@ -123,14 +122,18 @@ TEST_F(ConstraintValidationLevelUpgradeTest, ReturnsOKWhenAllDocumentsConformToV
 
     CollectionOptions options;
     options.validator = fromjson("{a: {$exists: true}}");
-    options.validationAction = ValidationActionEnum::error;
+    // 'warn' lets the test insert violating documents; the upgrade request passes 'error'.
+    options.validationAction = ValidationActionEnum::warn;
     options.validationLevel = ValidationLevelEnum::strict;
     options.prepareConstraintValidationLevel = true;
     options.uuid = UUID::gen();
 
     {
         ASSERT_OK(createCollection(opCtx, nss, options, boost::none));
-        insertDocument(opCtx, nss, BSON("_id" << 1 << "a" << 1));
+        auto coll = acquireForWrite(opCtx, nss);
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_OK(Helpers::insert(opCtx, coll.getCollectionPtr(), BSON("_id" << 1 << "a" << 1)));
+        wuow.commit();
     }
 
     ASSERT_OK(scanForUpgrade(opCtx, nss, ValidationActionEnum::error));
@@ -142,13 +145,19 @@ TEST_F(ConstraintValidationLevelUpgradeTest, ReturnsErrorWhenDocumentViolatesJso
 
     CollectionOptions options;
     options.validator = fromjson("{$jsonSchema: {required: [\"a\"]}}");
-    options.validationAction = ValidationActionEnum::error;
+    // 'warn' lets the test insert violating documents; the upgrade request passes 'error'.
+    options.validationAction = ValidationActionEnum::warn;
     options.validationLevel = ValidationLevelEnum::strict;
     options.prepareConstraintValidationLevel = true;
     options.uuid = UUID::gen();
 
     ASSERT_OK(createCollection(opCtx, nss, options, boost::none));
-    insertDocument(opCtx, nss, BSON("_id" << 1 << "b" << 1));
+    {
+        auto coll = acquireForWrite(opCtx, nss);
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_OK(Helpers::insert(opCtx, coll.getCollectionPtr(), BSON("_id" << 1 << "b" << 1)));
+        wuow.commit();
+    }
 
     ASSERT_EQ(scanForUpgrade(opCtx, nss, ValidationActionEnum::error).code(), 12370902);
 }
@@ -162,13 +171,19 @@ TEST_F(ConstraintValidationLevelUpgradeTest, ErrorMessageTruncatesLargeValidator
     CollectionOptions options;
     options.validator =
         BSON("$jsonSchema" << BSON("title" << longTitle << "required" << BSON_ARRAY("a")));
-    options.validationAction = ValidationActionEnum::error;
+    // 'warn' lets the test insert violating documents; the upgrade request passes 'error'.
+    options.validationAction = ValidationActionEnum::warn;
     options.validationLevel = ValidationLevelEnum::strict;
     options.prepareConstraintValidationLevel = true;
     options.uuid = UUID::gen();
 
     ASSERT_OK(createCollection(opCtx, nss, options, boost::none));
-    insertDocument(opCtx, nss, BSON("_id" << 1 << "b" << 1));
+    {
+        auto coll = acquireForWrite(opCtx, nss);
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_OK(Helpers::insert(opCtx, coll.getCollectionPtr(), BSON("_id" << 1 << "b" << 1)));
+        wuow.commit();
+    }
 
     auto status = scanForUpgrade(opCtx, nss, ValidationActionEnum::error);
     ASSERT_EQ(status.code(), 12370902);
@@ -240,10 +255,7 @@ TEST_F(ConstraintValidationLevelUpgradeTest, UpgradeCheckRejectsWarnActionBefore
     const auto nss = NamespaceString::createNamespaceString_forTest("testdb", "testcoll");
     auto* opCtx = operationContext();
     ASSERT_OK(createCollection(
-        opCtx,
-        nss,
-        makeUpgradeOptions(ValidationLevelEnum::strict, true, ValidationActionEnum::warn),
-        boost::none));
+        opCtx, nss, makeUpgradeOptions(ValidationLevelEnum::strict, true), boost::none));
     insertDocument(opCtx, nss, BSON("_id" << 1 << "b" << 1));
 
     // The collection's own action is already 'warn', so this also covers the default.
@@ -286,13 +298,19 @@ TEST_F(ConstraintValidationLevelUpgradeTest, ErrorMessageContainsValidatorAndCol
 
     CollectionOptions options;
     options.validator = fromjson("{a: {$exists: true}}");
-    options.validationAction = ValidationActionEnum::error;
+    // 'warn' lets the test insert violating documents; the upgrade request passes 'error'.
+    options.validationAction = ValidationActionEnum::warn;
     options.validationLevel = ValidationLevelEnum::strict;
     options.prepareConstraintValidationLevel = true;
     options.uuid = UUID::gen();
 
     ASSERT_OK(createCollection(opCtx, nss, options, boost::none));
-    insertDocument(opCtx, nss, BSON("_id" << 1 << "b" << 1));
+    {
+        auto coll = acquireForWrite(opCtx, nss);
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_OK(Helpers::insert(opCtx, coll.getCollectionPtr(), BSON("_id" << 1 << "b" << 1)));
+        wuow.commit();
+    }
 
     auto status = scanForUpgrade(opCtx, nss, ValidationActionEnum::error);
     ASSERT_EQ(status.code(), 12370902);

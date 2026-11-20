@@ -49,7 +49,6 @@ mongo_cc_unit_test(
         ":constraint_validation_level_upgrade",
         "//src/mongo/db:dbhelpers",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
-        "//src/mongo/db/shard_role/shard_catalog:document_validation",
     ],
 )
 
