@@ -48,8 +48,42 @@ RecipientTransitionSnapshot withCloneDetails(RecipientTransitionSnapshot s) {
     return s;
 }
 
-RecipientTransitionSnapshot makeCloned(RecipientStateEnum state, bool performVerification = false) {
-    return withCloneDetails(makeSnapshot(state, performVerification));
+// What a recipient holds when it transitions to 'state'. Each state keeps what the states before it
+// wrote. kError depends on the state it failed in, so it must be built explicitly.
+RecipientTransitionSnapshot makeRecipientAt(RecipientStateEnum state,
+                                            bool performVerification = false) {
+    auto s = makeSnapshot(state, performVerification);
+    switch (state) {
+        case kDone:
+        case kStrictConsistency:
+        case kApplying:
+            if (performVerification) {
+                s.ctx.setNumDocumentsCloned(100);
+                s.ctx.setTotalDocumentSize(1000);
+                s.changeStreamsMonitor = ChangeStreamsMonitorContext{Timestamp(13, 1), 0};
+            }
+            [[fallthrough]];
+        case kBuildingIndex:
+        case kCloning:
+        case kCreatingCollection:
+            return withCloneDetails(std::move(s));
+        case kError:
+            uasserted(ErrorCodes::InternalError, "build kError explicitly");
+        default:
+            return s;
+    }
+}
+
+// A recipient that skips cloning and applying records zero totals and never starts a monitor.
+RecipientTransitionSnapshot makeSkippingApplying(RecipientStateEnum state) {
+    auto s = makeRecipientAt(state, /*performVerification=*/true);
+    s.options.setSkipCloningAndApplying(true);
+    s.changeStreamsMonitor = boost::none;
+    s.ctx.setNumDocumentsCloned(0);
+    s.ctx.setTotalDocumentSize(0);
+    s.approxDocumentsToCopy = 0;
+    s.approxBytesToCopy = 0;
+    return s;
 }
 
 // Sets one donor's minFetchTimestamp and keeps the donor list as it is.
@@ -75,6 +109,13 @@ RecipientTransitionSnapshot withDonors(
 
 RecipientTransitionSnapshot withAbortReason(RecipientTransitionSnapshot s) {
     s.ctx.setAbortReason(BSON("code" << 12345 << "errmsg" << "aborted for test"));
+    return s;
+}
+
+RecipientTransitionSnapshot withCoordinatorAbort(RecipientTransitionSnapshot s) {
+    s.ctx.setAbortReason(BSON("code" << static_cast<int>(ErrorCodes::ReshardCollectionAborted)
+                                     << "errmsg"
+                                     << "Received abort from the resharding coordinator"));
     return s;
 }
 
@@ -111,16 +152,34 @@ std::string edgeName(const RecipientTransitionSnapshot& before,
                          << idl::serialize(after.ctx.getState());
 }
 
+using SnapshotEdge = std::pair<RecipientTransitionSnapshot, RecipientTransitionSnapshot>;
+
+// The forward edges that carry no abort reason, which is every forward edge but the one into kDone.
+std::vector<SnapshotEdge> forwardEdgesBeforeDone(bool verify) {
+    return {
+        {makeSnapshot(kAwaitingFetchTimestamp, verify),
+         makeRecipientAt(kCreatingCollection, verify)},
+        {makeRecipientAt(kCreatingCollection, verify), makeRecipientAt(kCloning, verify)},
+        {makeRecipientAt(kCloning, verify), makeRecipientAt(kBuildingIndex, verify)},
+        {makeRecipientAt(kBuildingIndex, verify), makeRecipientAt(kApplying, verify)},
+        {makeRecipientAt(kApplying, verify), makeRecipientAt(kStrictConsistency, verify)},
+    };
+}
+
 TEST(ReshardingRecipientTransitionValidationTest, AcceptsEveryAllowedForwardEdge) {
     for (const bool verify : {false, true}) {
-        const auto before = withVerification(makeSnapshot(kAwaitingFetchTimestamp), verify);
-        const auto after = makeCloned(kCreatingCollection, verify);
-        ASSERT_OK(validate(before, after).status) << edgeName(before, after);
+        auto edges = forwardEdgesBeforeDone(verify);
+        edges.emplace_back(makeRecipientAt(kStrictConsistency, verify),
+                           makeRecipientAt(kDone, verify));
+        for (const auto& [before, after] : edges) {
+            ASSERT_OK(validate(before, after).status) << edgeName(before, after);
+        }
     }
 }
 
 TEST(ReshardingRecipientTransitionValidationTest, RejectedEdgeMessageNamesTheEdge) {
-    const auto result = validate(makeCloned(kCreatingCollection), makeCloned(kBuildingIndex));
+    const auto result =
+        validate(makeRecipientAt(kCreatingCollection), makeRecipientAt(kBuildingIndex));
     ASSERT_EQ(result.status.code(), ErrorCodes::ReshardingPreconditionFailure);
     ASSERT_EQ(result.status.reason(),
               "transition from creating-collection to building-index is not allowed");
@@ -136,19 +195,20 @@ TEST(ReshardingRecipientTransitionValidationTest, EnteringCreatingCollectionRequ
                     "hasStartConfigTxnCloneTime"},
                    validate(before, withState(before, kCreatingCollection)));
 
-    const auto noMinFetch = withMinFetchTimestamp(makeCloned(kCreatingCollection), 1, boost::none);
+    const auto noMinFetch =
+        withMinFetchTimestamp(makeRecipientAt(kCreatingCollection), 1, boost::none);
     assertViolated({"donorsHaveMinFetchTimestamp"}, validate(before, noMinFetch));
 
     // The clone timestamp is exactly the highest minFetchTimestamp: neither earlier nor later.
-    auto tooEarly = makeCloned(kCreatingCollection);
+    auto tooEarly = makeRecipientAt(kCreatingCollection);
     tooEarly.cloneTimestamp = Timestamp(11, 1);
     assertViolated({"cloneTimestampIsHighestMinFetchTimestamp"}, validate(before, tooEarly));
 
-    auto tooLate = makeCloned(kCreatingCollection);
+    auto tooLate = makeRecipientAt(kCreatingCollection);
     tooLate.cloneTimestamp = Timestamp(13, 1);
     assertViolated({"cloneTimestampIsHighestMinFetchTimestamp"}, validate(before, tooLate));
 
-    auto negative = makeCloned(kCreatingCollection);
+    auto negative = makeRecipientAt(kCreatingCollection);
     negative.approxBytesToCopy = -1;
     assertViolated({"hasValidApproxCopyCounts"}, validate(before, negative));
 
@@ -156,14 +216,14 @@ TEST(ReshardingRecipientTransitionValidationTest, EnteringCreatingCollectionRequ
     // immutable-fields rule alone.
     assertViolated(
         {"hasDonorShards"},
-        validate(withDonors(before, {}), withDonors(makeCloned(kCreatingCollection), {})));
+        validate(withDonors(before, {}), withDonors(makeRecipientAt(kCreatingCollection), {})));
 }
 
 // The highest minFetchTimestamp may belong to any donor.
 TEST(ReshardingRecipientTransitionValidationTest, CloneTimestampIsHighestWhicheverDonorHoldsIt) {
     const auto before = makeSnapshot(kAwaitingFetchTimestamp);
     auto first = withMinFetchTimestamp(
-        withMinFetchTimestamp(makeCloned(kCreatingCollection), 0, Timestamp(12, 1)),
+        withMinFetchTimestamp(makeRecipientAt(kCreatingCollection), 0, Timestamp(12, 1)),
         1,
         Timestamp(10, 1));
     ASSERT_OK(validate(before, first).status);
@@ -174,10 +234,11 @@ TEST(ReshardingRecipientTransitionValidationTest, CloneTimestampIsHighestWhichev
 }
 
 TEST(ReshardingRecipientTransitionValidationTest, CloneDetailsAreWrittenExactlyOnce) {
-    const auto after = makeCloned(kCreatingCollection);
-    assertViolated({"cloneDetailsNotYetSet"}, validate(makeCloned(kAwaitingFetchTimestamp), after));
+    const auto after = makeRecipientAt(kCreatingCollection);
+    // A recipient that already holds clone details before the edge that writes them.
+    const auto cloned = withCloneDetails(makeSnapshot(kAwaitingFetchTimestamp));
+    assertViolated({"cloneDetailsNotYetSet"}, validate(cloned, after));
 
-    const auto cloned = makeCloned(kAwaitingFetchTimestamp);
     const std::vector<std::pair<std::string, std::function<void(RecipientTransitionSnapshot&)>>>
         alreadySet{
             {"cloneTimestamp",
@@ -217,23 +278,135 @@ TEST(ReshardingRecipientTransitionValidationTest, CloneDetailsAreWrittenExactlyO
             .status);
 }
 
+TEST(ReshardingRecipientTransitionValidationTest, LaterEdgesRequireCloneDetailsToBeKept) {
+    auto lost = makeRecipientAt(kCreatingCollection);
+    lost.cloneTimestamp = boost::none;
+    // Lost before the edge.
+    assertViolated({"cloneDetailsUnchanged"},
+                   validate(lost, withState(makeRecipientAt(kCreatingCollection), kCloning)));
+    // Lost by the edge.
+    assertViolated({"hasCloneTimestamp", "cloneDetailsUnchanged"},
+                   validate(makeRecipientAt(kCreatingCollection), withState(lost, kCloning)));
+    // Lost both before and by the edge: reported once.
+    assertViolated({"hasCloneTimestamp"}, validate(lost, withState(lost, kCloning)));
+}
+
+// Every edge after the first carries the clone details forward, so each must require each detail on
+// its own. Both snapshots lose the same detail, which leaves cloneDetailsUnchanged satisfied and
+// only the presence rule to fire.
+TEST(ReshardingRecipientTransitionValidationTest, LaterEdgesRequireEachCloneDetail) {
+    struct CloneDetail {
+        std::string name;
+        std::string rule;
+        std::function<void(RecipientTransitionSnapshot&)> lose;
+    };
+    const std::vector<CloneDetail> details = {
+        {"cloneTimestamp",
+         "hasCloneTimestamp",
+         [](auto& s) {
+             s.cloneTimestamp = boost::none;
+         }},
+        {"donor minFetchTimestamp",
+         "donorsHaveMinFetchTimestamp",
+         [](auto& s) {
+             s = withMinFetchTimestamp(std::move(s), 0, boost::none);
+         }},
+        {"approxDocumentsToCopy",
+         "hasValidApproxCopyCounts",
+         [](auto& s) {
+             s.approxDocumentsToCopy = boost::none;
+         }},
+        {"approxBytesToCopy",
+         "hasValidApproxCopyCounts",
+         [](auto& s) {
+             s.approxBytesToCopy = boost::none;
+         }},
+        {"startConfigTxnCloneTime",
+         "hasStartConfigTxnCloneTime",
+         [](auto& s) {
+             s.startConfigTxnCloneTime = boost::none;
+         }},
+    };
+
+    for (const bool verify : {false, true}) {
+        const auto edges = forwardEdgesBeforeDone(verify);
+        for (size_t i = 1; i < edges.size(); ++i) {
+            for (const auto& detail : details) {
+                auto before = edges[i].first;
+                auto after = edges[i].second;
+                detail.lose(before);
+                detail.lose(after);
+                const auto result = validate(before, after);
+                ASSERT_EQ(result.status.code(), ErrorCodes::ReshardingPreconditionFailure)
+                    << edgeName(before, after) << " without " << detail.name;
+                ASSERT_EQ(result.failed, std::vector<std::string>{detail.rule})
+                    << edgeName(before, after) << " without " << detail.name << ": "
+                    << result.status;
+            }
+        }
+    }
+}
+
 TEST(ReshardingRecipientTransitionValidationTest, NullTimestampsAreNotSet) {
     const auto before = makeSnapshot(kAwaitingFetchTimestamp);
 
-    auto nullCloneTimestamp = makeCloned(kCreatingCollection);
+    auto nullCloneTimestamp = makeRecipientAt(kCreatingCollection);
     nullCloneTimestamp.cloneTimestamp = Timestamp();
     assertViolated({"hasCloneTimestamp"}, validate(before, nullCloneTimestamp));
 
     const auto nullMinFetch =
-        withMinFetchTimestamp(makeCloned(kCreatingCollection), 0, Timestamp());
+        withMinFetchTimestamp(makeRecipientAt(kCreatingCollection), 0, Timestamp());
     assertViolated({"donorsHaveMinFetchTimestamp"}, validate(before, nullMinFetch));
 
     // A null clone timestamp is not treated as covering a null minFetchTimestamp.
-    auto allNull = makeCloned(kCreatingCollection);
+    auto allNull = makeRecipientAt(kCreatingCollection);
     allNull.cloneTimestamp = Timestamp();
     allNull.options.setDonorShards(
         {makeDonor("donor0", Timestamp()), makeDonor("donor1", Timestamp())});
     assertViolated({"hasCloneTimestamp", "donorsHaveMinFetchTimestamp"}, validate(before, allNull));
+}
+
+// A change to a clone detail, a donor's timestamp included, is reported by cloneDetailsUnchanged.
+TEST(ReshardingRecipientTransitionValidationTest, CloneDetailsAreNeverChangedAfterTheyAreWritten) {
+    const auto creating = makeRecipientAt(kCreatingCollection);
+    const auto cloning = withState(creating, kCloning);
+
+    auto otherTimestamp = cloning;
+    otherTimestamp.cloneTimestamp = Timestamp(13, 1);
+    assertViolated({"cloneTimestampIsHighestMinFetchTimestamp", "cloneDetailsUnchanged"},
+                   validate(creating, otherTimestamp));
+
+    auto otherDocuments = cloning;
+    otherDocuments.approxDocumentsToCopy = 7;
+    assertViolated({"cloneDetailsUnchanged"}, validate(creating, otherDocuments));
+
+    auto otherBytes = cloning;
+    otherBytes.approxBytesToCopy = 7;
+    assertViolated({"cloneDetailsUnchanged"}, validate(creating, otherBytes));
+
+    auto otherStart = cloning;
+    otherStart.startConfigTxnCloneTime = Date_t::fromMillisSinceEpoch(2);
+    assertViolated({"cloneDetailsUnchanged"}, validate(creating, otherStart));
+
+    // A donor's timestamp changed: either donor, highest or not.
+    assertViolated({"cloneDetailsUnchanged"},
+                   validate(creating, withMinFetchTimestamp(cloning, 0, Timestamp(9, 1))));
+    assertViolated({"cloneTimestampIsHighestMinFetchTimestamp", "cloneDetailsUnchanged"},
+                   validate(creating, withMinFetchTimestamp(cloning, 1, Timestamp(9, 1))));
+
+    // A donor's timestamp lost after being set.
+    assertViolated({"donorsHaveMinFetchTimestamp", "cloneDetailsUnchanged"},
+                   validate(creating, withMinFetchTimestamp(cloning, 0, boost::none)));
+
+    // The same holds on the edges that follow.
+    auto changedBuildingIndex = withState(creating, kBuildingIndex);
+    changedBuildingIndex.approxBytesToCopy = 7;
+    assertViolated({"cloneDetailsUnchanged"}, validate(cloning, changedBuildingIndex));
+
+    auto changedApplying = makeRecipientAt(kApplying);
+    changedApplying.startConfigTxnCloneTime = Date_t::fromMillisSinceEpoch(2);
+    assertViolated({"cloneDetailsUnchanged"},
+                   validate(makeRecipientAt(kBuildingIndex), changedApplying));
 }
 
 TEST(ReshardingRecipientTransitionValidationTest, MessageNamesEdgeEveryUnmetRuleAndItsValues) {
@@ -245,25 +418,51 @@ TEST(ReshardingRecipientTransitionValidationTest, MessageNamesEdgeEveryUnmetRule
         "transition from awaiting-fetch-timestamp to creating-collection violated: "
         "hasCloneTimestamp (cloneTimestamp is unset), donorsHaveMinFetchTimestamp (");
     ASSERT_STRING_CONTAINS(result.status.reason(), "minFetchTimestamp of donor donor0 is unset");
+
+    const auto creating = makeRecipientAt(kCreatingCollection);
+    auto changed = withState(creating, kCloning);
+    changed.approxDocumentsToCopy = 7;
+    ASSERT_STRING_CONTAINS(validate(creating, changed).status.reason(),
+                           "cloneDetailsUnchanged (approxDocumentsToCopy changed from 100 to 7)");
+
+    ASSERT_STRING_CONTAINS(
+        validate(creating, withMinFetchTimestamp(withState(creating, kCloning), 0, Timestamp(9, 1)))
+            .status.reason(),
+        "cloneDetailsUnchanged (minFetchTimestamp of donor donor0 changed from Timestamp(10, 1) to "
+        "Timestamp(9, 1))");
 }
 
 TEST(ReshardingRecipientTransitionValidationTest, ImmutableFieldsMustNotChange) {
     const auto before = withVerification(makeSnapshot(kAwaitingFetchTimestamp), true);
 
     // Dropping verification must not make the rules that depend on it optional.
-    assertViolated({"immutableFieldsUnchanged"}, validate(before, makeCloned(kCreatingCollection)));
+    assertViolated({"immutableFieldsUnchanged"},
+                   validate(before, makeRecipientAt(kCreatingCollection)));
 
     // Neither may skipCloningAndApplying be set.
-    auto skipSet = makeCloned(kCreatingCollection, /*performVerification=*/true);
+    auto skipSet = makeRecipientAt(kCreatingCollection, /*performVerification=*/true);
     skipSet.options.setSkipCloningAndApplying(true);
     assertViolated({"immutableFieldsUnchanged"}, validate(before, skipSet));
 
     // A mismatch is reported alone, since the other rules would be evaluated against the wrong
     // options.
-    auto alsoBroken = makeCloned(kCreatingCollection);
+    auto alsoBroken = makeRecipientAt(kCreatingCollection);
     alsoBroken.cloneTimestamp = Timestamp(99, 1);
     assertViolated({"immutableFieldsUnchanged"}, validate(before, alsoBroken));
     assertViolated({"immutableFieldsUnchanged"}, validate(before, makeSnapshot(kDone)));
+}
+
+TEST(ReshardingRecipientTransitionValidationTest, ImmutableFieldsCannotWaiveTheMonitor) {
+    const auto before = makeRecipientAt(kBuildingIndex, /*performVerification=*/true);
+
+    // Dropping verification must not make the monitor optional.
+    assertViolated({"immutableFieldsUnchanged"}, validate(before, makeRecipientAt(kApplying)));
+
+    // Nor may skipCloningAndApplying be set to waive it.
+    auto skipSet = makeRecipientAt(kApplying, /*performVerification=*/true);
+    skipSet.options.setSkipCloningAndApplying(true);
+    skipSet.changeStreamsMonitor = boost::none;
+    assertViolated({"immutableFieldsUnchanged"}, validate(before, skipSet));
 }
 
 // The donors' minFetchTimestamps are written by the transition out of kAwaitingFetchTimestamp and
@@ -320,26 +519,242 @@ TEST(ReshardingRecipientTransitionValidationTest, DonorListAndOtherOptionsMustNo
     assertViolated({"immutableFieldsUnchanged"}, validate(before, otherOption));
 }
 
+TEST(ReshardingRecipientTransitionValidationTest, EnteringApplyingRequiresVerificationState) {
+    // Before and proposed always share the immutable fields.
+    const auto verifying = makeRecipientAt(kBuildingIndex, /*performVerification=*/true);
+    const auto plain = makeRecipientAt(kBuildingIndex);
+
+    auto noTotals = makeRecipientAt(kApplying, /*performVerification=*/true);
+    noTotals.ctx.setNumDocumentsCloned(boost::none);
+    assertViolated({"hasCloningTotalsWhenVerifying"}, validate(verifying, noTotals));
+
+    auto noSize = makeRecipientAt(kApplying, /*performVerification=*/true);
+    noSize.ctx.setTotalDocumentSize(boost::none);
+    assertViolated({"hasCloningTotalsWhenVerifying"}, validate(verifying, noSize));
+
+    auto negativeDocuments = makeRecipientAt(kApplying, /*performVerification=*/true);
+    negativeDocuments.ctx.setNumDocumentsCloned(-1);
+    assertViolated({"hasCloningTotalsWhenVerifying"}, validate(verifying, negativeDocuments));
+
+    auto negativeSize = makeRecipientAt(kApplying, /*performVerification=*/true);
+    negativeSize.ctx.setTotalDocumentSize(-1);
+    assertViolated({"hasCloningTotalsWhenVerifying"}, validate(verifying, negativeSize));
+
+    auto noMonitor = makeRecipientAt(kApplying, /*performVerification=*/true);
+    noMonitor.changeStreamsMonitor = boost::none;
+    assertViolated({"changeStreamsMonitorMatchesOptions"}, validate(verifying, noMonitor));
+
+    auto unwantedMonitor = makeRecipientAt(kApplying);
+    unwantedMonitor.changeStreamsMonitor = ChangeStreamsMonitorContext{Timestamp(13, 1), 0};
+    assertViolated({"changeStreamsMonitorMatchesOptions"}, validate(plain, unwantedMonitor));
+
+    auto dirtyMonitor = makeRecipientAt(kApplying, /*performVerification=*/true);
+    dirtyMonitor.changeStreamsMonitor = ChangeStreamsMonitorContext{Timestamp(13, 1), 5};
+    assertViolated({"changeStreamsMonitorStartsEmpty"}, validate(verifying, dirtyMonitor));
+
+    // A null start would begin the monitor at the start of the oplog.
+    auto nullStart = makeRecipientAt(kApplying, /*performVerification=*/true);
+    nullStart.changeStreamsMonitor = ChangeStreamsMonitorContext{Timestamp(), 0};
+    assertViolated({"changeStreamsMonitorHasStart"}, validate(verifying, nullStart));
+
+    auto completedMonitor = makeRecipientAt(kApplying, /*performVerification=*/true);
+    completedMonitor.changeStreamsMonitor->setCompleted(true);
+    assertViolated({"changeStreamsMonitorStartsEmpty"}, validate(verifying, completedMonitor));
+
+    // A resume token would skip events that the initial delta does not account for.
+    auto resumedMonitor = makeRecipientAt(kApplying, /*performVerification=*/true);
+    resumedMonitor.changeStreamsMonitor->setResumeToken(BSON("_data" << "8264"));
+    assertViolated({"changeStreamsMonitorStartsEmpty"}, validate(verifying, resumedMonitor));
+
+    auto monitorAlreadyStarted = makeRecipientAt(kBuildingIndex);
+    monitorAlreadyStarted.changeStreamsMonitor = ChangeStreamsMonitorContext{Timestamp(9, 1), 0};
+    assertViolated({"noChangeStreamsMonitorYet"},
+                   validate(monitorAlreadyStarted, makeRecipientAt(kApplying)));
+}
+
+TEST(ReshardingRecipientTransitionValidationTest, StrictConsistencyKeepsMonitorStartAndTotals) {
+    const auto applying = makeRecipientAt(kApplying, /*performVerification=*/true);
+
+    auto otherStart = withState(applying, kStrictConsistency);
+    otherStart.changeStreamsMonitor = ChangeStreamsMonitorContext{Timestamp(14, 1), 0};
+    assertViolated({"changeStreamsMonitorStartUnchanged"}, validate(applying, otherStart));
+
+    auto otherDocuments = withState(applying, kStrictConsistency);
+    otherDocuments.ctx.setNumDocumentsCloned(99);
+    assertViolated({"cloningTotalsUnchanged"}, validate(applying, otherDocuments));
+
+    auto otherSize = withState(applying, kStrictConsistency);
+    otherSize.ctx.setTotalDocumentSize(999);
+    assertViolated({"cloningTotalsUnchanged"}, validate(applying, otherSize));
+
+    auto otherDetails = withState(applying, kStrictConsistency);
+    otherDetails.cloneTimestamp = Timestamp(13, 1);
+    assertViolated({"cloneTimestampIsHighestMinFetchTimestamp", "cloneDetailsUnchanged"},
+                   validate(applying, otherDetails));
+}
+
+TEST(ReshardingRecipientTransitionValidationTest, StrictConsistencyAllowsMonitorProgress) {
+    const auto before = makeRecipientAt(kApplying, /*performVerification=*/true);
+    auto after = withState(before, kStrictConsistency);
+    after.changeStreamsMonitor = ChangeStreamsMonitorContext{Timestamp(13, 1), 42};
+    ASSERT_OK(validate(before, after).status);
+
+    // A resume token is progress too, and is rejected only on a new monitor. Completion is not
+    // exercised here: the recipient's final event is written after it enters kStrictConsistency.
+    after.changeStreamsMonitor->setResumeToken(BSON("_data" << "8264"));
+    ASSERT_OK(validate(before, after).status);
+}
+
+TEST(ReshardingRecipientTransitionValidationTest, StrictConsistencyKeepsTheApplyingState) {
+    const auto verifying = makeRecipientAt(kApplying, /*performVerification=*/true);
+
+    auto lostMonitor = withState(verifying, kStrictConsistency);
+    lostMonitor.changeStreamsMonitor = boost::none;
+    assertViolated({"changeStreamsMonitorMatchesOptions", "changeStreamsMonitorStartUnchanged"},
+                   validate(verifying, lostMonitor));
+
+    auto lostTotals = withState(verifying, kStrictConsistency);
+    lostTotals.ctx.setNumDocumentsCloned(boost::none);
+    assertViolated({"hasCloningTotalsWhenVerifying", "cloningTotalsUnchanged"},
+                   validate(verifying, lostTotals));
+
+    auto lostSize = withState(verifying, kStrictConsistency);
+    lostSize.ctx.setTotalDocumentSize(boost::none);
+    assertViolated({"hasCloningTotalsWhenVerifying", "cloningTotalsUnchanged"},
+                   validate(verifying, lostSize));
+}
+
+TEST(ReshardingRecipientTransitionValidationTest, DoneAfterAbortRecordsTheCoordinatorsAbort) {
+    for (const bool verify : {false, true}) {
+        const auto strict = makeRecipientAt(kStrictConsistency, verify);
+        ASSERT_OK(validate(strict, withState(withCoordinatorAbort(strict), kDone)).status);
+
+        assertViolated({"newAbortReasonIsCoordinatorAbort"},
+                       validate(strict, withState(withAbortReason(strict), kDone)));
+    }
+}
+
+// The coordinator commits without waiting for a monitor once its verification deadline passes.
+TEST(ReshardingRecipientTransitionValidationTest, DoneDoesNotRequireACompletedMonitor) {
+    const auto strict = makeRecipientAt(kStrictConsistency, /*performVerification=*/true);
+    auto done = withState(strict, kDone);
+    ASSERT_FALSE(done.changeStreamsMonitor->getCompleted());
+    ASSERT_OK(validate(strict, done).status);
+
+    done.changeStreamsMonitor->setCompleted(true);
+    ASSERT_OK(validate(strict, done).status);
+}
+
+TEST(ReshardingRecipientTransitionValidationTest, DoneKeepsMonitorStart) {
+    const auto strict = makeRecipientAt(kStrictConsistency, /*performVerification=*/true);
+
+    auto otherStart = withState(strict, kDone);
+    otherStart.changeStreamsMonitor = ChangeStreamsMonitorContext{Timestamp(14, 1), 0};
+    assertViolated({"changeStreamsMonitorStartUnchanged"}, validate(strict, otherStart));
+
+    // The monitor's progress is not compared.
+    auto progressed = withState(strict, kDone);
+    progressed.changeStreamsMonitor = ChangeStreamsMonitorContext{Timestamp(13, 1), 42};
+    ASSERT_OK(validate(strict, progressed).status);
+}
+
+// kDone does not compare the totals: the service refreshes totalDocumentSize, totalNumDocuments and
+// numOfIndexes from the temporary collection before it writes kDone, verifying or not.
+TEST(ReshardingRecipientTransitionValidationTest, DoneAllowsRefreshedTotals) {
+    for (const bool verify : {false, true}) {
+        const auto strict = makeRecipientAt(kStrictConsistency, verify);
+        auto done = withState(strict, kDone);
+        done.ctx.setTotalDocumentSize(5000);
+        done.ctx.setTotalNumDocuments(50);
+        ASSERT_OK(validate(strict, done).status);
+    }
+}
+
+TEST(ReshardingRecipientTransitionValidationTest, DoneKeepsCloneDetails) {
+    const auto strict = makeRecipientAt(kStrictConsistency);
+    auto changed = withState(strict, kDone);
+    changed.approxBytesToCopy = 7;
+    assertViolated({"cloneDetailsUnchanged"}, validate(strict, changed));
+}
+
+TEST(ReshardingRecipientTransitionValidationTest, SkipCloningAndApplyingRecipientHasNoMonitor) {
+    const auto before = makeSkippingApplying(kBuildingIndex);
+    const auto applying = makeSkippingApplying(kApplying);
+    ASSERT_OK(validate(before, applying).status);
+    ASSERT_OK(validate(applying, withState(applying, kStrictConsistency)).status);
+
+    auto withMonitor = applying;
+    withMonitor.changeStreamsMonitor = ChangeStreamsMonitorContext{Timestamp(13, 1), 0};
+    assertViolated({"changeStreamsMonitorMatchesOptions"}, validate(before, withMonitor));
+
+    auto noTotals = applying;
+    noTotals.ctx.setNumDocumentsCloned(boost::none);
+    assertViolated({"hasCloningTotalsWhenVerifying"}, validate(before, noTotals));
+}
+
+TEST(ReshardingRecipientTransitionValidationTest, SkipCloningAndApplyingWithoutVerification) {
+    auto applying = makeRecipientAt(kApplying);
+    applying.options.setSkipCloningAndApplying(true);
+    applying.approxDocumentsToCopy = 0;
+    applying.approxBytesToCopy = 0;
+    ASSERT_OK(validate(withState(applying, kBuildingIndex), applying).status);
+    ASSERT_OK(validate(applying, withState(applying, kStrictConsistency)).status);
+}
+
 TEST(ReshardingRecipientTransitionValidationTest, ForwardEdgesRejectAbortReason) {
-    assertViolated({"noAbortReason"},
-                   validate(makeSnapshot(kAwaitingFetchTimestamp),
-                            withAbortReason(makeCloned(kCreatingCollection))));
-    assertViolated({"noAbortReason"},
-                   validate(withAbortReason(makeSnapshot(kAwaitingFetchTimestamp)),
-                            makeCloned(kCreatingCollection)));
+    for (const bool verify : {false, true}) {
+        for (const auto& [before, after] : forwardEdgesBeforeDone(verify)) {
+            assertViolated({"noAbortReason"}, validate(before, withAbortReason(after)));
+            assertViolated({"noAbortReason"}, validate(withAbortReason(before), after));
+        }
+    }
 }
 
 TEST(ReshardingRecipientTransitionValidationTest, PostTransitionAcceptsInstalledState) {
-    const auto proposed = makeCloned(kCreatingCollection, /*performVerification=*/true);
+    const auto proposed = makeRecipientAt(kCreatingCollection, /*performVerification=*/true);
     ASSERT_OK(validateRecipientPostTransition(
                   {.proposed = proposed, .inMemory = proposed.ctx, .durable = proposed})
                   .status);
 }
 
-TEST(ReshardingRecipientTransitionValidationTest, PostTransitionRejectsMismatches) {
-    const auto proposed = makeCloned(kCreatingCollection, /*performVerification=*/true);
+TEST(ReshardingRecipientTransitionValidationTest, PostTransitionIgnoresMonitorProgress) {
+    const auto proposed = makeRecipientAt(kApplying, /*performVerification=*/true);
+    ASSERT_OK(validateRecipientPostTransition(
+                  {.proposed = proposed, .inMemory = proposed.ctx, .durable = proposed})
+                  .status);
 
-    auto staleDurable = makeCloned(kAwaitingFetchTimestamp, /*performVerification=*/true);
+    // Progress persisted concurrently by the monitor is not a mismatch.
+    auto durable = proposed;
+    durable.changeStreamsMonitor = ChangeStreamsMonitorContext{Timestamp(13, 1), 7};
+    durable.changeStreamsMonitor->setResumeToken(BSON("_data" << "8264"));
+    ASSERT_OK(validateRecipientPostTransition(
+                  {.proposed = proposed, .inMemory = proposed.ctx, .durable = durable})
+                  .status);
+}
+
+TEST(ReshardingRecipientTransitionValidationTest,
+     PostTransitionRejectsAMonitorThatStartedElsewhere) {
+    const auto proposed = makeRecipientAt(kApplying, /*performVerification=*/true);
+
+    auto otherStart = proposed;
+    otherStart.changeStreamsMonitor = ChangeStreamsMonitorContext{Timestamp(14, 1), 0};
+    const auto result = validateRecipientPostTransition(
+        {.proposed = proposed, .inMemory = proposed.ctx, .durable = otherStart});
+    assertViolated({"durableMatchesProposed"}, result, ErrorCodes::ReshardingPostconditionFailure);
+    ASSERT_STRING_CONTAINS(result.status.reason(), "changeStreamsMonitor start");
+
+    auto lostMonitor = proposed;
+    lostMonitor.changeStreamsMonitor = boost::none;
+    assertViolated({"durableMatchesProposed"},
+                   validateRecipientPostTransition(
+                       {.proposed = proposed, .inMemory = proposed.ctx, .durable = lostMonitor}),
+                   ErrorCodes::ReshardingPostconditionFailure);
+}
+
+TEST(ReshardingRecipientTransitionValidationTest, PostTransitionRejectsMismatches) {
+    const auto proposed = makeRecipientAt(kCreatingCollection, /*performVerification=*/true);
+
+    auto staleDurable = makeRecipientAt(kAwaitingFetchTimestamp, /*performVerification=*/true);
     assertViolated({"durableMatchesProposed"},
                    validateRecipientPostTransition(
                        {.proposed = proposed, .inMemory = proposed.ctx, .durable = staleDurable}),
@@ -397,7 +812,7 @@ TEST(ReshardingRecipientTransitionValidationTest, PostTransitionRejectsMismatche
 
 TEST(ReshardingRecipientTransitionValidationTest, PersistedStateMustMatchInMemoryState) {
     const auto before = makeSnapshot(kAwaitingFetchTimestamp);
-    const auto proposed = makeCloned(kCreatingCollection);
+    const auto proposed = makeRecipientAt(kCreatingCollection);
     ASSERT_OK(
         validateRecipientPreTransition(
             {.before = before, .proposed = proposed, .outgoingPhase = kAwaitingFetchTimestamp})
@@ -416,6 +831,11 @@ TEST(ReshardingRecipientTransitionValidationTest, OnlyTheDocumentedEdgesAreAllow
     using Edge = std::pair<RecipientStateEnum, RecipientStateEnum>;
     const std::set<Edge> allowed{
         {kAwaitingFetchTimestamp, kCreatingCollection},
+        {kCreatingCollection, kCloning},
+        {kCloning, kBuildingIndex},
+        {kBuildingIndex, kApplying},
+        {kApplying, kStrictConsistency},
+        {kStrictConsistency, kDone},
     };
 
     for (const auto from : RecipientStateEnum_values) {

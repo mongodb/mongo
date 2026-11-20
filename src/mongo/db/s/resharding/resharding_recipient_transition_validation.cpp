@@ -93,6 +93,18 @@ Status checkCloneDetailsUnchanged(const RecipientTransitionSnapshot& before,
     return checkDonorMinFetchTimestampsUnchanged(before, proposed);
 }
 
+// Only the start is compared, as the monitor persists its own progress.
+Status checkChangeStreamsMonitorStartUnchanged(const RecipientTransitionSnapshot& before,
+                                               const RecipientTransitionSnapshot& proposed) {
+    const auto start = [](const RecipientTransitionSnapshot& s) -> boost::optional<Timestamp> {
+        if (!s.changeStreamsMonitor) {
+            return boost::none;
+        }
+        return s.changeStreamsMonitor->getStartAtOperationTime();
+    };
+    return checkUnchanged("changeStreamsMonitor start", start(before), start(proposed));
+}
+
 bool donorShardIdsUnchanged(const std::vector<DonorShardFetchTimestamp>& before,
                             const std::vector<DonorShardFetchTimestamp>& proposed) {
     auto sameShard = [](const auto& a, const auto& b) {
@@ -129,7 +141,8 @@ const RecipientPreConstraint kImmutableFieldsUnchanged{
         return checkImmutableFields(in.before, in.proposed);
     }};
 
-// A forward edge carries no abort reason.
+// The edges that advance the operation, from kAwaitingFetchTimestamp through kStrictConsistency,
+// carry no abort reason. An abort is recorded by the edges into kError and kDone.
 const RecipientPreConstraint kNoAbortReason{
     "noAbortReason", [](const RecipientPreTransitionInput& in) -> Status {
         Status status = checkNoAbortReason(in.before.ctx.getAbortReason());
@@ -224,6 +237,111 @@ const RecipientPreConstraint kHasStartConfigTxnCloneTime{
         return transitionViolation("startConfigTxnCloneTime is unset");
     }};
 
+const RecipientPreConstraint kCloneDetailsUnchanged{
+    "cloneDetailsUnchanged", [](const RecipientPreTransitionInput& in) -> Status {
+        return checkCloneDetailsUnchanged(in.before, in.proposed);
+    }};
+
+// A recipient reaches kDone without passing through kError when the coordinator aborts, and then
+// records the coordinator's abort as the reason.
+const RecipientPreConstraint kNewAbortReasonIsCoordinatorAbort{
+    "newAbortReasonIsCoordinatorAbort", [](const RecipientPreTransitionInput& in) -> Status {
+        const auto& proposed = in.proposed.ctx.getAbortReason();
+        if (in.before.ctx.getAbortReason() || !proposed ||
+            proposed->getIntField("code") ==
+                static_cast<int>(ErrorCodes::ReshardCollectionAborted)) {
+            return Status::OK();
+        }
+        return transitionViolation(str::stream() << "abort reason " << *proposed
+                                                 << " is not the coordinator's abort");
+    }};
+
+const RecipientPreConstraint kChangeStreamsMonitorStartUnchanged{
+    "changeStreamsMonitorStartUnchanged", [](const RecipientPreTransitionInput& in) -> Status {
+        return checkChangeStreamsMonitorStartUnchanged(in.before, in.proposed);
+    }};
+
+const RecipientPreConstraint kCloningTotalsUnchanged{
+    "cloningTotalsUnchanged", [](const RecipientPreTransitionInput& in) -> Status {
+        Status status = checkUnchanged("numDocumentsCloned",
+                                       in.before.ctx.getNumDocumentsCloned(),
+                                       in.proposed.ctx.getNumDocumentsCloned());
+        if (!status.isOK()) {
+            return status;
+        }
+        return checkUnchanged("totalDocumentSize",
+                              in.before.ctx.getTotalDocumentSize(),
+                              in.proposed.ctx.getTotalDocumentSize());
+    }};
+
+// Recorded on entering kApplying and kept afterwards.
+const RecipientPreConstraint kHasCloningTotalsWhenVerifying{
+    "hasCloningTotalsWhenVerifying", [](const RecipientPreTransitionInput& in) -> Status {
+        const auto& proposed = in.proposed;
+        if (!proposed.performVerification) {
+            return Status::OK();
+        }
+        Status status =
+            checkNonNegative("numDocumentsCloned", proposed.ctx.getNumDocumentsCloned());
+        if (!status.isOK()) {
+            return status;
+        }
+        return checkNonNegative("totalDocumentSize", proposed.ctx.getTotalDocumentSize());
+    }};
+
+// Started on entering kApplying if and only if the operation verifies and applies oplog entries,
+// as in _updateRecipientDocument().
+const RecipientPreConstraint kChangeStreamsMonitorMatchesOptions{
+    "changeStreamsMonitorMatchesOptions", [](const RecipientPreTransitionInput& in) -> Status {
+        const auto& proposed = in.proposed;
+        const bool skipCloningAndApplying = proposed.options.getSkipCloningAndApplying();
+        const bool expected = proposed.performVerification && !skipCloningAndApplying;
+        if (proposed.changeStreamsMonitor.has_value() == expected) {
+            return Status::OK();
+        }
+        return transitionViolation(str::stream()
+                                   << "change streams monitor is "
+                                   << (proposed.changeStreamsMonitor ? "present" : "absent")
+                                   << " but performVerification is " << proposed.performVerification
+                                   << " and skipCloningAndApplying is " << skipCloningAndApplying);
+    }};
+
+// A null start would begin the monitor at the start of the oplog.
+const RecipientPreConstraint kChangeStreamsMonitorHasStart{
+    "changeStreamsMonitorHasStart", [](const RecipientPreTransitionInput& in) -> Status {
+        const auto& monitor = in.proposed.changeStreamsMonitor;
+        if (!monitor) {
+            return Status::OK();
+        }
+        return checkSetAndNonNull("change streams monitor start",
+                                  monitor->getStartAtOperationTime());
+    }};
+
+const RecipientPreConstraint kNoChangeStreamsMonitorYet{
+    "noChangeStreamsMonitorYet", [](const RecipientPreTransitionInput& in) -> Status {
+        if (!in.before.changeStreamsMonitor) {
+            return Status::OK();
+        }
+        return transitionViolation("change streams monitor is already set before applying");
+    }};
+
+// A new monitor starts empty, with no resume token: a token would skip events that the initial
+// delta does not account for.
+const RecipientPreConstraint kChangeStreamsMonitorStartsEmpty{
+    "changeStreamsMonitorStartsEmpty", [](const RecipientPreTransitionInput& in) -> Status {
+        const auto& monitor = in.proposed.changeStreamsMonitor;
+        if (!monitor ||
+            (monitor->getDocumentsDelta() == 0 && !monitor->getCompleted() &&
+             !monitor->getResumeToken())) {
+            return Status::OK();
+        }
+        return transitionViolation(str::stream()
+                                   << "change streams monitor starts with documentsDelta "
+                                   << monitor->getDocumentsDelta() << ", completed "
+                                   << monitor->getCompleted() << " and resume token "
+                                   << (monitor->getResumeToken() ? "set" : "unset"));
+    }};
+
 // A mismatch means the edge would be checked against the wrong source state.
 const RecipientPreConstraint kPersistedStateMatchesInMemory{
     "persistedStateMatchesInMemory", [](const RecipientPreTransitionInput& in) -> Status {
@@ -257,6 +375,12 @@ const RecipientPostConstraint kDurableMatchesProposed{
                 str::stream() << "durable performVerification " << in.durable.performVerification
                               << " != proposed " << in.proposed.performVerification);
         }
+        status = checkChangeStreamsMonitorStartUnchanged(in.durable, in.proposed);
+        if (!status.isOK()) {
+            return transitionViolation(str::stream() << "durable change streams monitor differs "
+                                                        "from proposed: "
+                                                     << status.reason());
+        }
         return Status::OK();
     }};
 
@@ -270,20 +394,80 @@ RecipientPreCheck preCheck(const RecipientPreTransitionInput& in) {
     return makePreTransitionCheck(in, in.before.ctx.getState(), in.proposed.ctx.getState());
 }
 
-RecipientPreCheck& requireCloneDetails(RecipientPreCheck& check) {
-    return check.require(kHasCloneTimestamp)
+// A change to the donor list is rejected by the immutable-fields rule before this validator runs.
+ConstraintResult validateEnteringCreatingCollection(const RecipientPreTransitionInput& in) {
+    return preCheck(in)
+        .require(kNoAbortReason)
+        .require(kCloneDetailsNotYetSet)
+        .require(kHasCloneTimestamp)
         .require(kHasDonorShards)
         .require(kDonorsHaveMinFetchTimestamp)
         .require(kCloneTimestampIsHighestMinFetchTimestamp)
         .require(kHasValidApproxCopyCounts)
-        .require(kHasStartConfigTxnCloneTime);
+        .require(kHasStartConfigTxnCloneTime)
+        .result();
 }
 
-// A change to the donor list is rejected by the immutable-fields rule before this validator runs.
-ConstraintResult validateEnteringCreatingCollection(const RecipientPreTransitionInput& in) {
-    auto check = preCheck(in);
-    check.require(kNoAbortReason).require(kCloneDetailsNotYetSet);
-    return requireCloneDetails(check).result();
+// Writes nothing new: the clone details must be present and unchanged.
+ConstraintResult validateCarryingCloneDetails(const RecipientPreTransitionInput& in) {
+    return preCheck(in)
+        .require(kNoAbortReason)
+        .require(kHasCloneTimestamp)
+        .require(kHasDonorShards)
+        .require(kDonorsHaveMinFetchTimestamp)
+        .require(kCloneTimestampIsHighestMinFetchTimestamp)
+        .require(kHasValidApproxCopyCounts)
+        .require(kHasStartConfigTxnCloneTime)
+        .require(kCloneDetailsUnchanged)
+        .result();
+}
+
+ConstraintResult validateEnteringApplying(const RecipientPreTransitionInput& in) {
+    return preCheck(in)
+        .require(kNoAbortReason)
+        .require(kHasCloneTimestamp)
+        .require(kHasDonorShards)
+        .require(kDonorsHaveMinFetchTimestamp)
+        .require(kCloneTimestampIsHighestMinFetchTimestamp)
+        .require(kHasValidApproxCopyCounts)
+        .require(kHasStartConfigTxnCloneTime)
+        .require(kCloneDetailsUnchanged)
+        .require(kNoChangeStreamsMonitorYet)
+        .require(kChangeStreamsMonitorStartsEmpty)
+        .require(kHasCloningTotalsWhenVerifying)
+        .require(kChangeStreamsMonitorMatchesOptions)
+        .require(kChangeStreamsMonitorHasStart)
+        .result();
+}
+
+// Nothing new is written. Only the monitor's start is compared, not its progress.
+ConstraintResult validateEnteringStrictConsistency(const RecipientPreTransitionInput& in) {
+    return preCheck(in)
+        .require(kNoAbortReason)
+        .require(kHasCloneTimestamp)
+        .require(kHasDonorShards)
+        .require(kDonorsHaveMinFetchTimestamp)
+        .require(kCloneTimestampIsHighestMinFetchTimestamp)
+        .require(kHasValidApproxCopyCounts)
+        .require(kHasStartConfigTxnCloneTime)
+        .require(kHasCloningTotalsWhenVerifying)
+        .require(kChangeStreamsMonitorMatchesOptions)
+        .require(kChangeStreamsMonitorHasStart)
+        .require(kCloneDetailsUnchanged)
+        .require(kChangeStreamsMonitorStartUnchanged)
+        .require(kCloningTotalsUnchanged)
+        .result();
+}
+
+// Neither the cloning totals nor the monitor's completion is compared. The service refreshes the
+// totals from the temporary collection before this write, and the coordinator commits without
+// waiting for a monitor once its verification deadline passes.
+ConstraintResult validateEnteringDone(const RecipientPreTransitionInput& in) {
+    return preCheck(in)
+        .require(kCloneDetailsUnchanged)
+        .require(kNewAbortReasonIsCoordinatorAbort)
+        .require(kChangeStreamsMonitorStartUnchanged)
+        .result();
 }
 
 using RecipientTransitionEdge = std::pair<RecipientStateEnum, RecipientStateEnum>;
@@ -297,6 +481,13 @@ recipientTransitionValidators() {
         std::map<RecipientTransitionEdge, RecipientPreTransitionValidator>{
             // Forward edges.
             {{kAwaitingFetchTimestamp, kCreatingCollection}, &validateEnteringCreatingCollection},
+            {{kCreatingCollection, kCloning}, &validateCarryingCloneDetails},
+            {{kCloning, kBuildingIndex}, &validateCarryingCloneDetails},
+            {{kBuildingIndex, kApplying}, &validateEnteringApplying},
+            {{kApplying, kStrictConsistency}, &validateEnteringStrictConsistency},
+            // Whether the coordinator decided to commit is not examined: that needs a coordinator
+            // read.
+            {{kStrictConsistency, kDone}, &validateEnteringDone},
         };
     return *validators;
 }

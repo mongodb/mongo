@@ -29,6 +29,10 @@ struct RecipientTransitionSnapshot {
     boost::optional<int64_t> approxDocumentsToCopy;
     boost::optional<int64_t> approxBytesToCopy;
     boost::optional<Date_t> startConfigTxnCloneTime;
+    // Stored on the document, not in the options. Started by the edge into kApplying, so the
+    // proposed snapshot for that edge must already carry the new monitor (with its start time),
+    // and the pre-transition validator must run once it is built.
+    boost::optional<ChangeStreamsMonitorContext> changeStreamsMonitor;
 
     // Includes each donor's minFetchTimestamp. Fixed at initialization, except for those
     // timestamps, which the edge validators govern.
