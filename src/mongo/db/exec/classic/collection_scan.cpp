@@ -13,6 +13,7 @@
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/query/record_id_range.h"
@@ -197,7 +198,8 @@ BSONObj getFirstEntry(RecoveryUnit& ru, SeekableRecordCursor* newCursor) {
  * Throws CollectionIsEmpty if the collection has no documents.
  */
 std::unique_ptr<SeekableRecordCursor> initCursorAndAssertTsHasNotFallenOff(
-    OperationContext* opCtx, const CollectionPtr& coll, Timestamp tsToCheck) {
+    ExpressionContext* expCtx, const CollectionPtr& coll, Timestamp tsToCheck) {
+    auto* opCtx = expCtx->getOperationContext();
     auto cursor = coll->getCursor(opCtx);
     const auto firstEntry =
         getFirstEntry(*shard_role_details::getRecoveryUnit(opCtx), cursor.get());
@@ -205,10 +207,12 @@ std::unique_ptr<SeekableRecordCursor> initCursorAndAssertTsHasNotFallenOff(
 
     // Indicates that 'firstEntry' means initialization of a replica set.
     bool isNewRS{false};
+    Timestamp earliestOplogTimestamp;
     try {
         // Verify that the timestamp of the first observed oplog entry is earlier than or equal to
         // timestamp that should not have fallen off the oplog.
-        if (oplogEntryParser.getOpTime().getTimestamp() <= tsToCheck) {
+        earliestOplogTimestamp = oplogEntryParser.getOpTime().getTimestamp();
+        if (earliestOplogTimestamp <= tsToCheck) {
             return cursor;
         }
 
@@ -221,6 +225,12 @@ std::unique_ptr<SeekableRecordCursor> initCursorAndAssertTsHasNotFallenOff(
     } catch (const AssertionException& exception) {
         uasserted(8881102,
                   str::stream() << "Failed to parse the oldest oplog entry" << causedBy(exception));
+    }
+    if (!isNewRS && change_stream::changeStreamShowsErrorsAsEvents(expCtx)) {
+        // The history was lost. Record the earliest surviving oplog timestamp and keep scanning so
+        // the change stream can report the gap instead of failing.
+        expCtx->setChangeStreamOplogFloorAfterRollover(earliestOplogTimestamp);
+        return cursor;
     }
     uassert(ErrorCodes::OplogQueryMinTsMissing,
             str::stream()
@@ -236,8 +246,8 @@ void CollectionScan::initCursor(OperationContext* opCtx,
                                 bool forward) {
     if (_params.assertTsHasNotFallenOff) {
         tassert(11051657, "Expect forward scan if scanning the oplog", forward);
-        _cursor =
-            initCursorAndAssertTsHasNotFallenOff(opCtx, collPtr, *_params.assertTsHasNotFallenOff);
+        _cursor = initCursorAndAssertTsHasNotFallenOff(
+            expCtx(), collPtr, *_params.assertTsHasNotFallenOff);
 
         // We don't need to check this assertion again after we've confirmed the first oplog event.
         _params.assertTsHasNotFallenOff = boost::none;

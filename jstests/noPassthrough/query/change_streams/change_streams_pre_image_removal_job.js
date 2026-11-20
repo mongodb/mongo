@@ -12,6 +12,7 @@
 // ]
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {rollOplogPast} from "jstests/libs/query/change_stream_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {getFirstOplogEntry, getLatestOp} from "jstests/replsets/rslib.js";
 
@@ -41,7 +42,6 @@ rst.startSet({
     },
 });
 rst.initiate();
-const largeStr = "abcdefghi".repeat(4 * 1024);
 const primaryNode = rst.getPrimary();
 const testDB = primaryNode.getDB(jsTestName());
 const localDB = primaryNode.getDB("local");
@@ -53,23 +53,6 @@ adminDB.setLogLevel(1, "query");
 // Returns documents from the pre-images collection from 'node'.
 function getPreImages(node) {
     return node.getDB(preImagesCollectionDatabase)[preImagesCollectionName].find().toArray();
-}
-
-// Ensure that all current oplog entries are disappear from the capped oplog
-// collection by inserting a bunch of large documents.
-function rollOverCurrentOplog() {
-    const lastOplogEntry = getLatestOp(primaryNode);
-    // Keep populating the oplog as long as the first oplog entry is newer (more recent) than
-    // 'lastOplogEntry'. The majority concern guarantees that both nodes of the 2-node replica set
-    // have identical oplogs.
-    while (
-        timestampCmp(
-            lastOplogEntry.ts,
-            getFirstOplogEntry(primaryNode, {readConcern: "majority"}).ts,
-        ) >= 0
-    ) {
-        assert.commandWorked(testDB.tmp.insert({largeStr}, {writeConcern: {w: "majority"}}));
-    }
 }
 
 // Invokes function 'func()' and returns the invocation result. Retries the action if 'func()'
@@ -100,7 +83,7 @@ function retryOnCappedPositionLostError(func, message) {
 {
     // Roll over the oplog, leading to 'PeriodicChangeStreamExpiredPreImagesRemover' periodic job
     // deleting all pre-images.
-    rollOverCurrentOplog();
+    rollOplogPast(primaryNode, testDB.tmp, getLatestOp(primaryNode).ts);
     assert.soon(() => getPreImages(primaryNode).length === 0);
 
     // Drop and recreate the collections with pre-images recording.
@@ -126,7 +109,7 @@ function retryOnCappedPositionLostError(func, message) {
     // Roll over all current oplog entries.
     const lastOplogEntryToBeRemoved = getLatestOp(primaryNode);
     assert.neq(lastOplogEntryToBeRemoved, null);
-    rollOverCurrentOplog();
+    rollOplogPast(primaryNode, testDB.tmp, lastOplogEntryToBeRemoved.ts);
 
     // Perform update operations that insert 2 new pre-images that are not expired yet.
     for (const coll of [collA, collB]) {

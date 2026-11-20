@@ -6,6 +6,7 @@
 // ]
 import {
     ChangeStreamTest,
+    rollOplogPast,
     validateChangeStreamHistoryLostException,
 } from "jstests/libs/query/change_stream_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
@@ -98,21 +99,7 @@ assert.eq(firstStreamEntry.documentKey._id, 1);
 const primaryNode = rst.getPrimary();
 const mostRecentOplogEntry = getLatestOp(primaryNode);
 assert.neq(mostRecentOplogEntry, null);
-const largeStr = "abcdefghi".repeat(4 * 1024 * oplogSize);
-
-assert.soon(() => {
-    // The oplog has rolled over when everything in it is newer than what used to be the newest entry.
-    if (
-        bsonWoCompare(
-            mostRecentOplogEntry.ts,
-            getFirstOplogEntry(primaryNode, {readConcern: "majority"}).ts,
-        ) < 0
-    )
-        return true;
-
-    assert.commandWorked(testColl.insert({long_str: largeStr}, {writeConcern: {w: "majority"}}));
-    return false;
-}, "Timeout waiting for oplog to roll over on primary");
+rollOplogPast(primaryNode, testColl, mostRecentOplogEntry.ts);
 
 // Confirm that attempting to continue reading an existing change stream throws CappedPositionLost.
 assert.throwsWithCode(

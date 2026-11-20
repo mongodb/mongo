@@ -61,11 +61,65 @@ public:
      */
     static bool isBackfillingScan(const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
+    // Test-only accessor: lets a unit test assert that forwarding a resume-gap error event which
+    // names the client's token also advances the resume status to kFoundToken.
+    ResumeStatus getResumeStatusForTest() const {
+        return _resumeStatus;
+    }
+
 protected:
     GetNextResult doGetNext() override;
 
+    /**
+     * Returns true if 'doc' is a resume-gap error event whose _id is the client's requested token.
+     */
+    bool isResumeGapForClientToken(const Document& doc) const;
+
+    /**
+     * Fails the stream with ChangeStreamFatalError: the client's token matches the token of
+     * 'errorEvent' except for the fragment number.
+     */
+    [[noreturn]] void failClosedOnUnsplitErrorEvent(const Document& errorEvent) const;
+
     ResumeStatus _resumeStatus = ResumeStatus::kCheckNextDoc;
     const ResumeTokenData _tokenFromClient;
+
+    // Whether the client's requested resume point has been resolved, either because the token was
+    // found or because a gap which names it was forwarded or built. '_resumeStatus' only says where
+    // the latest compared event sits relative to the token, and a gap resolves the resume point
+    // without any event matching it. At most one gap is built per stream.
+    bool _resumePointAccountedFor = false;
+
+    // The event which surpassed the resume point and was set aside while a gap was reported in its
+    // place; returned first on the next call.
+    boost::optional<GetNextResult> _inputDisplacedByGap;
+
+private:
+    /**
+     * Wraps 'pSource->getNext()' and rethrows errors raised by the oplog scan as the errors a
+     * client can act on.
+     */
+    GetNextResult _getNextRethrowingScanErrors();
+
+    /**
+     * Returns true if the oplog scan recorded that history was lost and the resulting gap has not
+     * been reported yet: the stream is opted in, the scan recorded a floor, and the resume point is
+     * not yet accounted for.
+     */
+    bool _hasUnreportedResumeGap() const;
+
+    /**
+     * Returns the event a gap displaced, after recording its identity again so that a failure in
+     * the stages above is attributed to it.
+     */
+    GetNextResult _emitInputDisplacedByGap();
+
+    /**
+     * Builds the gap, stashes it on the ExpressionContext, marks the resume point as accounted for,
+     * holds 'displacedInput' (if any) and throws the ChangeStreamHistoryLost signal, which
+     * ChangeStreamConvertErrorsStage turns into the gap event.
+     */
+    [[noreturn]] void _signalResumeGap(boost::optional<GetNextResult> displacedInput);
 };
 
 /**

@@ -1557,6 +1557,7 @@ mongo_cc_unit_test(
 mongo_cc_unit_test(
     name = "db_document_source_test",
     srcs = [
+        "change_stream_check_resumability_error_as_event_test.cpp",
         "document_source_add_fields_test.cpp",
         "document_source_bucket_auto_test.cpp",
         "document_source_bucket_test.cpp",

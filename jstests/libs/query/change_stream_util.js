@@ -8,6 +8,7 @@ import {indexAccessOpsByName} from "jstests/libs/index_stats_utils.js";
 import {getLocalReadCount} from "jstests/libs/local_reads.js";
 import {it} from "jstests/libs/mochalite.js";
 import {getCollectionNameFromFullNamespace} from "jstests/libs/namespace_utils.js";
+import {getFirstOplogEntry} from "jstests/replsets/rslib.js";
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
@@ -409,6 +410,33 @@ export function collectUntilInvalidate(cst, cursor) {
     return collectUntil(cst, cursor, (event) => event.operationType === "invalidate", {
         msg: "did not observe an invalidate event",
     });
+}
+
+/**
+ * Inserts documents with a large string into 'coll' with majority write concern until the first
+ * majority-readable oplog entry of 'primary' is newer than 'ts', i.e. the oplog has rolled over
+ * past 'ts'. Asserts after 'timeoutMS'. Each retry of the condition inserts a batch of documents,
+ * since a retry only happens every few hundred milliseconds, which would take very long to fill an
+ * oplog of the default size with one document at a time.
+ */
+export function rollOplogPast(primary, coll, ts, timeoutMS = 10 * 60 * 1000) {
+    const largeStr = "abcdefghi".repeat(4 * 1024);
+    const kBatchSize = 50;
+    assert.soon(
+        () => {
+            if (bsonWoCompare(ts, getFirstOplogEntry(primary, {readConcern: "majority"}).ts) < 0) {
+                return true;
+            }
+            const batch = [];
+            for (let i = 0; i < kBatchSize; ++i) {
+                batch.push({long_str: largeStr});
+            }
+            assert.commandWorked(coll.insertMany(batch, {writeConcern: {w: "majority"}}));
+            return false;
+        },
+        "Timeout waiting for oplog to roll over on primary",
+        timeoutMS,
+    );
 }
 
 export function isResumableChangeStreamError(error) {

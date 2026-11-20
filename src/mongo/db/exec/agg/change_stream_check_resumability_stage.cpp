@@ -34,6 +34,60 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamCheckResumabili
 
 namespace exec::agg {
 
+namespace {
+// Field names in a resume-gap error event.
+constexpr std::string_view kEarliestOplogTimestamp{"earliestOplogTimestamp"};
+constexpr std::string_view kSkippedClusterTimeRange{"skippedClusterTimeRange"};
+constexpr std::string_view kSkippedFrom{"from"};
+constexpr std::string_view kSkippedTo{"to"};
+
+bool isErrorEvent(const Document& doc) {
+    const Value opType = doc[DocumentSourceChangeStream::kOperationTypeField];
+    return opType.getType() == BSONType::string &&
+        opType.getStringData() == DocumentSourceChangeStream::kErrorOpType;
+}
+
+bool isErrorEventResult(const GetNextResult& result) {
+    return result.isAdvanced() && isErrorEvent(result.getDocument());
+}
+
+// Builds an operationType:"error" resume-gap event under the client's requested resume token
+// 'requested', which it also uses as the sort key. 'earliestOplogTimestamp' is the oldest available
+// oplog entry.
+Document makeHistoryLostGapEvent(const ResumeTokenData& requested,
+                                 Timestamp earliestOplogTimestamp,
+                                 boost::optional<ShardId> shardId) {
+    const Value token(ResumeToken(requested).toDocument());
+    const auto code = ErrorCodes::ChangeStreamHistoryLost;
+
+    MutableDocument errorDoc;
+    errorDoc[DocumentSourceChangeStream::kErrorSourceField] =
+        Value(toString(ChangeStreamErrorSource::kResumeGap));
+    errorDoc[DocumentSourceChangeStream::kErrorCodeField] = Value(static_cast<int>(code));
+    errorDoc[DocumentSourceChangeStream::kErrorCodeNameField] =
+        Value(std::string(ErrorCodes::errorString(code)));
+    errorDoc[DocumentSourceChangeStream::kErrorMessageField] =
+        Value(std::string("resume point predates the earliest available oplog entry"));
+    errorDoc[kEarliestOplogTimestamp] = Value(earliestOplogTimestamp);
+    errorDoc[kSkippedClusterTimeRange] = Value(
+        Document{{kSkippedFrom, requested.clusterTime}, {kSkippedTo, earliestOplogTimestamp}});
+    if (shardId) {
+        errorDoc[DocumentSourceChangeStream::kShardIdField] = Value(shardId->toString());
+    }
+
+    MutableDocument event;
+    event[DocumentSourceChangeStream::kOperationTypeField] =
+        Value(DocumentSourceChangeStream::kErrorOpType);
+    event[DocumentSourceChangeStream::kIdField] = token;
+    event[DocumentSourceChangeStream::kErrorField] = Value(errorDoc.freeze());
+    event[DocumentSourceChangeStream::kClusterTimeField] = Value(requested.clusterTime);
+
+    constexpr bool isSingleElementKey = true;
+    event.metadata().setSortKey(token, isSingleElementKey);
+    return event.freeze();
+}
+}  // namespace
+
 REGISTER_AGG_STAGE_MAPPING(_internalChangeStreamCheckResumability,
                            DocumentSourceChangeStreamCheckResumability::id,
                            documentSourceChangeStreamCheckResumabilityToStageFn)
@@ -58,6 +112,113 @@ bool ChangeStreamCheckResumabilityStage::isBackfillingScan(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     const auto& spec = expCtx->getChangeStreamSpec();
     return spec && spec->getBackfillingStartAtOperationTime();
+}
+
+bool ChangeStreamCheckResumabilityStage::isResumeGapForClientToken(const Document& doc) const {
+    if (!isErrorEvent(doc)) {
+        return false;
+    }
+    const auto source =
+        doc[DocumentSourceChangeStream::kErrorField][DocumentSourceChangeStream::kErrorSourceField];
+    return source.getType() == BSONType::string &&
+        source.getStringData() == toString(ChangeStreamErrorSource::kResumeGap) &&
+        ValueComparator::kInstance.evaluate(doc[DocumentSourceChangeStream::kIdField] ==
+                                            Value(ResumeToken(_tokenFromClient).toDocument()));
+}
+
+void ChangeStreamCheckResumabilityStage::failClosedOnUnsplitErrorEvent(
+    const Document& /*errorEvent*/) const {
+    uasserted(ErrorCodes::ChangeStreamFatalError,
+              str::stream() << "Cannot resume from a split change stream event: the resume token "
+                               "matches an error event whose token has no fragment number "
+                               "(resumeTimestamp: "
+                            << _tokenFromClient.clusterTime << ")");
+}
+
+GetNextResult ChangeStreamCheckResumabilityStage::_getNextRethrowingScanErrors() {
+    // The underlying oplog scan will throw OplogQueryMinTsMissing if the minTs in the change stream
+    // filter has fallen off the oplog. Before the resume point is surpassed, catch this and throw a
+    // more explanatory error.
+    try {
+        return pSource->getNext();
+    } catch (const ExceptionFor<ErrorCodes::OplogQueryMinTsMissing>& ex) {
+        // Once the resume point is surpassed the error is propagated as it always was.
+        if (_resumeStatus == ResumeStatus::kSurpassedToken) {
+            throw;
+        }
+        LOGV2_ERROR(6663107,
+                    "Resume of change stream was not possible",
+                    "resumeTimestamp"_attr = _tokenFromClient.clusterTime,
+                    "reason"_attr = ex.reason());
+        uasserted(ErrorCodes::ChangeStreamHistoryLost,
+                  str::stream() << "Resume of change stream was not possible, as the resume point "
+                                   "may no longer be in the oplog (resumeTimestamp: "
+                                << _tokenFromClient.clusterTime << ")");
+    } catch (const ExceptionFor<ErrorCodes::CappedPositionLost>& ex) {
+        if (!change_stream::changeStreamShowsErrorsAsEvents(pExpCtx)) {
+            throw;
+        }
+        // The oplog cursor lost its position because the oplog rolled over. Report a resumable
+        // error instead of the non-resumable CappedPositionLost so the driver reopens the stream.
+        LOGV2_DEBUG(13732400,
+                    3,
+                    "Change stream oplog cursor position lost",
+                    "resumeTimestamp"_attr = _tokenFromClient.clusterTime,
+                    "reason"_attr = ex.reason());
+        uasserted(ErrorCodes::RetryChangeStream,
+                  str::stream() << "Change stream oplog cursor position was lost, as the oplog may "
+                                   "have rolled over (resumeTimestamp: "
+                                << _tokenFromClient.clusterTime << ")");
+    }
+}
+
+bool ChangeStreamCheckResumabilityStage::_hasUnreportedResumeGap() const {
+    return change_stream::changeStreamShowsErrorsAsEvents(pExpCtx) &&
+        pExpCtx->getChangeStreamOplogFloorAfterRollover() && !_resumePointAccountedFor;
+}
+
+void ChangeStreamCheckResumabilityStage::_signalResumeGap(
+    boost::optional<GetNextResult> displacedInput) {
+    const auto floor = *pExpCtx->getChangeStreamOplogFloorAfterRollover();
+    pExpCtx->setPendingChangeStreamResumeGap(makeHistoryLostGapEvent(
+        _tokenFromClient,
+        floor,
+        pExpCtx->getMongoProcessInterface()->getShardId(pExpCtx->getOperationContext())));
+    _resumePointAccountedFor = true;
+    _inputDisplacedByGap = std::move(displacedInput);
+    LOGV2_DEBUG(13732401,
+                3,
+                "Change stream resume gap built",
+                "resumeTimestamp"_attr = _tokenFromClient.clusterTime,
+                "earliestOplogTimestamp"_attr = floor);
+    uasserted(ErrorCodes::ChangeStreamHistoryLost,
+              str::stream() << "Resume point predates the earliest available oplog entry "
+                               "(resumeTimestamp: "
+                            << _tokenFromClient.clusterTime << ")");
+}
+
+GetNextResult ChangeStreamCheckResumabilityStage::_emitInputDisplacedByGap() {
+    auto input = std::move(*_inputDisplacedByGap);
+    _inputDisplacedByGap = boost::none;
+
+    // Only the event which surpassed the resume point is ever set aside, so it is an advanced
+    // result.
+    tassert(13732402,
+            "Expected the input displaced by a resume gap to be an event",
+            input.isAdvanced());
+
+    // The transform recorded the event's identity before the gap signal cleared it, so record it
+    // again for failures in the stages above.
+    const auto& doc = input.getDocument();
+    const auto& metadata = doc.metadata();
+    if (!metadata.hasSortKey() || !metadata.isSingleElementKey() ||
+        metadata.getSortKey().getType() != BSONType::object) {
+        // An event without a resume token sort key cannot be described by an error event.
+        pExpCtx->clearActiveChangeStreamEvent();
+    } else {
+        change_stream::recordActiveEventIdentity(pExpCtx, doc);
+    }
+    return input;
 }
 
 ChangeStreamResumeTokenTracker::ChangeStreamResumeTokenTracker(
@@ -93,8 +254,16 @@ ChangeStreamResumeTokenTracker::EventPosition ChangeStreamResumeTokenTracker::cl
 }
 
 GetNextResult ChangeStreamCheckResumabilityStage::doGetNext() {
+    // Deliver the input a gap displaced before pulling anything further. It bypasses the
+    // comparison below since the resume point is already surpassed.
+    if (MONGO_unlikely(_inputDisplacedByGap)) {
+        return _emitInputDisplacedByGap();
+    }
+
     if (_resumeStatus == ResumeStatus::kSurpassedToken) {
-        return pSource->getNext();
+        // Past the resume point the only failure translated is a mid-stream oplog rollover, and
+        // only for an opted-in stream. For any other stream this just returns the next result.
+        return _getNextRethrowingScanErrors();
     }
 
     // Constant for the life of the cursor: whether the scan may produce events that sort before the
@@ -102,33 +271,41 @@ GetNextResult ChangeStreamCheckResumabilityStage::doGetNext() {
     const bool scanStartsBeforeResumePoint = isBackfillingScan(pExpCtx);
 
     while (_resumeStatus != ResumeStatus::kSurpassedToken) {
-        // The underlying oplog scan will throw OplogQueryMinTsMissing if the minTs in the change
-        // stream filter has fallen off the oplog. Catch this and throw a more explanatory error.
-        auto nextInput = [this]() {
-            try {
-                return pSource->getNext();
-            } catch (const ExceptionFor<ErrorCodes::OplogQueryMinTsMissing>& ex) {
-                LOGV2_ERROR(6663107,
-                            "Resume of change stream was not possible",
-                            "resumeTimestamp"_attr = _tokenFromClient.clusterTime,
-                            "reason"_attr = ex.reason());
-                uasserted(
-                    ErrorCodes::ChangeStreamHistoryLost,
-                    str::stream()
-                        << "Resume of change stream was not possible, as the resume point may no "
-                           "longer be in the oplog (resumeTimestamp: "
-                        << _tokenFromClient.clusterTime << ")");
-            }
-        }();
+        auto nextInput = _getNextRethrowingScanErrors();
 
         // If we hit EOF or a control event, return it immediately. Control events are exempt from
         // resume suppression: the router must observe every control event, including one whose
         // token equals the resume token. A backfill rebuild starts a fresh cursor at an older scan
         // point and relies on re-observing the control events the old cursor had already seen (for
         // example, to rebuild its accounting state or to retarget shard cursors), so dropping one
-        // at the resume token would lose that state.
+        // at the resume token would lose that state. The exception is an EOF once the history was
+        // lost and the gap has not been reported yet, which builds the gap first. A tailable pause
+        // is not the end of the stream and never builds a gap.
         if (!nextInput.isAdvanced()) {
+            if (nextInput.isEOF() && _hasUnreportedResumeGap()) {
+                _signalResumeGap(boost::none);
+            }
             return nextInput;
+        }
+
+        // An error event built on this node or arriving from a shard may carry no sort key, which
+        // the comparison below requires. Forward it without changing the resume state. This is
+        // guarded by the opt-in rather than asserted: Ensure inherits this loop and sits above the
+        // user stages, so a stream which is not opted in can see a user-made 'operationType:
+        // "error"' document here, which must be positioned like any other event.
+        if (change_stream::changeStreamShowsErrorsAsEvents(pExpCtx) &&
+            isErrorEventResult(nextInput)) {
+            const auto& errorEvent = nextInput.getDocument();
+            if (!errorEvent.metadata().hasSortKey()) {
+                // Error events built by this server always carry a sort key, so this is defensive:
+                // forward the event rather than fail the stream, leaving the resume state alone.
+                return nextInput;
+            }
+            // A gap for the client's token accounts for the resume point. It is forwarded by the
+            // comparison below, once per shard since the status stays kFoundToken.
+            if (isResumeGapForClientToken(errorEvent)) {
+                _resumePointAccountedFor = true;
+            }
         }
 
         // Determine whether the current event sorts before, equal to or after the resume token.
@@ -139,17 +316,28 @@ GetNextResult ChangeStreamCheckResumabilityStage::doGetNext() {
                 // If the result was kCheckNextDoc, we are resumable but must swallow this event.
                 continue;
             case ResumeStatus::kNeedsSplit:
+                if (change_stream::changeStreamShowsErrorsAsEvents(pExpCtx) &&
+                    isErrorEventResult(nextInput)) {
+                    // An error event is never split, so the fragments the client's token names
+                    // cannot be regenerated from it.
+                    failClosedOnUnsplitErrorEvent(nextInput.getDocument());
+                }
                 // If the result was kNeedsSplit, we found a resume token which matches the client's
                 // except for the splitNum attribute. Allow this document to pass through so that
                 // the split stage can regenerate the original fragments and their resume tokens.
                 return nextInput;
             case ResumeStatus::kSurpassedToken:
-                // In this case the resume token wasn't found; it may be on another shard. However,
-                // since the oplog scan did not throw, we know that we are resumable. Fall through
-                // into the following case and return the document.
+                // In this case the resume token wasn't found; it may be on another shard. If the
+                // oplog scan recorded that the history was lost, report the gap before this event
+                // and set the event aside so it is delivered after the gap. Otherwise the scan did
+                // not throw, so we know that we are resumable: return the document.
+                if (_hasUnreportedResumeGap()) {
+                    _signalResumeGap(std::move(nextInput));
+                }
                 return nextInput;
             case ResumeStatus::kFoundToken:
                 // We found the actual token! Return the doc so DSEnsureResumeTokenPresent sees it.
+                _resumePointAccountedFor = true;
                 return nextInput;
         }
     }
