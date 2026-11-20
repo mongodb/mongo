@@ -1808,6 +1808,70 @@ TEST_F(SessionWorkflowTest, OversizedDecompressedMessage) {
     joinSessions();
 }
 
+class ResponseCompressionTest : public SessionWorkflowTest {
+public:
+    void setUp() override {
+        SessionWorkflowTest::setUp();
+        auto& registry = MessageCompressorRegistry::get();
+        const auto& compressorNames = registry.getCompressorNames();
+        if (std::ranges::find(compressorNames, "snappy") == compressorNames.end()) {
+            registry.setSupportedCompressors({"snappy"});
+            registry.registerImplementation(std::make_unique<SnappyMessageCompressor>());
+            uassertStatusOK(registry.finalizeSupportedCompressors());
+        }
+    }
+
+    static Message makeOpMsgWithPayload(size_t payloadSize) {
+        auto omb = OpMsgBuilder{};
+        omb.setBody(BSONObjBuilder{}.append("payload", std::string(payloadSize, 'x')).obj());
+        return omb.finish();
+    }
+
+    static Message snappyCompressed(Message msg) {
+        MessageCompressorManager compressorManager{};
+        const auto cid = static_cast<MessageCompressorId>(MessageCompressor::kSnappy);
+        return uassertStatusOK(compressorManager.compressMessage(msg, &cid));
+    }
+
+    /** Runs one request through a session and returns the opcode of the response it sinks. */
+    NetworkOp sinkResponse(Message request, Message response) {
+        startSession();
+        expect<Event::sessionSourceMessage>(std::move(request));
+        expect<Event::sepHandleRequest>(makeResponse(std::move(response)));
+        NetworkOp sunkOp{};
+        expect<Event::sessionSinkMessage>([&](const Message& m) {
+            sunkOp = m.operation();
+            return Status::OK();
+        });
+        expect<Event::sessionSourceMessage>(kClosedSessionError);
+        expect<Event::sepEndSession>();
+        joinSessions();
+        return sunkOp;
+    }
+};
+
+TEST_F(ResponseCompressionTest, SmallResponseToCompressedRequestIsNotCompressed) {
+    auto response = makeOpMsgWithPayload(100);
+    ASSERT_LT(response.size(), gNetworkMessageCompressionMinResponseSizeBytes.loadRelaxed());
+    ASSERT_EQ(sinkResponse(snappyCompressed(makeOpMsg()), std::move(response)), dbMsg);
+}
+
+TEST_F(ResponseCompressionTest, ResponseOfMinimumSizeToCompressedRequestIsCompressed) {
+    auto response = makeOpMsgWithPayload(4096);
+    unittest::ServerParameterGuard minSize{"networkMessageCompressionMinResponseSizeBytes",
+                                           response.size()};
+    ASSERT_EQ(sinkResponse(snappyCompressed(makeOpMsg()), std::move(response)), dbCompressed);
+}
+
+TEST_F(ResponseCompressionTest, ZeroMinimumSizeCompressesEveryResponse) {
+    unittest::ServerParameterGuard minSize{"networkMessageCompressionMinResponseSizeBytes", 0};
+    ASSERT_EQ(sinkResponse(snappyCompressed(makeOpMsg()), makeOpMsgWithPayload(10)), dbCompressed);
+}
+
+TEST_F(ResponseCompressionTest, LargeResponseToUncompressedRequestIsNotCompressed) {
+    ASSERT_EQ(sinkResponse(makeOpMsg(), makeOpMsgWithPayload(4096)), dbMsg);
+}
+
 /** Builds a minimal opReply (OP_QUERY response) message using LegacyReplyBuilder. */
 Message makeOpReplyMsg() {
     rpc::LegacyReplyBuilder builder;
