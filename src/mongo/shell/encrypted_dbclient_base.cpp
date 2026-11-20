@@ -175,7 +175,7 @@ BSONObj EncryptedDBClientBase::encryptDecryptCommand(const BSONObj& object,
                     ConstDataRange dataCursor(data, len);
                     decryptPayload(dataCursor, &builder, elem.fieldNameStringData());
                 } else if (*data == kIntentToEncryptBit && encrypt) {
-                    BSONObj obj = BSONObj(data + 1);
+                    BSONObj obj(std::span{data, static_cast<size_t>(len)}.subspan(1));
                     encryptMarking(obj, &builder, elem.fieldNameStringData());
                 } else {
                     builder.append(elem);

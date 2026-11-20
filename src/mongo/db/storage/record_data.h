@@ -43,11 +43,13 @@ public:
     }
 
     BSONObj toBson() const& {
-        return isOwned() ? BSONObj(_ownedData) : BSONObj(_data);
+        return isOwned() ? BSONObj(_ownedData)
+                         : BSONObj(std::span{_data, static_cast<size_t>(_size)});
     }
 
     BSONObj releaseToBson() {
-        return isOwned() ? BSONObj(releaseBuffer()) : BSONObj(_data);
+        return isOwned() ? BSONObj(releaseBuffer())
+                         : BSONObj(std::span{_data, static_cast<size_t>(_size)});
     }
 
     BSONObj toBson() && {

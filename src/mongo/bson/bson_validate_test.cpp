@@ -95,7 +95,7 @@ TEST(BSONValidate, RandomData) {
 
         x[size - 1] = 0;
 
-        BSONObj o(x);
+        BSONObj o(std::span{x, static_cast<size_t>(size)});
 
         ASSERT_EQUALS(size, o.objsize());
 
@@ -807,10 +807,21 @@ TEST(BSONValidateFast, BoolValuesAreValidated) {
 
 TEST(BSONValidateFast, InvalidType) {
     // Encode an invalid BSON Object with an invalid type, x90.
-    const char* buffer = "\x0c\x00\x00\x00\x90\x41\x00\x10\x00\x00\x00\x00";
+    const char buffer[] = {'\x0c',
+                           '\x00',
+                           '\x00',
+                           '\x00',
+                           '\x90',
+                           '\x41',
+                           '\x00',
+                           '\x10',
+                           '\x00',
+                           '\x00',
+                           '\x00',
+                           '\x00'};
 
     // Constructing the object is fine, but validating should fail.
-    BSONObj obj(buffer);
+    BSONObj obj(std::span{buffer, sizeof(buffer)});
 
     // Validate fails.
     ASSERT_NOT_OK(validateBSON(obj));

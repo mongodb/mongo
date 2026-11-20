@@ -443,8 +443,11 @@ Status HandoffSession::_handleSessionHandoff(const Message& msg, int clientFd) {
 
     SessionHandoffMessage handoffMsg;
     try {
-        handoffMsg = SessionHandoffMessage::parse(BSONObj(msg.singleData().data()),
-                                                  IDLParserContext("OP_HANDOFF"));
+        handoffMsg = SessionHandoffMessage::parse(
+            BSONObj(BSONObj::skipCheck,
+                    std::span{msg.singleData().data(),
+                              static_cast<size_t>(msg.singleData().dataLen())}),
+            IDLParserContext("OP_HANDOFF"));
     } catch (const DBException& e) {
         return e.toStatus();
     }

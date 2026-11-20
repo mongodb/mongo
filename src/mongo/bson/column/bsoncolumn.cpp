@@ -204,8 +204,11 @@ BSONColumn::Iterator::Iterator(boost::intrusive_ptr<BSONElementStorage> allocato
 }
 
 void BSONColumn::Iterator::_initializeInterleaving() {
+    uassert(ErrorCodes::InvalidBSONColumn,
+            "interleaved reference object starts past the end of the buffer",
+            _end - _control >= 1);
     Interleaved& interleaved = _mode.emplace<Interleaved>(
-        BSONObj(_control + 1),
+        BSONObj(std::span{_control, _end}.subspan(1)),
         *_control == bsoncolumn::kInterleavedStartArrayRootControlByte ? BSONType::array
                                                                        : BSONType::object,
         *_control == bsoncolumn::kInterleavedStartControlByte ||

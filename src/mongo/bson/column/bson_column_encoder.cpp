@@ -176,7 +176,7 @@ int main(int argc, char* argv[]) {
                     cerr << "Encountered incomplete BSON object" << endl;
                     return static_cast<int>(ExitCode::fail);
                 }
-                BSONObj readObj(buf.get());
+                BSONObj readObj(std::span{buf.get(), BSONObjMaxInternalSize});
                 columnBuilder.append(readObj);
                 encoded += len;
 

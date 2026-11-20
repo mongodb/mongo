@@ -44,7 +44,7 @@ boost::optional<Timestamp> SizeCountTimestampStore::read(OperationContext* opCtx
     if (!result) {
         return boost::none;
     }
-    BSONObj data(result->data());
+    BSONObj data(*result);
     return data.getField(kValidAsOfKey).timestamp();
 }
 
@@ -62,7 +62,7 @@ boost::optional<Timestamp> SizeCountTimestampStore::insert(OperationContext* opC
     const auto previousValue = cursor->find(kTimestampContainerKey);
     boost::optional<Timestamp> previousTimestamp = boost::none;
     if (previousValue.has_value()) {
-        previousTimestamp = BSONObj(previousValue->data()).getField(kValidAsOfKey).timestamp();
+        previousTimestamp = BSONObj(*previousValue).getField(kValidAsOfKey).timestamp();
         massertStatusOK(
             container_write::update(opCtx, ru, container, kTimestampContainerKey, valSpan));
     } else {

@@ -29,6 +29,7 @@
 #include <bitset>
 #include <memory>
 #include <set>
+#include <span>
 
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
@@ -475,7 +476,7 @@ BSONObj OpMsgBuilder::releaseBody() {
     invariant(!_openBuilder);
     _state = kDone;
 
-    auto bson = BSONObj(_buf.buf() + _bodyStart);
+    auto bson = BSONObj(std::span{_buf.buf(), static_cast<size_t>(_buf.len())}.subspan(_bodyStart));
     return bson.shareOwnershipWith(_buf.release());
 }
 

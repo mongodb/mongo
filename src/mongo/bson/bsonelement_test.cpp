@@ -164,7 +164,7 @@ TEST(BSONElement, ExtractLargeSubObject) {
     DataRange bufferRange(&buffer.front(), &buffer.back());
     ASSERT_OK(bufferRange.writeNoThrow(LittleEndian<int32_t>(size)));
 
-    BSONObj obj(buffer.data(), BSONObj::LargeSizeTrait{});
+    BSONObj obj(std::span{buffer.data(), buffer.size()});
 
     BSONObjBuilder bigObjectBuilder;
     bigObjectBuilder.append("a", obj);

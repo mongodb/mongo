@@ -108,7 +108,7 @@ void HashPropertyOnRawBytes(const std::string& data) {
     if (!validateBSON(data.data(), data.size()).isOK()) {
         return;
     }
-    assertHashEqualityMatchesWoCompare(BSONObj(data.data()));
+    assertHashEqualityMatchesWoCompare(BSONObj(BSONObj::skipCheck, data));
 }
 
 std::vector<std::string> seeds() {

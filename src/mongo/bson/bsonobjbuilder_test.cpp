@@ -172,7 +172,7 @@ TEST(BSONObjBuilderTest, ResumeBuilding) {
         BSONObjBuilder secondBuilder(BSONObjBuilder::ResumeBuildingTag(), b);
         secondBuilder.append("c", "d");
     }
-    auto obj = BSONObj(b.buf());
+    auto obj = BSONObj(std::span{b.buf(), static_cast<size_t>(b.len())});
     ASSERT_BSONOBJ_EQ(obj,
                       BSON("a" << "b"
                                << "c"
@@ -191,7 +191,7 @@ TEST(BSONObjBuilderTest, ResumeBuildingWithNesting) {
         BSONObjBuilder secondBuilder(BSONObjBuilder::ResumeBuildingTag(), b);
         secondBuilder.append("a", BSON("c" << 3));
     }
-    auto obj = BSONObj(b.buf());
+    auto obj = BSONObj(std::span{b.buf(), static_cast<size_t>(b.len())});
     ASSERT_BSONOBJ_EQ(obj, BSON("ll" << BSON("f" << BSON("cc" << "dd")) << "a" << BSON("c" << 3)));
 }
 
@@ -409,7 +409,8 @@ TEST(BSONObjBuilderTest, SeedingBSONObjBuilderWithRootedSharedOwnedBsonWorks) {
 TEST(BSONObjBuilderTest, SeedingBSONObjBuilderWithRootedUnownedBsonWorks) {
     const auto origObjHolder = BSON("a" << 1);
     auto origObjPtr = origObjHolder.objdata();
-    const auto origObj = BSONObj(origObjPtr);
+    const auto origObj =
+        BSONObj(std::span{origObjPtr, static_cast<size_t>(origObjHolder.objsize())});
     invariant(!origObj.isOwned());
 
     BSONObjBuilder bob(origObj);  // not moving.
@@ -475,7 +476,7 @@ TEST(BSONObjBuilderTest, SizeChecks) {
         // Implicitly assert that BSONObjBuilder does not throw
         // with standard size buffers.
         auto normalBuffer = generateBuffer(15 * 1024 * 1024);
-        BSONObj obj(normalBuffer.data());
+        BSONObj obj(std::span{normalBuffer.data(), normalBuffer.size()});
 
         BSONObjBuilder builder;
         builder.append("a", obj);
@@ -486,7 +487,7 @@ TEST(BSONObjBuilderTest, SizeChecks) {
     ASSERT_THROWS_CODE(
         [&] {
             auto largeBuffer = generateBuffer(126 * 1024 * 1024);
-            BSONObj obj(largeBuffer.data(), BSONObj::LargeSizeTrait{});
+            BSONObj obj(std::span{largeBuffer.data(), largeBuffer.size()});
 
             BSONObjBuilder builder;
             builder.append("a", obj);

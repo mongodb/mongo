@@ -74,7 +74,7 @@ StatusWith<RecordId> extractKeyOptime(const char* data, int len) {
         invariantStatusOK(validateBSON(data, len));
     }
 
-    const BSONObj obj(data);
+    const BSONObj obj(std::span{data, static_cast<size_t>(len)});
     const BSONElement elem = obj["ts"];
     if (elem.eoo())
         return {ErrorCodes::BadValue, "no ts field"};

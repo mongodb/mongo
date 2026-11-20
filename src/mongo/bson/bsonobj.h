@@ -171,6 +171,19 @@ public:
     }
 
     /**
+     * Construct a BSONObj from part of an allocated buffer.
+     *
+     * The span starts at the object and extends to one past the last byte of the allocated
+     * buffer the object may occupy.
+     */
+    explicit BSONObj(std::span<const char> buffer) : _objdata(buffer.data()) {
+        // TODO(SERVER-133681): Remove size traits and move the run time size check out.
+        // The span bound already proves the minimum length, so only the upper bound is left.
+        const auto size = _checkSpanGetSize(buffer, LargeSizeTrait::MaxSize);
+        _checkEoo(size);
+    }
+
+    /**
      * Construct a BSONObj from data in the proper format.
      *  Use this constructor when something else owns bsonData's buffer.
      */
@@ -196,14 +209,25 @@ public:
         }
     }
 
+    BSONObj(TrustedTag, std::span<const char> buffer) : _objdata(buffer.data()) {
+        if (!isValid<LargeSizeTrait>()) {
+            const auto size = objsize();
+            _throwInvalidSize(size, LargeSizeTrait::MaxSize);
+        }
+        if constexpr (kDebugBuild) {
+            const auto size = _checkSpanGetSize(buffer, LargeSizeTrait::MaxSize);
+            _checkEoo(size);
+        }
+    }
+
     template <typename Traits>
     BSONObj(TrustedTag, const char* bsonData, Traits) : _objdata(bsonData) {
         static_assert(Traits::MaxSize > 0 && Traits::MaxSize <= std::numeric_limits<int>::max(),
                       "BSONObj maximum size must be within possible limits");
+        const auto size = objsize();
+        if (!isValid<Traits>())
+            _throwInvalidSize(size, Traits::MaxSize);
         if constexpr (kDebugBuild) {
-            const auto size = objsize();
-            if (!isValid<Traits>())
-                _throwInvalidSize(size, Traits::MaxSize);
             _checkEoo(size);
         }
     }
@@ -1094,7 +1118,7 @@ struct DataType::Handler<BSONObj> {
                        size_t length,
                        size_t* advanced,
                        std::ptrdiff_t debug_offset) noexcept try {
-        auto temp = BSONObj(ptr);
+        auto temp = BSONObj(std::span{ptr, length});
         auto len = temp.objsize();
         if (bson) {
             *bson = std::move(temp);

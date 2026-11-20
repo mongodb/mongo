@@ -321,7 +321,7 @@ CheckpointContents parseCheckpoint(const repl::OplogEntry& entry) {
                 massert(13647900,
                         "Fast count metadata store container write is missing a value",
                         parsed.getValue().has_value());
-                const BSONObj valueBson = BSONObj(parsed.getValue()->data().data()).getOwned();
+                const BSONObj valueBson = BSONObj(parsed.getValue()->data()).getOwned();
                 const SizeCountStore::Entry storeEntry = SizeCountStore::parseContainerValue(
                     {valueBson.objdata(), static_cast<size_t>(valueBson.objsize())});
                 contents[uuidFromContainerInnerOp(innerOp)] = CollectionReplicatedMetadata{
@@ -333,7 +333,7 @@ CheckpointContents parseCheckpoint(const repl::OplogEntry& entry) {
             case repl::OpTypeEnum::kContainerUpdate: {
                 const auto parsed = repl::ContainerUpdateOplogEntryO::parse(
                     innerOp.getObject(), IDLParserContext("FastCountCheckpointInnerUpdate"));
-                const BSONObj valueBson = BSONObj(parsed.getValue().data().data()).getOwned();
+                const BSONObj valueBson = BSONObj(parsed.getValue().data()).getOwned();
                 const SizeCountStore::Entry storeEntry = SizeCountStore::parseContainerValue(
                     {valueBson.objdata(), static_cast<size_t>(valueBson.objsize())});
                 contents[uuidFromContainerInnerOp(innerOp)] = CollectionReplicatedMetadata{

@@ -765,33 +765,51 @@ TEST(BSONObj, sizeChecks) {
         // Implicitly assert that BSONObj constructor does not throw
         // with standard size buffers.
         auto normalBuffer = generateBuffer(15 * 1024 * 1024);
-        BSONObj obj(normalBuffer.data());
+        BSONObj obj(std::span{normalBuffer.data(), normalBuffer.size()});
     }
 
     // Large buffers cause an exception to be thrown.
     ASSERT_THROWS_CODE(
         [&] {
             auto largeBuffer = generateBuffer(126 * 1024 * 1024);
-            BSONObj obj(largeBuffer.data());
+            BSONObj obj(std::span{largeBuffer.data(), largeBuffer.size()});
         }(),
         DBException,
         ErrorCodes::BSONObjectTooLarge);
 
 
-    // Assert that the max size can be increased by passing BSONObj a tag type.
+    // Buffers above the default max size are accepted because the span constructor always uses
+    // the large buffer limit.
     {
         auto largeBuffer = generateBuffer(17 * 1024 * 1024);
-        BSONObj obj(largeBuffer.data(), BSONObj::LargeSizeTrait{});
+        BSONObj obj(std::span{largeBuffer.data(), largeBuffer.size()});
     }
 
     // But a size is in fact being enforced.
     ASSERT_THROWS_CODE(
         [&]() {
             auto hugeBuffer = generateBuffer(130 * 1024 * 1024);
-            BSONObj obj(hugeBuffer.data(), BSONObj::LargeSizeTrait{});
+            BSONObj obj(std::span{hugeBuffer.data(), hugeBuffer.size()});
         }(),
         DBException,
         ErrorCodes::BSONObjectTooLarge);
+
+    // Traits are ignored: buffers larger than DefaultSizeTrait::MaxSize are accepted by both the
+    // pointer constructor and the span constructor.
+    {
+        auto midBuffer = generateBuffer(17 * 1024 * 1024);
+        BSONObj fromPtr(midBuffer.data(), BSONObj::DefaultSizeTrait{});
+        BSONObj fromSpan(std::span{midBuffer.data(), midBuffer.size()});
+    }
+}
+
+TEST(BSONObj, SpanMustContainObject) {
+    const auto owned = BSON("a" << 1);
+    const auto full = std::span{owned.objdata(), static_cast<size_t>(owned.objsize())};
+    ASSERT_BSONOBJ_EQ(BSONObj(full), owned);
+
+    ASSERT_TASSERT_CODE(BSONObj(full.first(full.size() - 1)), ErrorCodes::BSONInternalError);
+    ASSERT_TASSERT_CODE(BSONObj(std::span<const char>{}), ErrorCodes::BSONInternalError);
 }
 
 TEST(BSONObj, OwnedBufferMustContainObject) {

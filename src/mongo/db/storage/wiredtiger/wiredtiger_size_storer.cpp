@@ -87,7 +87,7 @@ std::shared_ptr<WiredTigerSizeStorer::SizeInfo> WiredTigerSizeStorer::load(
 
     WT_ITEM value;
     invariantWTOK(cursor->get_value(cursor, &value), cursor->session);
-    BSONObj data(reinterpret_cast<const char*>(value.data));
+    BSONObj data(std::span{reinterpret_cast<const char*>(value.data), value.size});
 
     LOGV2_DEBUG(
         22424, 2, "WiredTigerSizeStorer::load", "uri"_attr = uri, "data"_attr = redact(data));

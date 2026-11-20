@@ -211,7 +211,7 @@ std::pair<BSONObj::iterator, bool> _traverseLockStep(const BSONObj& reference,
 
 template <class Allocator>
 BSONObj asUnownedBson(const allocator_aware::SharedBuffer<Allocator>& buffer) {
-    return buffer ? BSONObj{buffer.get()} : BSONObj{};
+    return buffer ? BSONObj{std::span{buffer.get(), buffer.capacity()}} : BSONObj{};
 }
 
 // Traverses and validates BSONObj's in reference and obj in lock-step. Returns true if the object

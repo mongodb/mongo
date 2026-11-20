@@ -243,7 +243,10 @@ const char* BlockBasedInterleavedDecompressor::decompress(
 
     // The reference object will appear right after the control byte that starts interleaved
     // mode.
-    BSONObj refObj{_buffer.data() + 1};
+    uassert(ErrorCodes::InvalidBSONColumn,
+            "interleaved reference object starts past the end of the buffer",
+            _buffer.size() >= 1);
+    BSONObj refObj{_buffer.subspan(1)};
 
     // find all the scalar elements in the reference object.
     absl::flat_hash_set<const void*> scalarElems;
@@ -327,7 +330,10 @@ const char* BlockBasedInterleavedDecompressor::decompressGeneral(
 
     // The reference object will appear right after the control byte that starts interleaved
     // mode.
-    BSONObj refObj{control + 1};
+    uassert(ErrorCodes::InvalidBSONColumn,
+            "interleaved reference object starts past the end of the buffer",
+            end - control >= 1);
+    BSONObj refObj{std::span{control, end}.subspan(1)};
 
     // A vector that maps the ordinal position of the pre-order traversal of the reference
     // object to the buffers where that element should be materialized. The length of the vector
@@ -1024,7 +1030,10 @@ const char* BlockBasedInterleavedDecompressor::decompressFast(
 
     // The reference object will appear right after the control byte that starts interleaved
     // mode.
-    BSONObj refObj{control + 1};
+    uassert(ErrorCodes::InvalidBSONColumn,
+            "Reading past end of buffer while advancing past reference object in decompressFast",
+            _buffer.size() >= 1);
+    BSONObj refObj{_buffer.subspan(1)};
     uassert(ErrorCodes::InvalidBSONColumn,
             "Reading past end of buffer while advancing past reference object in decompressFast",
             end - control > refObj.objsize() + 1);

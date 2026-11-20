@@ -70,7 +70,7 @@ BSONObj DbMessage::nextJsObj() {
             str::stream() << "Client Error: bad object in message: " << status.reason(),
             status.isOK());
 
-    BSONObj js(_nextjsobj);
+    BSONObj js(BSONObj::skipCheck, std::span{_nextjsobj, _theEnd});
     MONGO_verify(js.objsize() >= 5);
     MONGO_verify(js.objsize() <= (_theEnd - _nextjsobj));
 

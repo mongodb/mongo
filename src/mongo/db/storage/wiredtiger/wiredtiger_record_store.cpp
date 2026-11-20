@@ -358,7 +358,8 @@ Status WiredTigerRecordStore::wtInsertRecord(OperationContext* opCtx,
         if (TestingProctor::instance().isEnabled()) {
             WT_ITEM foundValue;
             invariantWTOK(c->get_value(c, &foundValue), c->session);
-            foundValueObj = BSONObj(reinterpret_cast<const char*>(foundValue.data));
+            foundValueObj =
+                BSONObj(std::span{reinterpret_cast<const char*>(foundValue.data), foundValue.size});
         }
 
         return Status{

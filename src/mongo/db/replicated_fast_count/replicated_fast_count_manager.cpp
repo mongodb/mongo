@@ -183,7 +183,7 @@ int ReplicatedFastCountManager::_hydrateMetadataFromContainer(
     while (auto record = cursor->next()) {
         const auto& [keySpan, valueSpan] = *record;
         const auto uuid = UUID::fromCDR(ConstDataRange(keySpan.data(), keySpan.size()));
-        const BSONObj data(valueSpan.data());
+        const BSONObj data(valueSpan);
 
         BSONObj metadataField = data.getField(replicated_fast_count::kMetadataKey).Obj();
         accumulator[uuid].size += metadataField.getField(kSizeKey).Long();

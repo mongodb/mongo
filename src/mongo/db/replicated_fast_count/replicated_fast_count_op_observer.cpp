@@ -97,7 +97,7 @@ void recordContainerWriteForFastCountTimestamp(OperationContext* opCtx,
         // container.
         return;
     }
-    BSONObj doc(valueBytes.data());
+    BSONObj doc(valueBytes);
     const auto ts = doc.getField(replicated_fast_count::kValidAsOfKey).timestamp();
     if (ts.isNull()) {
         return;

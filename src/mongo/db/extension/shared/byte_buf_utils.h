@@ -35,7 +35,7 @@ inline BSONObj bsonObjFromByteView(const MongoExtensionByteView& view) {
     tassert(ErrorCodes::ExtensionSerializationError,
             "Extension returned invalid bson obj",
             isValidObj(view));
-    return BSONObj(reinterpret_cast<const char*>(view.data));
+    return BSONObj(std::span{reinterpret_cast<const char*>(view.data), view.len});
 }
 
 inline MongoExtensionByteView objAsByteView(const BSONObj& obj) {

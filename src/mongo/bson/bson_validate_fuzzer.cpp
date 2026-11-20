@@ -27,7 +27,9 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
                     "oldRet"_attr = oldRet);
         // We trust the old implementation's OK, so dump the object to hopefully give a hint.
         if (oldRet.isOK())
-            LOGV2(4496701, "Object used to be valid", "obj"_attr = BSONObj(Data));
+            LOGV2(4496701,
+                  "Object used to be valid",
+                  "obj"_attr = BSONObj(std::span{reinterpret_cast<const char*>(Data), Size}));
     }
 
     // This will effectively cause the fuzer to find differences between both implementations

@@ -43,7 +43,7 @@ Timestamp validAsOfFromTimestampStoreObject(const BSONObj& object) {
     uassert(
         13064102, "Container object must have a value field", containerO.getValue().has_value());
     const auto valueBytes = containerO.getValue()->data();
-    const BSONObj value(valueBytes.data());
+    const BSONObj value(valueBytes);
 
     const auto validAsOfElem = value[kValidAsOfKey];
     tassert(12984805,

@@ -35,7 +35,7 @@ bool BucketMetadata::operator==(const BucketMetadata& other) const {
 }
 
 BSONObj BucketMetadata::toBSON() const {
-    return _metadata ? BSONObj{_metadata.get()} : BSONObj{};
+    return _metadata ? BSONObj{std::span{_metadata.get(), _metadata.capacity()}} : BSONObj{};
 }
 
 BSONElement BucketMetadata::element() const {

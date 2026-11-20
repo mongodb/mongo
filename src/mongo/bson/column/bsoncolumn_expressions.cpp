@@ -59,7 +59,9 @@ const char* walkControlBytes(const char* pos, const char* end, Visitor&& visitor
             if constexpr (interleaved) {
                 uasserted(ErrorCodes::InvalidBSONColumn, "Invalid BSONColumn encoding");
             } else {
-                BSONObj refObj(pos + 1);
+                uassert(
+                    ErrorCodes::InvalidBSONColumn, "Invalid BSONColumn encoding", end - pos >= 1);
+                BSONObj refObj(std::span{pos, end}.subspan(1));
                 const char* innerStart = pos + 1 + refObj.objsize();
                 uint32_t numStreams = numInterleavedStreams(refObj, control);
                 visitor.onInterleavedStart(control, refObj, numStreams);

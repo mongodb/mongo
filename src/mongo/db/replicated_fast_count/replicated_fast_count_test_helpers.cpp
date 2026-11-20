@@ -81,7 +81,7 @@ bool findPersistedDocInContainer(OperationContext* opCtx, const UUID& uuid, BSON
         return false;
     }
     // Copy the BSON out of the cursor-owned span so 'outDoc' outlives the cursor.
-    outDoc = BSONObj(result->data()).getOwned();
+    outDoc = BSONObj(*result).getOwned();
     return true;
 }
 
@@ -470,7 +470,7 @@ ObservedApplyOp parseContainerInnerOp(const repl::OplogEntry& innerEntry) {
         return out;
     }
 
-    const BSONObj entryBson = BSONObj(val.data().data()).getOwned();
+    const BSONObj entryBson = BSONObj(val.data()).getOwned();
     readMetaFieldsInto(entryBson, out);
     return out;
 }

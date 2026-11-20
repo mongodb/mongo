@@ -62,7 +62,7 @@ SizeCountStore::Entry parseEntry(const BSONObj& data) {
 }  // namespace
 
 SizeCountStore::Entry SizeCountStore::parseContainerValue(std::span<const char> value) {
-    return parseEntry(BSONObj(value.data()));
+    return parseEntry(BSONObj(value));
 }
 
 std::span<const char> SizeCountStore::uuidToContainerKey(const UUID& uuid) {

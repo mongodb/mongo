@@ -227,7 +227,7 @@ public:
      * Callers responsibility to call getOwned() if needed as this is a view on underlying data
      */
     BSONObj toBSON() {
-        return BSONObj(reinterpret_cast<const char*>(data()));
+        return BSONObj(std::span{reinterpret_cast<const char*>(data()), length()});
     }
 
     operator mongocrypt_binary_t*() {
