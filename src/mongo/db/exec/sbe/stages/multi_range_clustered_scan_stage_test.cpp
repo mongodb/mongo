@@ -10,6 +10,7 @@
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/stages/clustered_scan_stage_test_fixtures.h"
+#include "mongo/db/exec/sbe/stages/exchange_gather.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -22,6 +23,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/unittest/unittest.h"
 
+#include <algorithm>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -176,6 +178,84 @@ TEST_F(MultiRangeClusteredScanStageTest, ReOpenWithStartBoundForward) {
     p.stage->open(/*reOpen=*/true);
     auto second = drain(p.stage.get(), p.recordIdAccessor);
     ASSERT_EQ(second, expected);
+}
+
+// Runs the stage under an ExchangeGather and checks that every record in the ranges is returned
+// exactly once, whatever chunk of the collection it lands in.
+class MultiRangeClusteredScanStageParallelTest : public MultiRangeClusteredScanStageTest {
+public:
+    void runParallel(bool forward) {
+        // Enough documents for the random cursor to sample the boundaries of many more chunks
+        // than there are threads.
+        constexpr int kNumDocs = 500;
+        std::vector<BSONObj> docs;
+        for (int i = 0; i < kNumDocs; ++i) {
+            docs.push_back(BSON("_id" << i));
+        }
+        auto colls = createClusteredCollection(docs);
+
+        // Ranges that are small compared to the chunks, and one that spans many of them.
+        auto rangeList = RecordIdRangeList::makeUnion({
+            makeIntRange(boost::none, true, 10, true),
+            makeIntRange(100, true, 103, false),
+            makeIntRange(250, false, 400, true),
+            makeIntRange(450, true, 452, true),
+            makeIntRange(499, true, boost::none, true),
+        });
+        std::vector<RecordId> expected;
+        for (int i = 0; i < kNumDocs; ++i) {
+            if (i <= 10 || (i >= 100 && i < 103) || (i > 250 && i <= 400) ||
+                (i >= 450 && i <= 452) || i >= 499) {
+                expected.push_back(record_id_helpers::keyForElem(BSON("_id" << i).firstElement()));
+            }
+        }
+
+        const value::SlotId recordIdSlot = generateSlotId();
+        auto scan =
+            std::make_unique<MultiRangeClusteredScanStage>(colls.getMainCollection()->uuid(),
+                                                           _nss.dbName(),
+                                                           /*recordSlot=*/boost::none,
+                                                           recordIdSlot,
+                                                           /*snapshotIdSlot=*/boost::none,
+                                                           /*indexIdentSlot=*/boost::none,
+                                                           /*indexKeySlot=*/boost::none,
+                                                           /*indexKeyPatternSlot=*/boost::none,
+                                                           std::vector<std::string>{},
+                                                           value::SlotVector{},
+                                                           std::move(rangeList),
+                                                           forward,
+                                                           /*yieldPolicy=*/nullptr,
+                                                           kEmptyPlanNodeId,
+                                                           /*scanOpenCallback=*/nullptr,
+                                                           /*participateInTrialRunTracking=*/false);
+        auto root = makeS<ExchangeGather>(std::move(scan),
+                                          value::SlotVector{recordIdSlot},
+                                          /*dop=*/4,
+                                          getYieldPolicy(),
+                                          kEmptyPlanNodeId,
+                                          /*participateInTrialRunTracking=*/false);
+
+        auto ctx = makeCompileCtx();
+        attachCollectionAcquisition(colls);
+        auto* accessor = prepareTree(ctx.get(), root.get(), recordIdSlot);
+
+        // Drain the plan directly rather than through getAllResults(), which yields between
+        // calls: ExchangeGather does not support yielding over a collection scan yet.
+        auto results = drain(root.get(), accessor);
+        root->close();
+
+        // Records come back in no particular order.
+        std::sort(results.begin(), results.end());
+        ASSERT_EQ(results, expected);
+    }
+};
+
+TEST_F(MultiRangeClusteredScanStageParallelTest, ParallelForward) {
+    runParallel(/*forward=*/true);
+}
+
+TEST_F(MultiRangeClusteredScanStageParallelTest, ParallelBackward) {
+    runParallel(/*forward=*/false);
 }
 
 }  // namespace mongo::sbe

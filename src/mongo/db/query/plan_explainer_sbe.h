@@ -218,6 +218,18 @@ private:
     const std::unique_ptr<PlanExplainer> _classicRuntimePlannerExplainer;
 };
 
+/**
+ * Renders 'stats' into 'bob' in the same shape explain uses for the "executionStages" field of its
+ * "executionStats" section. 'topLevelBob' is the builder for the whole explain output, and is only
+ * read, to stop recursing once the output has grown past the explain size limit; pass 'bob' itself
+ * if there is no enclosing object.
+ *
+ * Exposed for testing and benchmarking purposes.
+ */
+void statsToBSON(const sbe::PlanStageStats* stats,
+                 BSONObjBuilder* bob,
+                 const BSONObjBuilder* topLevelBob);
+
 // Exposed only for testing purposes.
 void statsToBSON(const QuerySolutionNode* node,
                  BSONObjBuilder* bob,

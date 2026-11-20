@@ -576,24 +576,6 @@ mongo_cc_benchmark(
 )
 
 mongo_cc_benchmark(
-    name = "sbe_scan_test",
-    srcs = [
-        "//src/mongo/db/exec/sbe:sbe_scan_test.cpp",
-    ],
-    deps = [
-        ":query_sbe_stages",
-        ":sbe_plan_stage_test",
-        ":sbe_unittest_base",
-        "//src/mongo/db:query_exec",
-        "//src/mongo/db/exec:expression_bm_fixture",
-        "//src/mongo/db/pipeline:expression_context_for_test",
-        "//src/mongo/unittest",
-        "//src/mongo/unittest:server_parameter_guard",
-        "//src/mongo/util:pcre_wrapper",
-    ],
-)
-
-mongo_cc_benchmark(
     name = "sbe_ix_scan_bm",
     srcs = [
         "//src/mongo/db/exec/sbe:sbe_ix_scan_bm.cpp",

@@ -254,7 +254,7 @@ public:
     template <typename Source>
     std::pair<value::TypeTags, value::Value> getAllResults(PlanStage* stage, Source* source);
 
-    void exhaustStage(PlanStage* stage, value::SlotAccessor* accessor);
+    size_t exhaustStage(PlanStage* stage, value::SlotAccessor* accessor);
 
     /**
      * This method is similar to getAllResults(), except that it supports multiple SlotAccessors.
@@ -303,7 +303,9 @@ public:
         value::Value inputVal,
         const MakeStageWithEnvFn<value::SlotId>& makeStage);
 
-    void runFast(value::TypeTags inputTag, value::Value inputVal, auto makeStage) {
+    std::pair<size_t, std::unique_ptr<PlanStage>> runFast(value::TypeTags inputTag,
+                                                          value::Value inputVal,
+                                                          auto makeStage) {
         auto cctx = makeCompileCtx();
         auto ctx = cctx.get();
         auto [scanSlot, scanStage] = generateVirtualScan(
@@ -311,7 +313,8 @@ public:
         auto [outputSlot, stage] = makeStage(
             scanSlot, std::move(scanStage), [&]() { return _slotIdGenerator->generate(); });
         auto resultAccessor = prepareTree(ctx, stage.get(), outputSlot);
-        exhaustStage(stage.get(), resultAccessor);
+        size_t count = exhaustStage(stage.get(), resultAccessor);
+        return std::make_pair(count, std::move(stage));
     }
 
     /**

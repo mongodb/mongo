@@ -153,9 +153,12 @@ template std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllRe
 template std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResults(
     PlanStage* stage, ResultMaterializer* source);
 
-void PlanStageTestFixture::exhaustStage(PlanStage* stage, value::SlotAccessor* accessor) {
+size_t PlanStageTestFixture::exhaustStage(PlanStage* stage, value::SlotAccessor* accessor) {
+    size_t count = 0;
     for (auto st = stage->getNext(); st == PlanState::ADVANCED; st = stage->getNext()) {
+        count++;
     }
+    return count;
 }
 
 std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResultsMulti(

@@ -42,8 +42,12 @@ public:
     GenericScanStage(std::shared_ptr<ScanStageBaseState> state,
                      PlanYieldPolicySBE* yieldPolicy,
                      PlanNodeId nodeId,
-                     bool participateInTrialRunTracking);
+                     bool participateInTrialRunTracking,
+                     std::shared_ptr<ParallelScanChunks> parallelChunks = nullptr,
+                     size_t parallelId = 0);
 
+    std::vector<std::unique_ptr<PlanStage>> cloneForParallelExecution(CompileCtx& ctx,
+                                                                      size_t dop) const final;
     std::unique_ptr<PlanStage> clone() const final;
     void inline prepare(CompileCtx& ctx) final {
         prepareShared(ctx);
@@ -59,6 +63,10 @@ public:
 private:
     inline void scanResetState(bool reOpen) {
         _cursor = _coll->getCollectionPtr()->getCursor(_opCtx, _state->forward);
+        if (_parallelChunks) {
+            _parallelChunks->reset(_parallelId);
+            _needNextChunk = true;
+        }
     }
     inline RecordCursor* getActiveCursor() const {
         return _cursor.get();
@@ -68,10 +76,25 @@ private:
         return false;
     }
     boost::optional<Record> getNextInternal() {
-        return _cursor->next();
+        if (MONGO_likely(!_parallelChunks)) {
+            return _cursor->next();
+        }
+        return getNextInternalParallel();
     }
+    boost::optional<Record> getNextInternalParallel();
 
     std::unique_ptr<SeekableRecordCursor> _cursor;
+
+    // The chunks left to scan, shared with the sibling clones of a parallel scan. Null when this
+    // stage is not part of one.
+    std::shared_ptr<ParallelScanChunks> _parallelChunks;
+    // Identifies this clone among its siblings; selects the span of chunks it consumes first.
+    size_t _parallelId = 0;
+
+    // Only for a parallel scan: whether the next getNext() call must claim a new chunk and seek to
+    // its lower bound, and the exclusive upper bound of the chunk currently being scanned.
+    bool _needNextChunk = false;
+    RecordId _excludedHigherBound;
 };  // class GenericScanStage
 }  // namespace sbe
 }  // namespace mongo

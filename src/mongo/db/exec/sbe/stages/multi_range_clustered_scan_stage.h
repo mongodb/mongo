@@ -52,8 +52,12 @@ public:
                                  PlanYieldPolicySBE* yieldPolicy,
                                  PlanNodeId nodeId,
                                  RecordIdRangeList rangeList,
-                                 bool participateInTrialRunTracking);
+                                 bool participateInTrialRunTracking,
+                                 std::shared_ptr<ParallelScanChunks> parallelChunks = nullptr,
+                                 size_t parallelId = 0);
 
+    std::vector<std::unique_ptr<PlanStage>> cloneForParallelExecution(CompileCtx& ctx,
+                                                                      size_t dop) const final;
     std::unique_ptr<PlanStage> clone() const final;
     void prepare(CompileCtx& ctx) final;
     void close() final;
@@ -71,6 +75,8 @@ private:
         return _havePassedScanEndRecordId;
     }
     boost::optional<Record> getNextInternal();
+    boost::optional<Record> getNextInternalParallel();
+    boost::optional<Record> seekToRange(size_t rangeId);
 
     std::unique_ptr<SeekableRecordCursor> _cursor;
 
@@ -83,6 +89,15 @@ private:
     size_t _currentRangeIdx = -1ULL;
 
     RecordIdRangeList _rangeList;
+
+    // The chunks left to scan, shared with the sibling clones of a parallel scan. Null when this
+    // stage is not part of one. Each chunk is intersected with '_rangeList' while scanning it.
+    std::shared_ptr<ParallelScanChunks> _parallelChunks;
+    // Identifies this clone among its siblings; selects the span of chunks it consumes first.
+    size_t _parallelId = 0;
+
+    // Only for a parallel scan: the exclusive upper bound of the chunk currently being scanned.
+    RecordId _excludedHigherBound;
 };  // class MultiRangeClusteredScanStage
 
 }  // namespace sbe

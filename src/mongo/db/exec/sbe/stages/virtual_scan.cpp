@@ -72,7 +72,7 @@ std::vector<std::unique_ptr<PlanStage>> VirtualScanStage::cloneForParallelExecut
             _commonStats.nodeId,
             _outField,
             std::move(chunk),
-            nullptr,  // TODO: SERVER-134367 make PlanYieldPolicy thread safe
+            nullptr,  // TODO: SERVER-137779 make PlanYieldPolicy thread safe
             participateInTrialRunTracking()));
     }
 

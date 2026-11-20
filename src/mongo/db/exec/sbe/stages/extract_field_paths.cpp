@@ -26,6 +26,23 @@ ExtractFieldPathsStage::ExtractFieldPathsStage(std::unique_ptr<PlanStage> input,
     _children.emplace_back(std::move(input));
 }
 
+std::vector<std::unique_ptr<PlanStage>> ExtractFieldPathsStage::cloneForParallelExecution(
+    CompileCtx& ctx, size_t dop) const {
+    std::vector<std::unique_ptr<PlanStage>> clones =
+        _children[0]->cloneForParallelExecution(ctx, dop);
+    if (clones.size() == 0) {
+        return clones;
+    }
+    for (size_t i = 0; i < clones.size(); i++) {
+        clones[i] = std::make_unique<ExtractFieldPathsStage>(std::move(clones[i]),
+                                                             _inputs,
+                                                             _outputs,
+                                                             _commonStats.nodeId,
+                                                             participateInTrialRunTracking());
+    }
+    return clones;
+}
+
 std::unique_ptr<PlanStage> ExtractFieldPathsStage::clone() const {
     return std::make_unique<ExtractFieldPathsStage>(_children[0]->clone(),
                                                     _inputs,

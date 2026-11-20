@@ -78,21 +78,33 @@ std::unique_ptr<PlanStage> ExchangeGather::clone() const {
 }
 
 void ExchangeGather::prepare(CompileCtx& ctx) {
+    // Prepare the branch used in single-threaded mode, even if we are not going to use it because
+    // we can use the parallel threads; saveState()/restoreState() will automatically propagate the
+    // attach/detach operations to every children during yielding, and they would fail if
+    // preparation hasn't been done.
+    _children[0]->prepare(ctx);
+
+    if (!ctx.correlated.empty()) {
+        // If we are part of a plan branch that needs to access correlated slots produced by another
+        // branch that is running in serial mode, we don't have a safe way of accessing those slot,
+        // so fallback to single-threaded plan.
+        return;
+    }
     // Lease _dop threads from a global pool. The number of returned thread handle can be lower than
     // the requested _dop according to the number of available worker threads (global counter set
     // via server parameter setting the max number of worker threads) and the availability of WT
     // tickets.
     std::vector<ExchangeWorkerPool::Handle> workers =
         ExchangeWorkerPool::get(cc().getService()->getServiceContext()).acquire(_opCtx, _dop);
-
-    std::vector<std::unique_ptr<PlanStage>> clones;
-    if (workers.size() > 1) {
-        clones = _children[0]->cloneForParallelExecution(ctx, workers.size());
+    if (workers.size() < 2) {
+        // Not enough worker threads available at this time, so fallback to single threaded mode.
+        return;
     }
 
+    std::vector<std::unique_ptr<PlanStage>> clones =
+        _children[0]->cloneForParallelExecution(ctx, workers.size());
     if (clones.size() < 2) {
         // Some stages don't support parallel execution, so fallback to single threaded mode.
-        _children[0]->prepare(ctx);
         return;
     }
     // Prepare N copies of the child stage subtree.
@@ -101,16 +113,16 @@ void ExchangeGather::prepare(CompileCtx& ctx) {
         workers.pop_back();
         _producers.push_back(std::make_unique<Producer>(
             std::move(worker), std::move(t), ctx.makeCopyForParallelUse()));
-        // TODO: SERVER-134366 Ensure that compileCtx.mca is initialized properly so that
-        // ScanStages can reach the collection
     }
 
     for (auto& producer : _producers) {
         // Forward the setting regarding collection of timing info.
         producer->plan->markShouldCollectTimingInfo(_commonStats.executionTime.precision);
-        // TODO: SERVER-139245 move it be done on the separate thread with the dedicated
-        // MultipleCollectionAcquisition created by SERVER-134366; if prepare() ends up acquiring
-        // resources we must be ready to yield to avoid deadlocks here too.
+        // TODO: SERVER-137780 Ensure that compileCtx.mca is initialized properly so that
+        // ScanStages can reach the collection
+        producer->compileCtx.mca = ctx.mca;
+        // TODO: SERVER-139245 move it be done on the separate thread; if prepare() ends up
+        // acquiring resources we must be ready to yield to avoid deadlocks here too.
         producer->plan->prepare(producer->compileCtx);
         // Resolve, for each exposed slot, the accessor the corresponding slot of each
         // producer's plan. This must happen after preparing each producer above, since a

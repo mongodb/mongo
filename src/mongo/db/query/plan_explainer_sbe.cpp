@@ -158,12 +158,6 @@ void statsToBSONHelper(const sbe::PlanStageStats* stats,
     childrenBob.doneFast();
 }
 
-void statsToBSON(const sbe::PlanStageStats* stats,
-                 BSONObjBuilder* bob,
-                 const BSONObjBuilder* topLevelBob) {
-    statsToBSONHelper(stats, bob, topLevelBob, 0);
-}
-
 /**
  * Whether 'solution' still carries the pushed-down pipeline that extended it upward after its
  * find part was ranked. When it does, the tree that executes is not the tree that was ranked.
@@ -684,6 +678,11 @@ void qsnToBson(const QuerySolutionNode* node,
 }
 }  // namespace
 
+void statsToBSON(const sbe::PlanStageStats* stats,
+                 BSONObjBuilder* bob,
+                 const BSONObjBuilder* topLevelBob) {
+    statsToBSONHelper(stats, bob, topLevelBob, 0);
+}
 void statsToBSON(const QuerySolutionNode* node,
                  BSONObjBuilder* bob,
                  const BSONObjBuilder* topLevelBob,

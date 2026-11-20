@@ -17,16 +17,23 @@
 #include "mongo/db/exec/sbe/stages/multi_range_clustered_scan_stage.h"
 #include "mongo/db/exec/sbe/stages/random_scan.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/str.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
+#include <span>
+#include <tuple>
+#include <utility>
 
 #include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 namespace sbe {
@@ -35,6 +42,59 @@ namespace sbe {
 MONGO_FAIL_POINT_DEFINE(hangScanGetNext);
 
 using namespace std::literals::string_view_literals;
+
+std::shared_ptr<ParallelScanChunks> ParallelScanChunks::make(
+    CompileCtx& ctx, OperationContext* opCtx, const UUID& collUuid, bool forward, size_t dop) {
+    auto coll = ctx.mca->getCollectionAcquisitionFromUuid(collUuid);
+    if (!coll) {
+        // Collection not found.
+        return nullptr;
+    }
+    auto store = coll->getCollectionPtr()->getRecordStore();
+    auto cursor = store->getRandomCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+    if (!cursor) {
+        return nullptr;
+    }
+
+    // Sample many more boundaries than there are threads: the resulting chunks are then small
+    // enough that a chunk which happens to hold far more records than the others cannot dominate
+    // the runtime of the whole scan, since the threads that finish early pick up the remaining
+    // chunks. A random cursor gives no guarantee about how evenly it spreads its samples, so
+    // oversampling is what keeps the work balanced.
+    size_t maxSamples = std::min(std::max(store->numRecords() / 100LL, 24LL), 1024LL);
+
+    std::vector<RecordId> boundaries;
+    boundaries.reserve(maxSamples + 2);
+    for (size_t i = 0; i < maxSamples; i++) {
+        auto boundary = cursor->next();
+        if (!boundary) {
+            break;
+        }
+        boundaries.push_back(boundary->id);
+    }
+    // The sentinels must have the same format as the sampled ids, as ids of different formats
+    // cannot be compared. Clustered collections use binary string ids.
+    const auto keyFormat = store->keyFormat();
+    constexpr char kMinStr[] = {'\0'};
+    boundaries.push_back(keyFormat == KeyFormat::Long ? RecordId::minLong()
+                                                      : RecordId(std::span<const char>(kMinStr)));
+    boundaries.push_back(record_id_helpers::maxRecordId(keyFormat));
+
+    std::sort(boundaries.begin(),
+              boundaries.end(),
+              [forward](const RecordId& left, const RecordId& right) {
+                  return forward ? left < right : right < left;
+              });
+    // A random cursor may well return the same record twice; a duplicate boundary would only
+    // produce an empty chunk.
+    boundaries.erase(std::unique(boundaries.begin(), boundaries.end()), boundaries.end());
+    if (boundaries.size() <= dop) {
+        // Not enough boundaries to make 'dop' chunks, refuse parallelization.
+        return nullptr;
+    }
+    return std::make_shared<ParallelScanChunks>(std::move(boundaries), dop);
+}
+
 /**
  * Regular constructor. Initializes static '_state' managed by a shared_ptr.
  */
@@ -381,6 +441,10 @@ void ScanStage::scanResetState(bool reOpen) {
         setMaxRecordId();
     }
 
+    if (_parallelChunks) {
+        _parallelChunks->reset(_parallelId);
+    }
+
     _firstGetNext = true;
     _hasScanEndRecordId = _state->forward ? !!_maxRecordIdAccessor : !!_minRecordIdAccessor;
     _havePassedScanEndRecordId = false;
@@ -533,12 +597,40 @@ ScanStage::ScanStage(std::shared_ptr<ScanStageBaseState> state,
                      boost::optional<value::SlotId> maxRecordIdSlot,
                      bool participateInTrialRunTracking,
                      bool includeScanStartRecordId,
-                     bool includeScanEndRecordId)
+                     bool includeScanEndRecordId,
+                     std::shared_ptr<ParallelScanChunks> parallelChunks,
+                     size_t parallelId)
     : ScanStageBaseImpl(std::move(state), yieldPolicy, nodeId, participateInTrialRunTracking),
       _includeScanStartRecordId(includeScanStartRecordId),
       _includeScanEndRecordId(includeScanEndRecordId),
       _maxRecordIdSlot(maxRecordIdSlot),
-      _minRecordIdSlot(minRecordIdSlot) {}  // ScanStageBaseImpl constructor for clone()
+      _minRecordIdSlot(minRecordIdSlot),
+      _parallelChunks(std::move(parallelChunks)),
+      _parallelId(parallelId) {}  // ScanStageBaseImpl constructor for clone()
+
+std::vector<std::unique_ptr<PlanStage>> ScanStage::cloneForParallelExecution(CompileCtx& ctx,
+                                                                             size_t dop) const {
+    std::vector<std::unique_ptr<PlanStage>> clones;
+    auto chunks = ParallelScanChunks::make(ctx, _opCtx, _state->collUuid, _state->forward, dop);
+    if (!chunks) {
+        return clones;
+    }
+    for (size_t i = 0; i < dop; i++) {
+        clones.push_back(std::make_unique<ScanStage>(
+            _state,
+            /*yieldPolicy=*/nullptr,  // TODO: SERVER-137779 make PlanYieldPolicy thread safe
+            _commonStats.nodeId,
+            _minRecordIdSlot,
+            _maxRecordIdSlot,
+            participateInTrialRunTracking(),
+            _includeScanStartRecordId,
+            _includeScanEndRecordId,
+            chunks,
+            i));
+    }
+
+    return clones;
+}
 
 std::unique_ptr<PlanStage> ScanStage::clone() const {
     return std::make_unique<ScanStage>(_state,
@@ -548,10 +640,14 @@ std::unique_ptr<PlanStage> ScanStage::clone() const {
                                        _maxRecordIdSlot,
                                        participateInTrialRunTracking(),
                                        _includeScanStartRecordId,
-                                       _includeScanEndRecordId);
+                                       _includeScanEndRecordId,
+                                       nullptr);
 }
 
 boost::optional<Record> ScanStage::getNextInternal() {
+    if (MONGO_unlikely(_parallelChunks)) {
+        return getNextInternalParallel();
+    }
     // Optimized so the most common case has as short a codepath as possible.
     // '_minRecordIdAccessor' and/or '_maxRecordIdAccessor' mean we are doing a bounded scan on
     // a clustered collection, and we will do a seek() to the start bound on the first call.
@@ -602,6 +698,89 @@ boost::optional<Record> ScanStage::getNextInternal() {
     }
 
     return nextRecord;
+}
+
+boost::optional<Record> ScanStage::getNextInternalParallel() {
+    boost::optional<Record> nextRecord;
+    while (true) {
+        if (!_firstGetNext) {
+            nextRecord = _cursor->next();
+        } else {
+            _firstGetNext = false;
+
+            auto chunk = _parallelChunks->nextChunk(_parallelId);
+            if (!chunk) {
+                // Every chunk of the collection has been claimed by some thread.
+                return boost::none;
+            }
+            RecordId includedLowerBound;
+            std::tie(includedLowerBound, _excludedHigherBound) = *chunk;
+
+            if (_minRecordIdAccessor && _state->forward) {
+                if (includedLowerBound > _minRecordId) {
+                    // Check if we just ended the chunk coming right before this one, in this case
+                    // we are already on the correct record and we can avoid the seek operation.
+                    if (!nextRecord || nextRecord->id != includedLowerBound) {
+                        nextRecord = _cursor->seek(includedLowerBound,
+                                                   SeekableRecordCursor::BoundInclusion::kInclude);
+                    }
+                } else {
+                    // The range may be exclusive of the start record.
+                    nextRecord = _cursor->seek(
+                        _minRecordId,
+                        _includeScanStartRecordId ? SeekableRecordCursor::BoundInclusion::kInclude
+                                                  : SeekableRecordCursor::BoundInclusion::kExclude);
+                }
+            } else if (_maxRecordIdAccessor && !_state->forward) {
+                if (includedLowerBound < _maxRecordId) {
+                    // Check if we just ended the chunk coming right before this one, in this case
+                    // we are already on the correct record and we can avoid the seek operation.
+                    if (!nextRecord || nextRecord->id != includedLowerBound) {
+                        nextRecord = _cursor->seek(includedLowerBound,
+                                                   SeekableRecordCursor::BoundInclusion::kInclude);
+                    }
+                } else {
+                    nextRecord = _cursor->seek(
+                        _maxRecordId,
+                        _includeScanStartRecordId ? SeekableRecordCursor::BoundInclusion::kInclude
+                                                  : SeekableRecordCursor::BoundInclusion::kExclude);
+                }
+            } else {
+                // Check if we just ended the chunk coming right before this one, in this case
+                // we are already on the correct record and we can avoid the seek operation.
+                if (!nextRecord || nextRecord->id != includedLowerBound) {
+                    nextRecord = _cursor->seek(includedLowerBound,
+                                               SeekableRecordCursor::BoundInclusion::kInclude);
+                }
+            }
+        }
+
+        if (!nextRecord || (_state->forward && nextRecord->id >= _excludedHigherBound) ||
+            (!_state->forward && nextRecord->id <= _excludedHigherBound)) {
+            // Done with this chunk; claim the next one and carry on from its lower bound.
+            _firstGetNext = true;
+            continue;
+        }
+
+        // End-bound check (only relevant when the caller cares about the recordId slot, which is
+        // what gates the bound enforcement on the original single-range code path).
+        if (_state->recordIdSlot && _hasScanEndRecordId) {
+            if (_includeScanEndRecordId) {
+                _havePassedScanEndRecordId = _state->forward ? (nextRecord->id > _maxRecordId)
+                                                             : (nextRecord->id < _minRecordId);
+            } else {
+                _havePassedScanEndRecordId = _state->forward ? (nextRecord->id >= _maxRecordId)
+                                                             : (nextRecord->id <= _minRecordId);
+            }
+            if (_havePassedScanEndRecordId) {
+                // Done with this chunk; claim the next one and carry on from its lower bound.
+                _firstGetNext = true;
+                continue;
+            }
+        }
+
+        return nextRecord;
+    }
 }
 
 void ScanStageBase::closeShared() {

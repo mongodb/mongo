@@ -298,6 +298,117 @@ private:
 };
 
 /**
+ * The record id ranges a set of parallel ScanStage clones divide the collection into, shared by all
+ * of them. Rather than statically assigning one range per clone, each clone pulls the next range
+ * out of here whenever it has exhausted the one it was working on, so that a range that happens to
+ * hold many more records than the others does not put the whole scan on one thread's critical path.
+ *
+ * The ranges are half open, '[lower, higher)', and are handed out in scan order.
+ */
+class ParallelScanChunks {
+public:
+    // 'boundaries' must already be sorted in scan order and hold at least two entries; entry 'i'
+    // and 'i + 1' delimit the i-th chunk. The chunks are split into 'dop' ranges of consecutive
+    // chunks, one per clone.
+    ParallelScanChunks(std::vector<RecordId> boundaries, size_t dop)
+        : _boundaries(std::move(boundaries)) {
+        const size_t count = _boundaries.size() - 1;
+        const size_t baseSize = count / dop;
+        const size_t numLarger = count % dop;
+        size_t begin = 0;
+        for (size_t i = 0; i < dop; ++i) {
+            const size_t size = baseSize + (i < numLarger ? 1 : 0);
+            _initialRanges.push_back({begin, begin + size});
+            begin += size;
+        }
+        _ranges = _initialRanges;
+        _opened.resize(dop, false);
+    }
+
+    /**
+     * Splits the collection identified by 'collUuid' into chunks to be scanned in the 'forward'
+     * direction by 'dop' parallel clones, sampling the boundaries with a random cursor. Returns
+     * null if the collection cannot be found or is too small to be split into 'dop' chunks.
+     */
+    static std::shared_ptr<ParallelScanChunks> make(
+        CompileCtx& ctx, OperationContext* opCtx, const UUID& collUuid, bool forward, size_t dop);
+
+    /**
+     * Returns the next chunk for the clone 'id', or boost::none once they have all been handed
+     * out. The chunks are taken from the front of the clone's own range; when that is empty, one is
+     * stolen from the back of another range. Thread safe: it is called concurrently by every clone
+     * participating in the scan.
+     */
+    boost::optional<std::pair<RecordId, RecordId>> nextChunk(size_t id) {
+        std::lock_guard lk(_mutex);
+        size_t chunk;
+        if (auto& own = _ranges[id]; !own.empty()) {
+            chunk = own.takeFront();
+        } else {
+            // Steal from the range that comes right after ours first, wrapping around.
+            auto victim = _ranges.size();
+            for (size_t i = 1; i < _ranges.size(); ++i) {
+                auto& other = _ranges[(id + i) % _ranges.size()];
+                if (!other.empty()) {
+                    chunk = other.takeBack();
+                    victim = i;
+                    break;
+                }
+            }
+            if (victim == _ranges.size()) {
+                return boost::none;
+            }
+        }
+        return std::make_pair(_boundaries[chunk], _boundaries[chunk + 1]);
+    }
+
+    /**
+     * Makes every chunk available again. Called by each participating clone as it opens; only the
+     * first one performs the reset, the other invocations are a no-op. This way a plan that
+     * includes a stage that consumes its inputs during the call to open() (e.g. BlockHashAggStage,
+     * AndHashStage, HashLookupStage, StreamingAggStage, SortStage::SortImpl) can safely start
+     * consuming partitions while slower threads are still attempting to open their cloned source.
+     */
+    void reset(size_t id) {
+        std::lock_guard lk(_mutex);
+        if (_opened[id]) {
+            // we are reopening a stage that has already processed its input, check if it's the
+            // first one and hence we have to restore the partitions as they were defined in the
+            // constructor.
+            tassert(13436602,
+                    "Reset operation requested before the previous one was completed",
+                    std::find(_opened.begin(), _opened.end(), false) == _opened.end());
+            _opened.assign(_opened.size(), false);
+            _ranges = _initialRanges;
+        }
+        _opened[id] = true;
+    }
+
+private:
+    // Chunks '[next, end)' are still to be handed out from this range. 'next' advances from the
+    // front for the owner of the range, 'end' retreats from the back for the clones stealing.
+    struct ChunkRange {
+        size_t next;
+        size_t end;
+        bool empty() const {
+            return next >= end;
+        }
+        size_t takeFront() {
+            return next++;
+        }
+        size_t takeBack() {
+            return --end;
+        }
+    };
+
+    std::mutex _mutex;
+    std::vector<bool> _opened;
+    const std::vector<RecordId> _boundaries;
+    std::vector<ChunkRange> _initialRanges;
+    std::vector<ChunkRange> _ranges;
+};
+
+/**
  * Scan stage for a clustered collection scan over a single contiguous RecordId range (or an
  * unbounded scan with a known direction). Use MultiRangeClusteredScanStage for non-contiguous
  * (multi-range) clustered scans.
@@ -338,8 +449,12 @@ public:
               boost::optional<value::SlotId> maxRecordIdSlot,
               bool participateInTrialRunTracking,
               bool includeScanStartRecordId,
-              bool includeScanEndRecordId);
+              bool includeScanEndRecordId,
+              std::shared_ptr<ParallelScanChunks> parallelChunks = nullptr,
+              size_t parallelId = 0);
 
+    std::vector<std::unique_ptr<PlanStage>> cloneForParallelExecution(CompileCtx& ctx,
+                                                                      size_t dop) const final;
     std::unique_ptr<PlanStage> clone() const final;
     void prepare(CompileCtx& ctx) final;
     void close() final;
@@ -357,6 +472,7 @@ private:
         return _havePassedScanEndRecordId;
     }
     boost::optional<Record> getNextInternal();
+    boost::optional<Record> getNextInternalParallel();
 
     // Only for a clustered collection scan, this sets '_minRecordId' to the lower scan bound.
     void setMinRecordId();
@@ -390,6 +506,17 @@ private:
     RecordId _maxRecordId;
     // Only care about whether first call of getNext() if clustered scan because we need to seek.
     bool _firstGetNext{false};
+
+    // Hard boundary of the chunk currently being scanned, when this stage is participating in a
+    // parallel scan.
+    RecordId _excludedHigherBound;
+
+    // The chunks left to scan, shared with the sibling clones of a parallel scan. Null when this
+    // stage is not part of one, in which case the bounds above stay at their unbounded values.
+    std::shared_ptr<ParallelScanChunks> _parallelChunks;
+    // Identifies this clone among its siblings; selects the range of chunks it consumes first.
+    size_t _parallelId = 0;
+
 };  // class ScanStage
 
 extern FailPoint hangScanGetNext;
