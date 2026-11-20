@@ -53,7 +53,8 @@ public:
     NetworkInterfaceTL(std::string instanceName,
                        std::shared_ptr<AsyncClientFactory> factory,
                        std::unique_ptr<rpc::EgressMetadataHook> metadataHook,
-                       bool trackShardRequestCounts);
+                       bool trackShardRequestCounts,
+                       bool alwaysEmitFullReactorHistogram = false);
     ~NetworkInterfaceTL() override;
 
     constexpr static Milliseconds kCancelCommandTimeout{1000};
@@ -132,6 +133,8 @@ public:
         Milliseconds timeout) override;
 
 private:
+    class SynchronizedCounters;
+
     /**
      * For an RPC, an instance of `CommandState` is created to capture the state of the
      * remote command. As part of running a remote command, `NITL` sends out a request
@@ -272,20 +275,6 @@ private:
 
     ExecutorFuture<RemoteCommandResponse> _runCommand(std::shared_ptr<CommandStateBase> cmdState);
 
-    std::string _instanceName;
-    transport::ReactorHandle _reactor;
-    std::shared_ptr<AsyncClientFactory> _clientFactory;
-
-    // A lock-free way to check that the reactor and connection pool have been initialized. We need
-    // this and the _state enum to prevent null pointer dereferencing on the hot path without
-    // acquiring an extra lock.
-    Atomic<bool> _initialized{false};
-
-    class SynchronizedCounters;
-    std::shared_ptr<SynchronizedCounters> _counters;
-
-    std::unique_ptr<rpc::EgressMetadataHook> _metadataHook;
-
     // We start in kDefault, transition to kStarted after a call to startup completes.
     // Enter kStopping at the first call to shutdown and transition to kStopped
     // when the call completes.
@@ -305,6 +294,20 @@ private:
         }
             .at(s);
     }
+
+    std::string _instanceName;
+    bool _alwaysEmitFullReactorHistogram;
+    transport::ReactorHandle _reactor;
+    std::shared_ptr<AsyncClientFactory> _clientFactory;
+
+    // A lock-free way to check that the reactor and connection pool have been initialized. We need
+    // this and the _state enum to prevent null pointer dereferencing on the hot path without
+    // acquiring an extra lock.
+    Atomic<bool> _initialized{false};
+
+    std::shared_ptr<SynchronizedCounters> _counters;
+
+    std::unique_ptr<rpc::EgressMetadataHook> _metadataHook;
 
     // Guards _svcCtx, _state, _inProgress, and _inProgressAlarms.
     mutable ObservableMutex<std::mutex> _mutex;

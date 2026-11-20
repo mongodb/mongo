@@ -54,7 +54,8 @@ std::unique_ptr<NetworkInterface> makeNetworkInterface(
         instanceName,
         std::move(clientFactory),
         {.metadataHook = std::move(options.metadataHook),
-         .trackRequestCounts = options.trackRequestCounts});
+         .trackRequestCounts = options.trackRequestCounts,
+         .alwaysEmitFullReactorHistogram = options.alwaysEmitFullReactorHistogram});
 }
 
 #ifdef MONGO_CONFIG_GRPC
@@ -74,7 +75,8 @@ std::unique_ptr<NetworkInterface> makeNetworkInterfaceWithClientFactory(
     return std::make_unique<NetworkInterfaceTL>(makeInstanceName(instanceName),
                                                 std::move(clientFactory),
                                                 std::move(options.metadataHook),
-                                                options.trackRequestCounts);
+                                                options.trackRequestCounts,
+                                                options.alwaysEmitFullReactorHistogram);
 }
 
 }  // namespace executor

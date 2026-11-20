@@ -7,6 +7,7 @@
 #include "mongo/db/baton.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/platform/rwmutex.h"
+#include "mongo/transport/reactor_options.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/executor_stats.h"
@@ -97,7 +98,9 @@ public:
         std::list<std::unique_ptr<CompletionQueueEntry>>::iterator _iter;
     };
 
-    GRPCReactor() : _tickSource(this), _stats(&_tickSource), _cq() {}
+    GRPCReactor() : GRPCReactor{ReactorOptions{}} {}
+    explicit GRPCReactor(ReactorOptions options)
+        : _stats(&_tickSource, options.alwaysEmitFullHistogram) {}
 
     void run() override;
 
@@ -143,7 +146,7 @@ private:
         return _inShutdownFlag;
     }
 
-    ReactorTickSource _tickSource;
+    ReactorTickSource _tickSource{this};
     ExecutorStats _stats;
 
     WriteRarelyRWMutex _shutdownMutex;

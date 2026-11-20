@@ -27,6 +27,7 @@
 #include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/transport/reactor_options.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
@@ -160,8 +161,10 @@ constexpr auto kNotYetStartedUpMsg = "NetworkInterface has not started yet"sv;
 NetworkInterfaceTL::NetworkInterfaceTL(std::string instanceName,
                                        std::shared_ptr<AsyncClientFactory> factory,
                                        std::unique_ptr<rpc::EgressMetadataHook> metadataHook,
-                                       bool trackShardRequestCounts)
+                                       bool trackShardRequestCounts,
+                                       bool alwaysEmitFullReactorHistogram)
     : _instanceName(std::move(instanceName)),
+      _alwaysEmitFullReactorHistogram{alwaysEmitFullReactorHistogram},
       _clientFactory(std::move(factory)),
       _metadataHook(std::move(metadataHook)),
       _state(kDefault),
@@ -232,7 +235,7 @@ void NetworkInterfaceTL::startup() {
 
     auto tl = tlm->getTransportLayer(_clientFactory->getTransportProtocol());
     invariant(tl && tl->isEgress());
-    _reactor = tl->getReactor(transport::TransportLayer::kNewReactor);
+    _reactor = tl->makeReactor({.alwaysEmitFullHistogram = _alwaysEmitFullReactorHistogram});
     _clientFactory->startup(_svcCtx, tl, _reactor);
     _initialized.store(true);
 

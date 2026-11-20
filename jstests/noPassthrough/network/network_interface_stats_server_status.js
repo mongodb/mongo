@@ -39,6 +39,41 @@ jsTestLog("shardingTaskExecutorMetrics " + tojson(section));
 const interfaceNames = Object.keys(section);
 assert.gt(interfaceNames.length, 0, "Expected at least one network interface entry");
 
+function validateHistogram(stats, histogramName, name) {
+    const histogram = stats[histogramName];
+    assert(
+        histogram.hasOwnProperty("totalCount"),
+        "Missing 'totalCount' in " + histogramName + " for " + name,
+        {stats},
+    );
+
+    let bucketCountSum = 0;
+    for (const bucketKey of Object.keys(histogram)) {
+        if (bucketKey === "totalCount") {
+            continue;
+        }
+        assert(
+            histogram[bucketKey].hasOwnProperty("count"),
+            "Missing 'count' in " + histogramName + " bucket " + bucketKey + " for " + name,
+            {stats},
+        );
+        bucketCountSum += histogram[bucketKey]["count"];
+    }
+
+    assert.eq(
+        histogram["totalCount"],
+        bucketCountSum,
+        "totalCount should equal the sum of bucket counts in " + histogramName + " for " + name,
+        {stats},
+    );
+    assert.gt(
+        histogram["totalCount"],
+        0,
+        "Expected " + histogramName + " totalCount > 0 for " + name,
+        {stats},
+    );
+}
+
 let totalExecuted = 0;
 for (let i = 0; i < interfaceNames.length; i++) {
     const name = interfaceNames[i];
@@ -46,36 +81,26 @@ for (let i = 0; i < interfaceNames.length; i++) {
     const stats = section[name];
     assert(stats, "Stats for " + name + " should not be null");
 
-    assert(
-        stats.hasOwnProperty("scheduled"),
-        "Missing 'scheduled' for " + name + ": " + tojson(stats),
-    );
-    assert(
-        stats.hasOwnProperty("executed"),
-        "Missing 'executed' for " + name + ": " + tojson(stats),
-    );
-    assert(
-        stats.hasOwnProperty("averageWaitTimeMicros"),
-        "Missing 'averageWaitTimeMicros' for " + name + ": " + tojson(stats),
-    );
-    assert(
-        stats.hasOwnProperty("averageRunTimeMicros"),
-        "Missing 'averageRunTimeMicros' for " + name + ": " + tojson(stats),
-    );
+    for (const fieldName of [
+        "scheduled",
+        "executed",
+        "averageWaitTimeMicros",
+        "averageRunTimeMicros",
+    ]) {
+        assert(stats.hasOwnProperty(fieldName), "Missing '" + fieldName + "' for " + name, {stats});
+        assert.gte(stats[fieldName], 0, "Expected " + fieldName + " >= 0 for " + name, {stats});
+    }
 
-    assert.gte(stats["scheduled"], 0);
-    assert.gte(stats["executed"], 0);
-    assert.gte(stats["averageWaitTimeMicros"], 0);
-    assert.gte(stats["averageRunTimeMicros"], 0);
-
-    assert(
-        !stats.hasOwnProperty("waitTime"),
-        "Unexpected 'waitTime' histogram in server status for " + name,
-    );
-    assert(
-        !stats.hasOwnProperty("runTime"),
-        "Unexpected 'runTime' histogram in server status for " + name,
-    );
+    if (name.includes("TaskExecutorPool-")) {
+        validateHistogram(stats, "waitTime", name);
+        validateHistogram(stats, "runTime", name);
+    } else {
+        assert(
+            !stats.hasOwnProperty("waitTime") && !stats.hasOwnProperty("runTime"),
+            "Unexpected reactor histograms in server status for " + name,
+            {stats},
+        );
+    }
 
     totalExecuted += stats["executed"];
 }

@@ -179,6 +179,7 @@ public:
     Status setup() final;
 
     ReactorHandle getReactor(WhichReactor which) final;
+    ReactorHandle makeReactor(ReactorOptions options) final;
 
     Status start() final;
 

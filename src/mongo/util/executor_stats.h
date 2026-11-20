@@ -28,7 +28,8 @@ namespace [[MONGO_MOD_PUBLIC]] mongo {
  */
 class ExecutorStats {
 public:
-    explicit ExecutorStats(TickSource*);
+    explicit ExecutorStats(TickSource* tickSource);
+    ExecutorStats(TickSource* tickSource, bool fullHistogram);
 
     using Task = OutOfLineExecutor::Task;
     Task wrapTask(Task&&);
@@ -58,6 +59,7 @@ private:
     Histogram<Microseconds> _running;
 
     TickSource* const _tickSource;
+    bool _fullHistogram;
     logv2::SeveritySuppressor _severitySuppressorSlowWait{
         Seconds{10}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2)};
     logv2::SeveritySuppressor _severitySuppressorSlowRun{
