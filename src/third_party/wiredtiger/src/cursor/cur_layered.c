@@ -2177,6 +2177,46 @@ err:
 }
 
 /*
+ * __clayered_next_raw_kv_batch --
+ *     Read up to count keys and values, moving the cursor forward accordingly.
+ */
+static int
+__clayered_next_raw_kv_batch(
+  WT_CURSOR *cursor, WT_ITEM *keys, WT_ITEM *values, size_t count, size_t *returned_countp)
+{
+    WTI_CURSOR_LAYERED *clayered = (WTI_CURSOR_LAYERED *)cursor;
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+
+    CURSOR_API_CALL(cursor, session, ret, next_raw_kv_batch, clayered->dhandle);
+    CURSOR_API_CHECK_SYSTEM_OVERLOAD(session, ret);
+    __cursor_novalue(cursor);
+    WT_ERR(__cursor_copy_release(cursor));
+    WT_STAT_CONN_DSRC_INCR(session, cursor_next_raw_kv_batch);
+
+    *returned_countp = 0;
+
+    if (count == 0 || (keys == NULL && values == NULL))
+        WT_ERR(EINVAL);
+
+    WT_ERR(__clayered_iterate(clayered, WTI_CLAYERED_ITERATE_NEXT));
+
+    if (keys != NULL)
+        WT_ITEM_SET(keys[0], cursor->key);
+    if (values != NULL)
+        WT_ITEM_SET(values[0], cursor->value);
+
+    *returned_countp = 1;
+
+    /* FIXME-WT-19064: We will need to increment by the returned count. */
+    WT_STAT_CLAYERED_READ_CONSTITUENT_INCR(session, clayered, layered_curs_next);
+    WT_STAT_CONN_DSRC_INCRV(session, cursor_next_raw_kv_batch_result, *returned_countp);
+
+err:
+    API_END_RET(session, ret);
+}
+
+/*
  * __clayered_prev --
  *     WT_CURSOR->prev method for the layered cursor type.
  */
@@ -4408,6 +4448,7 @@ __wt_clayered_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, 
       __clayered_compare,                             /* compare */
       __wt_cursor_equals,                             /* equals */
       __clayered_next,                                /* next */
+      __clayered_next_raw_kv_batch,                   /* next-raw-kv-batch */
       __clayered_prev,                                /* prev */
       __clayered_reset,                               /* reset */
       __clayered_search,                              /* search */

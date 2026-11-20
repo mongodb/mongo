@@ -939,6 +939,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], 
       __wti_cursor_compare_notsup,                  /* compare */
       __wti_cursor_equals_notsup,                   /* equals */
       __curstat_next,                               /* next */
+      __wt_cursor_next_raw_kv_batch_notsup,         /* next-raw-kv-batch */
       __curstat_prev,                               /* prev */
       __curstat_reset,                              /* reset */
       __curstat_search,                             /* search */

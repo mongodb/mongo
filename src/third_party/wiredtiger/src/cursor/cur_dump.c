@@ -400,6 +400,7 @@ __wti_curdump_create(WT_CURSOR *child, WT_CURSOR *owner, WT_CURSOR **cursorp)
       __wti_cursor_compare_notsup,                  /* compare */
       __wti_cursor_equals_notsup,                   /* equals */
       __curdump_next,                               /* next */
+      __wt_cursor_next_raw_kv_batch_notsup,         /* next-raw-kv-batch */
       __curdump_prev,                               /* prev */
       __curdump_reset,                              /* reset */
       __curdump_search,                             /* search */

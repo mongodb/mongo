@@ -23,48 +23,40 @@ static WT_INLINE bool
 __layered_stable_has_value(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 {
     WT_UPDATE *upd;
-    bool has_value;
 
     if (cbt->compare != 0)
-        has_value = false;
-    else {
-        WT_ASSERT_ALWAYS(session, cbt->ins == NULL,
-          "The stable btree should not contain inserts prior to draining");
+        return (false);
 
-        if (cbt->ref->page->modify != NULL && cbt->ref->page->modify->mod_row_update != NULL)
-            upd = cbt->ref->page->modify->mod_row_update[cbt->slot];
-        else
-            upd = NULL;
+    if (cbt->ins != NULL)
+        upd = cbt->ins->upd;
+    else if (cbt->ref->page->modify != NULL && cbt->ref->page->modify->mod_row_update != NULL)
+        upd = cbt->ref->page->modify->mod_row_update[cbt->slot];
+    else
+        upd = NULL;
 
-        /*
-         * Walk the chain: assert no unresolved preserved prepared update exists, and advance past
-         * any rolled-back preserved prepared updates to find the first visible update.
-         */
-        for (; upd != NULL; upd = upd->next) {
-            if (upd->txnid == WT_TXN_ABORTED) {
-                WT_ASSERT_ALWAYS(session, upd->prepare_state == WT_PREPARE_INPROGRESS,
-                  "During ingest drain, aborted updates on the stable btree must be "
-                  "rolled-back preserved prepared transactions");
-                continue;
-            }
-
-            WT_ASSERT_ALWAYS(session, upd->prepare_state != WT_PREPARE_INPROGRESS,
-              "During ingest drain, found an unresolved prepared update on the stable btree; "
-              "prepared transactions must be resolved before step-up");
-            break;
+    /*
+     * Walk the chain: assert no unresolved preserved prepared update exists, and advance past any
+     * rolled-back preserved prepared updates to find the first visible update.
+     */
+    for (; upd != NULL; upd = upd->next) {
+        if (upd->txnid == WT_TXN_ABORTED) {
+            WT_ASSERT_ALWAYS(session, upd->prepare_state == WT_PREPARE_INPROGRESS,
+              "During ingest drain, aborted updates on the stable btree must be "
+              "rolled-back preserved prepared transactions");
+            continue;
         }
 
-        if (upd != NULL)
-            has_value = upd->type != WT_UPDATE_TOMBSTONE;
-        else {
-            WT_TIME_WINDOW tw;
-            bool tw_found = __wt_read_cell_time_window(cbt, &tw);
-            has_value =
-              tw_found && !WT_TIME_WINDOW_HAS_PREPARE(&tw) && !WT_TIME_WINDOW_HAS_STOP(&tw);
-        }
+        WT_ASSERT_ALWAYS(session, upd->prepare_state != WT_PREPARE_INPROGRESS,
+          "During ingest drain, found an unresolved prepared update on the stable btree; "
+          "prepared transactions must be resolved before step-up");
+
+        return (upd->type != WT_UPDATE_TOMBSTONE);
     }
 
-    return (has_value);
+    WT_TIME_WINDOW tw;
+    bool tw_found = __wt_read_cell_time_window(cbt, &tw);
+
+    return (tw_found && !WT_TIME_WINDOW_HAS_PREPARE(&tw) && !WT_TIME_WINDOW_HAS_STOP(&tw));
 }
 
 /*
@@ -76,7 +68,7 @@ __layered_stable_has_value(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
  */
 static int
 __layered_move_updates(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_BTREE *ingest_btree,
-  WT_ITEM *key, WT_UPDATE **updates_ptr, wt_timestamp_t from_ts, uint64_t *orphan_countp)
+  WT_ITEM *key, WT_UPDATE **updates_ptr, uint64_t *orphan_countp)
 {
     WT_DECL_RET;
     WT_UPDATE *last_upd, *newest;
@@ -103,6 +95,8 @@ __layered_move_updates(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_BTREE 
           session, key, ingest_btree, CUR2BT(cbt), newest->txnid, newest->prepared_id));
 
     /*
+     * Recheck stable in every drain pass, including those after replaying a truncate.
+     *
      * With no stable value, starting from the oldest update that was not rolled back:
      *
      * 1. If it is a remove, drop it: it has nothing to delete and cannot be reconciled.
@@ -111,7 +105,7 @@ __layered_move_updates(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_BTREE 
      * 3. If an older rolled-back update is a value, keep it: a checkpoint between its prepare and
      * rollback must still write it as prepared.
      */
-    if (from_ts == WT_TS_NONE && !__layered_stable_has_value(session, cbt)) {
+    if (!__layered_stable_has_value(session, cbt)) {
         WT_UPDATE *upd;
         WT_UPDATE **oldest_pointerp, **upd_pointerp;
 
@@ -319,13 +313,13 @@ __layered_derive_layered_uri(WT_SESSION_IMPL *session, const char *ingest_uri, W
 }
 
 /*
- * __wti_layered_create_missing_ingest_table --
- *     Create a missing ingest table from its layered table's configuration, opening its handle if
- *     requested. An existing ingest table is left unchanged.
+ * __layered_create_missing_ingest_table --
+ *     Create a missing ingest table from its layered table's configuration, leaving an existing
+ *     ingest table unchanged.
  */
-int
-__wti_layered_create_missing_ingest_table(
-  WT_SESSION_IMPL *session, const char *ingest_uri, const char *layered_cfg, bool open_dhandle)
+static int
+__layered_create_missing_ingest_table(
+  WT_SESSION_IMPL *session, const char *ingest_uri, const char *layered_cfg)
 {
     WT_CONFIG_ITEM key_format, value_format;
     WT_DECL_ITEM(ingest_config);
@@ -342,8 +336,8 @@ __wti_layered_create_missing_ingest_table(
       "disaggregated=(page_log=none,storage_source=none)",
       (int)key_format.len, key_format.str, (int)value_format.len, value_format.str));
 
-    WT_WITH_SCHEMA_LOCK(session,
-      ret = __wt_schema_create_internal(session, ingest_uri, ingest_config->data, open_dhandle));
+    WT_WITH_SCHEMA_LOCK(
+      session, ret = __wt_schema_create_internal(session, ingest_uri, ingest_config->data, false));
     WT_ERR(ret);
 
     __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
@@ -406,7 +400,7 @@ __wti_layered_ingest_create_on_open(WT_SESSION_IMPL *session)
     time_start = __wt_clock(session);
     WT_ERR(__wt_open_internal_session(S2C(session), "ingest-create-on-open", true,
       F_MASK(session, WT_SESSION_SAVE_ERRORS), session->lock_flags, &int_session));
-    ret = __wti_layered_create_missing_ingest_table(int_session, ingest_uri, layered_cfg, false);
+    ret = __layered_create_missing_ingest_table(int_session, ingest_uri, layered_cfg);
     if (int_session->err_info.err != 0)
         __wt_session_set_last_error(session, int_session->err_info.err,
           int_session->err_info.sub_level_err, "%s", int_session->err_info.err_msg);
@@ -729,8 +723,8 @@ __layered_copy_ingest_table(WT_SESSION_IMPL *session, const char *ingest_uri,
         if (ret == WT_NOTFOUND) {
             if (key->size > 0 && upds != NULL) {
                 WT_WITH_DHANDLE(session, cbt->dhandle,
-                  ret = __layered_move_updates(
-                    session, cbt, ingest_btree, key, &upds, from_ts, orphan_countp));
+                  ret =
+                    __layered_move_updates(session, cbt, ingest_btree, key, &upds, orphan_countp));
                 WT_ERR(ret);
             } else
                 ret = 0;
@@ -748,8 +742,8 @@ __layered_copy_ingest_table(WT_SESSION_IMPL *session, const char *ingest_uri,
 
             if (upds != NULL) {
                 WT_WITH_DHANDLE(session, cbt->dhandle,
-                  ret = __layered_move_updates(
-                    session, cbt, ingest_btree, key, &upds, from_ts, orphan_countp));
+                  ret =
+                    __layered_move_updates(session, cbt, ingest_btree, key, &upds, orphan_countp));
                 WT_ERR(ret);
             }
 

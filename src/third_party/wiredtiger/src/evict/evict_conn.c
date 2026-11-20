@@ -252,6 +252,9 @@ __wt_evict_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
     conn->evict_config.threads_max = evict_threads_max;
     conn->evict_config.threads_min = evict_threads_min;
 
+    WT_RET(__wt_config_gets(session, cfg, "eviction.cache_share_walk_budget", &cval));
+    __wt_atomic_store_bool_relaxed(&conn->evict_config.cache_share_walk_budget, cval.val != 0);
+
     WT_RET(__wt_config_gets(session, cfg, "eviction.evict_sample_inmem", &cval));
     conn->evict_config.sample_inmem = cval.val != 0;
 

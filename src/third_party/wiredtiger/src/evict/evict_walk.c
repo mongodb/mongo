@@ -1094,20 +1094,29 @@ __evict_get_target_pages(WT_SESSION_IMPL *session, u_int max_entries, uint32_t s
 static WT_INLINE uint64_t
 __evict_get_min_pages(WT_SESSION_IMPL *session, uint32_t target_pages)
 {
+    WT_CACHE *cache;
     WT_EVICT *evict;
-    uint64_t min_pages;
+    uint64_t cache_inuse, min_pages, tree_inuse;
+    bool clean, enabled;
 
+    cache = S2C(session)->cache;
     evict = S2C(session)->evict;
+    clean = F_ISSET(evict, WT_EVICT_CACHE_CLEAN);
+    enabled = __wt_atomic_load_bool_relaxed(&S2C(session)->evict_config.cache_share_walk_budget);
 
     /*
      * Examine at least a reasonable number of pages before deciding whether to give up. When we are
      * not looking for clean pages, search the tree for longer.
      */
-    min_pages = 10 * (uint64_t)target_pages;
-    if (F_ISSET(evict, WT_EVICT_CACHE_CLEAN))
+    tree_inuse = cache_inuse = 0;
+    if (clean)
         WT_STAT_CONN_INCR(session, eviction_target_strategy_clean);
-    else
-        min_pages *= 10;
+    if (clean && enabled) {
+        cache_inuse = __wt_cache_bytes_inuse(cache);
+        if (cache_inuse != 0)
+            tree_inuse = __wt_btree_bytes_evictable(session);
+    }
+    min_pages = __evict_min_walk_pages(target_pages, clean, enabled, tree_inuse, cache_inuse);
     if (F_ISSET(evict, WT_EVICT_CACHE_UPDATES))
         WT_STAT_CONN_INCR(session, eviction_target_strategy_updates);
     if (F_ISSET(evict, WT_EVICT_CACHE_DIRTY))

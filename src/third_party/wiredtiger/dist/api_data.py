@@ -815,6 +815,10 @@ connection_runtime_config = [
                 images it retains for that replacement. Checkpoint stops retaining new images
                 once the limit is reached; a value of \c 0 disables retention entirely''',
                 min=0, max=100),
+            Config('cache_share_walk_budget', 'false', r'''
+                increase the minimum clean eviction walk based on a tree's share of
+                cache usage. This may improve or degrade performance depending on the workload''',
+                type='boolean', undoc=True),
             Config('evict_sample_inmem', 'true', r'''
                 If no in-memory ref is found on the root page, attempt to locate a random
                 in-memory page by examining all entries on the root page.''',

@@ -554,19 +554,6 @@ functions:
 #######################################
 
 variables:
-  # Variant of format-stress-test-disagg-switch that exercises the default
-  # fast-truncate code path.
-  - &format-stress-test-disagg-switch-fast-truncate
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "format test disagg"
-        vars:
-          # FIXME-WT-17380: Enable prepare for switch mode once failures are resolved.
-          format_args: disagg.mode=switch debug.disagg_slow_truncate_follower=off runs.timer=10:15 ops.prepare=0 ops.verify=1 runs.mirror=1
-          times: 5
-
   # Configure flags for builtins.
   - &configure_flags_with_builtins
     HAVE_BUILTIN_EXTENSION_LZ4: -DHAVE_BUILTIN_EXTENSION_LZ4=1
@@ -597,10 +584,6 @@ tasks:
       - func: "upload artifact"
       - func: "cleanup"
 
-  - <<: *format-stress-test-disagg-switch-fast-truncate
-    name: format-stress-test-disagg-switch-fast-truncate-1
-    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
-
 #######################################
 #            Buildvariants            #
 #######################################
@@ -617,7 +600,6 @@ buildvariants:
     disagg_run: true
   tasks:
     - name: compile
-    - name: ".stress-test-disagg-fail"
 
 - name: amazon2023-disagg-asan-stress
   display_name: "[Failure Expected] Amazon2023 ARM64 ASAN Disagg Stress tests"
@@ -635,4 +617,3 @@ buildvariants:
     additional_san_vars: export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
   tasks:
     - name: compile
-    - name: ".stress-test-disagg-san-fail"

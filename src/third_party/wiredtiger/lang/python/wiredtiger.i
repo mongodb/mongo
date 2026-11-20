@@ -277,6 +277,45 @@ from packing import pack, unpack
 }
 
 /*
+ * next_raw_key_value_batch takes only the batch size from Python and returns a list of (key, value)
+ * byte-string tuples. The items point into cursor memory that the next cursor call invalidates, so
+ * they are copied out in the argout typemap. The arrays only hold item descriptors, so there is no
+ * per-item memory to free.
+ */
+%typemap(in) (WT_ITEM *keys, WT_ITEM *values, size_t count, size_t *returned_countp)
+  (size_t returned = 0) {
+    Py_ssize_t n = PyLong_AsSsize_t($input);
+    if (n == -1 && PyErr_Occurred() != NULL)
+        SWIG_fail;
+    if (n < 1)
+        SWIG_exception_fail(SWIG_ValueError, "count must be a positive integer");
+    $3 = (size_t)n;
+    $1 = (WT_ITEM *)calloc($3, sizeof(WT_ITEM));
+    $2 = (WT_ITEM *)calloc($3, sizeof(WT_ITEM));
+    if ($1 == NULL || $2 == NULL)
+        SWIG_exception_fail(SWIG_MemoryError, "out of memory");
+    $4 = &returned;
+}
+
+%typemap(freearg) (WT_ITEM *keys, WT_ITEM *values, size_t count, size_t *returned_countp) {
+    free($1);
+    free($2);
+}
+
+%typemap(argout) (WT_ITEM *keys, WT_ITEM *values, size_t count, size_t *returned_countp) {
+    /* A non-zero return leaves the count in an unknown state. */
+    size_t i, n = (result == 0) ? *$4 : 0;
+
+    $result = PyList_New((Py_ssize_t)n);
+    for (i = 0; i < n; i++) {
+        PyObject *kv = PyTuple_New(2);
+        PyTuple_SetItem(kv, 0, PyBytes_FromStringAndSize((const char *)$1[i].data, $1[i].size));
+        PyTuple_SetItem(kv, 1, PyBytes_FromStringAndSize((const char *)$2[i].data, $2[i].size));
+        PyList_SetItem($result, (Py_ssize_t)i, kv);
+    }
+}
+
+/*
  * This typemap removes the argument for pl_get_complete_checkpoint and allocates a local
  * WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS struct instead. Zeroing it selects the most recently
  * completed checkpoint; the wrapper below overwrites the selector when the caller supplies one.
@@ -740,6 +779,7 @@ do {
 %enddef
 
 NOTFOUND_OK(__wt_cursor::next)
+NOTFOUND_OK(__wt_cursor::next_raw_key_value_batch)
 NOTFOUND_OK(__wt_cursor::prev)
 NOTFOUND_OK(__wt_cursor::remove)
 NOTFOUND_OK(__wt_cursor::search)

@@ -932,3 +932,31 @@ err:
 
     return (ret);
 }
+
+/*
+ * __wt_btcur_next_batch --
+ *     Read up to count keys and values, moving the cursor forward accordingly.
+ */
+int
+__wt_btcur_next_batch(
+  WT_CURSOR_BTREE *cbt, WT_ITEM *keys, WT_ITEM *values, size_t count, size_t *returned_countp)
+{
+    WT_SESSION_IMPL *session = CUR2S(cbt);
+    WT_STAT_CONN_DSRC_INCR(session, cursor_next_raw_kv_batch);
+    *returned_countp = 0;
+
+    if (count == 0 || (keys == NULL && values == NULL))
+        WT_RET(EINVAL);
+
+    WT_RET(__wt_btcur_next(cbt, false));
+
+    if (keys != NULL)
+        WT_ITEM_SET(keys[0], cbt->iface.key);
+    if (values != NULL)
+        WT_ITEM_SET(values[0], cbt->iface.value);
+
+    *returned_countp = 1;
+    WT_STAT_CONN_DSRC_INCRV(session, cursor_next_raw_kv_batch_result, *returned_countp);
+
+    return (0);
+}

@@ -134,6 +134,7 @@ __wt_cursor_prepared_discover_open(WT_SESSION_IMPL *session, const char *uri, WT
       __wti_cursor_compare_notsup,                    /* compare */
       __wti_cursor_equals_notsup,                     /* equals */
       __cursor_prepared_discover_next,                /* next */
+      __wt_cursor_next_raw_kv_batch_notsup,           /* next-raw-kv-batch */
       __wt_cursor_notsup,                             /* prev */
       __cursor_prepared_discover_reset,               /* reset */
       __wt_cursor_notsup,                             /* search */

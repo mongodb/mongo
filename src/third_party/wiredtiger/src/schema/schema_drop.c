@@ -263,8 +263,8 @@ __drop_layered(
         WT_ERR_MSG(session, ENOENT,
           "stable constituent \"%s\" not found when dropping \"%s\" on leader", stable_uri, uri);
     /*
-     * The initial checkpoint pickup defers ingest creation until first access, so dropping an
-     * untouched layered table must tolerate missing ingest metadata.
+     * Checkpoint pickup defers ingest creation until first access, so dropping an untouched layered
+     * table must tolerate missing ingest metadata.
      */
     WT_ERR_ERROR_OK(__wt_schema_drop(session, ingest_uri, cfg, check_visibility), ENOENT, true);
 

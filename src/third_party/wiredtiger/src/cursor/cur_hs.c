@@ -1478,6 +1478,7 @@ __wt_curhs_open_ext(WT_SESSION_IMPL *session, uint32_t hs_id, uint32_t btree_id,
       __curhs_compare,                                /* compare */
       __wti_cursor_equals_notsup,                     /* equals */
       __curhs_next,                                   /* next */
+      __wt_cursor_next_raw_kv_batch_notsup,           /* next-raw-kv-batch */
       __curhs_prev,                                   /* prev */
       __curhs_reset,                                  /* reset */
       __wt_cursor_notsup,                             /* search */

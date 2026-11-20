@@ -202,6 +202,38 @@ err:
 }
 
 /*
+ * __curfile_next_raw_kv_batch --
+ *     Read up to count keys and values, moving the cursor forward accordingly.
+ */
+static int
+__curfile_next_raw_kv_batch(
+  WT_CURSOR *cursor, WT_ITEM *keys, WT_ITEM *values, size_t count, size_t *returned_countp)
+{
+    WT_CURSOR_BTREE *cbt = (WT_CURSOR_BTREE *)cursor;
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+
+    CURSOR_API_CALL(cursor, session, ret, next_raw_kv_batch, cbt->dhandle);
+    CURSOR_REPOSITION_ENTER(cursor, session);
+    CURSOR_API_CHECK_SYSTEM_OVERLOAD(session, ret);
+    WT_ERR(__cursor_copy_release(cursor));
+    WT_ERR(__curfile_check_cbt_txn(session, cbt));
+
+    WT_WITH_CHECKPOINT(
+      session, cbt, ret = __wt_btcur_next_batch(cbt, keys, values, count, returned_countp));
+    WT_ERR(ret);
+
+    /* Next maintains a position, key and value. */
+    WT_ASSERT(session,
+      F_ISSET(cbt, WT_CBT_ACTIVE) && F_MASK(cursor, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT &&
+        F_MASK(cursor, WT_CURSTD_VALUE_SET) == WT_CURSTD_VALUE_INT);
+
+err:
+    CURSOR_REPOSITION_END(cursor, session);
+    API_END_RET_STAT(session, ret, cursor_next_raw_kv_batch);
+}
+
+/*
  * __wti_curfile_next_random --
  *     WT_CURSOR->next method for the btree cursor type when configured with next_random.
  */
@@ -1042,6 +1074,7 @@ __curfile_create(WT_SESSION_IMPL *session, WT_CURSOR *owner, const char *cfg[], 
       __curfile_compare,                              /* compare */
       __curfile_equals,                               /* equals */
       __curfile_next,                                 /* next */
+      __curfile_next_raw_kv_batch,                    /* next-raw-kv-batch */
       __curfile_prev,                                 /* prev */
       __curfile_reset,                                /* reset */
       __curfile_search,                               /* search */

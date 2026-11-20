@@ -217,6 +217,16 @@ cursor_ops(WT_SESSION *session)
     error_check(cursor->reset(cursor));
     /*! [Reset the cursor] */
 
+    {
+        /*! [Return multiple records] */
+        WT_ITEM key;
+        WT_ITEM value;
+        size_t returned_count;
+        error_check(cursor->next_raw_key_value_batch(cursor, &key, &value, 1, &returned_count));
+        /*! [Return multiple records] */
+        error_check(cursor->reset(cursor));
+    }
+
     /*! [Return the previous record] */
     error_check(cursor->prev(cursor));
     /*! [Return the previous record] */

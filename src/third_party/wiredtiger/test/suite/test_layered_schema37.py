@@ -146,14 +146,19 @@ class test_layered_schema37(DisaggSchemaEpochMixin, wttest.WiredTigerTestCase):
                 self.assertEqual(cursor[self.key], self.value)
         self.assertTrue(self.follower_has_ingest_metadata(self.layered_uri))
 
-    # Steady-state pickup creates ingest metadata eagerly, while a table picked up at startup
-    # remains deferred.
-    def test_steady_state_pickup_creates_ingest_eagerly(self):
+    def test_steady_state_pickup_creates_ingest_lazily(self):
         self.create_table_and_start_follower()
         self.assertFalse(self.follower_has_ingest_metadata(self.layered_uri))
 
         self.create_populated_table(self.uri + '_new', timestamp=2)
         self.leader_checkpoint(2)
         self.disagg_advance_checkpoint_and_wait(self.conn_follow)
-        self.assertTrue(self.follower_has_ingest_metadata(self.layered_uri + '_new'))
+        self.assertFalse(self.follower_has_ingest_metadata(self.layered_uri))
+        self.assertFalse(self.follower_has_ingest_metadata(self.layered_uri + '_new'))
         self.assertEqual(self.lazy_ingest_creation_count(), 0)
+
+        with WiredTigerCursor(self.session_follow, self.uri + '_new') as cursor:
+            self.assertEqual(cursor[self.key], self.value)
+        self.assertFalse(self.follower_has_ingest_metadata(self.layered_uri))
+        self.assertTrue(self.follower_has_ingest_metadata(self.layered_uri + '_new'))
+        self.assertEqual(self.lazy_ingest_creation_count(), 1)

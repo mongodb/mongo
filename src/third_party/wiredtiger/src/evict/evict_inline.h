@@ -9,6 +9,28 @@
 #pragma once
 
 /*
+ * __evict_min_walk_pages --
+ *     Calculate the pages-seen threshold before abandoning a low-yield eviction walk.
+ *
+ * For enabled clean walks, scale a floor from 100 to 1,000 pages using the tree's share of cache in
+ *     use. The bounds match the original 10-times-target threshold for the usual minimum target of
+ *     10 pages and maximum refill of 100 pages. Cap the share at 100% because the tree and cache
+ *     sizes are sampled separately.
+ */
+static WT_INLINE uint64_t
+__evict_min_walk_pages(
+  uint32_t target_pages, bool clean, bool enabled, uint64_t tree_inuse, uint64_t cache_inuse)
+{
+    uint64_t min_pages;
+
+    min_pages = (clean ? 10 : 100) * (uint64_t)target_pages;
+    if (clean && enabled && cache_inuse != 0)
+        min_pages = WT_MAX(min_pages,
+          100 + (uint64_t)(900.0 * WT_MIN((double)tree_inuse / (double)cache_inuse, 1.0)));
+    return (min_pages);
+}
+
+/*
  * __evict_wake_waiters --
  *     Wake threads waiting for eviction candidates: n of them if bounded wake is configured, else
  *     all of them.

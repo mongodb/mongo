@@ -933,13 +933,14 @@ struct __wt_conn_debug {
  *     Eviction thread group configuration and management fields extracted from WT_CONNECTION_IMPL.
  */
 struct __wt_conn_evict_config {
-    bool server_running;             /* Eviction server operating */
-    WT_THREAD_GROUP threads;         /* Eviction thread group */
-    uint32_t threads_max;            /* Max eviction threads */
-    uint32_t threads_min;            /* Min eviction threads */
-    bool sample_inmem;               /* Sample in-memory pages */
-    wt_shared bool use_npos;         /* Use npos page visit strategy */
-    bool legacy_page_visit_strategy; /* Use legacy page visit strategy */
+    wt_shared bool cache_share_walk_budget; /* Scale clean walk budget by cache share */
+    bool server_running;                    /* Eviction server operating */
+    WT_THREAD_GROUP threads;                /* Eviction thread group */
+    uint32_t threads_max;                   /* Max eviction threads */
+    uint32_t threads_min;                   /* Min eviction threads */
+    bool sample_inmem;                      /* Sample in-memory pages */
+    wt_shared bool use_npos;                /* Use npos page visit strategy */
+    bool legacy_page_visit_strategy;        /* Use legacy page visit strategy */
 };
 
 /*

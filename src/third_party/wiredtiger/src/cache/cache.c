@@ -247,48 +247,55 @@ __wt_cache_destroy(WT_SESSION_IMPL *session)
 {
     WT_CACHE *cache;
     WT_CONNECTION_IMPL *conn;
+    const char *shutdown_mode;
 
     conn = S2C(session);
     cache = conn->cache;
+    shutdown_mode = F_ISSET_ATOMIC_32(conn, WT_CONN_LEAK_MEMORY) ? " leak_memory=true;" : "";
 
     if (cache == NULL)
         return (0);
 
     __wti_cache_top_destroy(session);
 
-    /* The cache should be empty at this point.  Complain if not. */
+    /*
+     * The cache should be empty after a normal close. With leak-memory enabled, page cleanup may
+     * skip operations that also release cache accounting.
+     */
     if (cache->pages_inmem != cache->pages_evicted)
         __wt_errx(session,
-          "cache server: exiting with %" PRIu64 " pages in memory and %" PRIu64 " pages evicted",
-          cache->pages_inmem, cache->pages_evicted);
+          "cache server:%s exiting with %" PRIu64 " pages in memory and %" PRIu64 " pages evicted",
+          shutdown_mode, cache->pages_inmem, cache->pages_evicted);
     if ((__wt_atomic_load_uint64_relaxed(&cache->bytes_image_intl) +
           __wt_atomic_load_uint64_relaxed(&cache->bytes_image_leaf)) != 0)
-        __wt_errx(session, "cache server: exiting with %" PRIu64 " image bytes in memory",
+        __wt_errx(session, "cache server:%s exiting with %" PRIu64 " image bytes in memory",
+          shutdown_mode,
           __wt_atomic_load_uint64_relaxed(&cache->bytes_image_intl) +
             __wt_atomic_load_uint64_relaxed(&cache->bytes_image_leaf));
     if (__wt_atomic_load_uint64_relaxed(&cache->bytes_inmem) != 0)
-        __wt_errx(session, "cache server: exiting with %" PRIu64 " bytes in memory",
-          __wt_atomic_load_uint64_relaxed(&cache->bytes_inmem));
+        __wt_errx(session, "cache server:%s exiting with %" PRIu64 " bytes in memory",
+          shutdown_mode, __wt_atomic_load_uint64_relaxed(&cache->bytes_inmem));
     if ((__wt_atomic_load_uint64_relaxed(&cache->bytes_dirty_intl) +
           __wt_atomic_load_uint64_relaxed(&cache->bytes_dirty_leaf)) != 0 ||
       cache->pages_dirty_intl + cache->pages_dirty_leaf != 0)
         __wt_errx(session,
-          "cache server: exiting with %" PRIu64 " bytes dirty and %" PRIu64 " pages dirty",
+          "cache server:%s exiting with %" PRIu64 " bytes dirty and %" PRIu64 " pages dirty",
+          shutdown_mode,
           __wt_atomic_load_uint64_relaxed(&cache->bytes_dirty_intl) +
             __wt_atomic_load_uint64_relaxed(&cache->bytes_dirty_leaf),
           cache->pages_dirty_intl + cache->pages_dirty_leaf);
 
     /*
-     * Every page has been discarded and every dhandle closed by this point, so any image checkpoint
-     * scrub retained has been freed with its page. A non-zero count means a path freed an image
-     * without releasing its accounting.
+     * A normal close discards every page and closes every dhandle, freeing retained
+     * checkpoint-scrub images and their accounting. With leak-memory enabled, page cleanup skips
+     * that work, so the counters may remain non-zero.
      */
     if (__wt_atomic_load_uint64_relaxed(&cache->bytes_scrub_image) != 0 ||
       __wt_atomic_load_uint64_relaxed(&cache->pages_scrub_image) != 0)
         __wt_errx(session,
-          "cache server: exiting with %" PRIu64 " scrub image bytes and %" PRIu64
+          "cache server:%s exiting with %" PRIu64 " scrub image bytes and %" PRIu64
           " scrub image pages",
-          __wt_atomic_load_uint64_relaxed(&cache->bytes_scrub_image),
+          shutdown_mode, __wt_atomic_load_uint64_relaxed(&cache->bytes_scrub_image),
           __wt_atomic_load_uint64_relaxed(&cache->pages_scrub_image));
 
     /* Destroy the shared disk cache if it was initialized. */

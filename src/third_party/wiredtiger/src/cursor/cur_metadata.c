@@ -569,6 +569,7 @@ __wt_curmetadata_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owne
       __curmetadata_compare,                          /* compare */
       __wt_cursor_equals,                             /* equals */
       __curmetadata_next,                             /* next */
+      __wt_cursor_next_raw_kv_batch_notsup,           /* next-raw-kv-batch */
       __curmetadata_prev,                             /* prev */
       __curmetadata_reset,                            /* reset */
       __curmetadata_search,                           /* search */

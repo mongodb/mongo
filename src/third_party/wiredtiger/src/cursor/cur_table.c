@@ -277,6 +277,34 @@ err:
 }
 
 /*
+ * __curtable_next_raw_kv_batch --
+ *     Read up to count keys and values, moving the cursor forward accordingly.
+ */
+static int
+__curtable_next_raw_kv_batch(
+  WT_CURSOR *cursor, WT_ITEM *keys, WT_ITEM *values, size_t count, size_t *returned_countp)
+{
+    WT_CURSOR_TABLE *ctable = (WT_CURSOR_TABLE *)cursor;
+    WT_CURSOR *primary;
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+
+    CURSOR_API_CALL(cursor, session, ret, next_raw_kv_batch, NULL);
+    CURSOR_REPOSITION_ENTER(cursor, session);
+    CURSOR_API_CHECK_SYSTEM_OVERLOAD(session, ret);
+
+    if (WT_COLGROUPS(ctable->table) != 1)
+        WT_ERR(__wt_cursor_notsup(cursor));
+
+    primary = *ctable->cg_cursors;
+    WT_ERR(primary->next_raw_key_value_batch(primary, keys, values, count, returned_countp));
+
+err:
+    CURSOR_REPOSITION_END(cursor, session);
+    API_END_RET(session, ret);
+}
+
+/*
  * __curtable_next_random --
  *     WT_CURSOR->next method for the table cursor type when configured with next_random.
  */
@@ -973,6 +1001,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, 
       __curtable_compare,                            /* compare */
       __wt_cursor_equals,                            /* equals */
       __curtable_next,                               /* next */
+      __curtable_next_raw_kv_batch,                  /* next-raw-kv-batch */
       __curtable_prev,                               /* prev */
       __curtable_reset,                              /* reset */
       __curtable_search,                             /* search */

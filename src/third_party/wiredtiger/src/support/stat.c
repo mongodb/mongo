@@ -312,6 +312,8 @@ static const char *const __stats_dsrc_desc[] = {
   "cursor: cursor next calls that skip greater than 1 and fewer than 100 entries",
   "cursor: cursor next calls that skip greater than or equal to 100 entries",
   "cursor: cursor next random calls that return an error",
+  "cursor: cursor next raw key value batch calls",
+  "cursor: cursor next raw kv batch calls that return an error",
   "cursor: cursor prev calls that return an error",
   "cursor: cursor prev calls that skip due to a globally visible history store tombstone",
   "cursor: cursor prev calls that skip greater than or equal to 100 entries",
@@ -330,6 +332,7 @@ static const char *const __stats_dsrc_desc[] = {
   "cursor: modify key and value bytes affected",
   "cursor: modify value bytes modified",
   "cursor: next calls",
+  "cursor: number of results returned by cursor next raw key value batch",
   "cursor: open cursor count",
   "cursor: open cursor time application (usecs)",
   "cursor: open cursor time internal (usecs)",
@@ -524,6 +527,18 @@ __wt_stat_dsrc_desc(WT_CURSOR_STAT *cst, int slot, const char **p)
     return (0);
 }
 
+static const int __stats_dsrc_otel_counters[] = {
+  WT_STAT_DSRC_CACHE_BYTES_READ,
+  WT_STAT_DSRC_CACHE_BYTES_WRITE,
+  WT_STAT_DSRC_CACHE_READ,
+  WT_STAT_DSRC_CACHE_PAGES_REQUESTED,
+};
+
+static const int __stats_dsrc_otel_gauges[] = {
+  WT_STAT_DSRC_CACHE_BYTES_INUSE,
+  WT_STAT_DSRC_CACHE_BYTES_DIRTY,
+};
+
 static const int __stats_dsrc_otel_none[] = {
   WT_STAT_DSRC_AUTOCOMMIT_READONLY_RETRY,
   WT_STAT_DSRC_AUTOCOMMIT_UPDATE_RETRY,
@@ -613,10 +628,7 @@ static const int __stats_dsrc_otel_none[] = {
   WT_STAT_DSRC_CACHE_EVICTION_APP_THREADS_FILL_RATIO_50_75,
   WT_STAT_DSRC_CACHE_EVICTION_APP_THREADS_FILL_RATIO_GT_75,
   WT_STAT_DSRC_CACHE_EVICTION_APP_THREADS_SKIP_UPDATES_DIRTY_PAGE,
-  WT_STAT_DSRC_CACHE_BYTES_INUSE,
   WT_STAT_DSRC_CACHE_BYTES_DIRTY_TOTAL,
-  WT_STAT_DSRC_CACHE_BYTES_READ,
-  WT_STAT_DSRC_CACHE_BYTES_WRITE,
   WT_STAT_DSRC_CACHE_EVICTION_BLOCKED_CHECKPOINT,
   WT_STAT_DSRC_CACHE_EVICTION_BLOCKED_CHECKPOINT_HS,
   WT_STAT_DSRC_CACHE_WRITE_RESTORE_SCRUB_SKIPPED_DIRTY,
@@ -691,11 +703,9 @@ static const int __stats_dsrc_otel_none[] = {
   WT_STAT_DSRC_CACHE_WRITE_HS,
   WT_STAT_DSRC_CACHE_EVICTION_DIRTY_OBSOLETE_TW,
   WT_STAT_DSRC_CACHE_EVICTION_AHEAD_OF_LAST_MATERIALIZED_LSN,
-  WT_STAT_DSRC_CACHE_READ,
   WT_STAT_DSRC_CACHE_READ_DELETED,
   WT_STAT_DSRC_CACHE_READ_DELETED_PREPARED,
   WT_STAT_DSRC_CACHE_READ_CHECKPOINT,
-  WT_STAT_DSRC_CACHE_PAGES_REQUESTED,
   WT_STAT_DSRC_CACHE_PAGES_PREFETCH,
   WT_STAT_DSRC_CACHE_PAGES_REQUESTED_INTERNAL,
   WT_STAT_DSRC_CACHE_PAGES_REQUESTED_LEAF,
@@ -718,7 +728,6 @@ static const int __stats_dsrc_otel_none[] = {
   WT_STAT_DSRC_CACHE_READ_RESTORED_TOMBSTONE_BYTES,
   WT_STAT_DSRC_CACHE_HS_INSERT_FULL_UPDATE,
   WT_STAT_DSRC_CACHE_HS_INSERT_REVERSE_MODIFY,
-  WT_STAT_DSRC_CACHE_BYTES_DIRTY,
   WT_STAT_DSRC_CACHE_BYTES_DIRTY_INTERNAL,
   WT_STAT_DSRC_CACHE_BYTES_DIRTY_LEAF,
   WT_STAT_DSRC_CACHE_EVICTION_BLOCKED_UNCOMMITTED_TRUNCATE,
@@ -812,6 +821,8 @@ static const int __stats_dsrc_otel_none[] = {
   WT_STAT_DSRC_CURSOR_NEXT_SKIP_LT_100,
   WT_STAT_DSRC_CURSOR_NEXT_SKIP_GE_100,
   WT_STAT_DSRC_CURSOR_NEXT_RANDOM_ERROR,
+  WT_STAT_DSRC_CURSOR_NEXT_RAW_KV_BATCH,
+  WT_STAT_DSRC_CURSOR_NEXT_RAW_KV_BATCH_ERROR,
   WT_STAT_DSRC_CURSOR_PREV_ERROR,
   WT_STAT_DSRC_CURSOR_PREV_HS_TOMBSTONE,
   WT_STAT_DSRC_CURSOR_PREV_SKIP_GE_100,
@@ -830,6 +841,7 @@ static const int __stats_dsrc_otel_none[] = {
   WT_STAT_DSRC_CURSOR_MODIFY_BYTES,
   WT_STAT_DSRC_CURSOR_MODIFY_BYTES_TOUCH,
   WT_STAT_DSRC_CURSOR_NEXT,
+  WT_STAT_DSRC_CURSOR_NEXT_RAW_KV_BATCH_RESULT,
   WT_STAT_DSRC_CURSOR_OPEN_COUNT,
   WT_STAT_DSRC_CURSOR_OPEN_TIME_USER_USECS,
   WT_STAT_DSRC_CURSOR_OPEN_TIME_INTERNAL_USECS,
@@ -1009,12 +1021,12 @@ __wt_stat_dsrc_otel_keys(uint32_t otel_flag, const int **keysp, u_int *countp)
 {
     switch (otel_flag) {
     case WT_STAT_OTEL_COUNTERS:
-        *keysp = NULL;
-        *countp = 0;
+        *keysp = __stats_dsrc_otel_counters;
+        *countp = WT_ELEMENTS(__stats_dsrc_otel_counters);
         break;
     case WT_STAT_OTEL_GAUGES:
-        *keysp = NULL;
-        *countp = 0;
+        *keysp = __stats_dsrc_otel_gauges;
+        *countp = WT_ELEMENTS(__stats_dsrc_otel_gauges);
         break;
     case WT_STAT_OTEL_HISTOGRAMS:
         *keysp = NULL;
@@ -1055,6 +1067,24 @@ void
 __wt_stat_dsrc_discard(WT_SESSION_IMPL *session, WT_DATA_HANDLE *handle)
 {
     __wt_free(session, handle->stat_array);
+}
+
+static void
+__stat_dsrc_clear_counters(WT_DSRC_STATS *stats)
+{
+    stats->cache_bytes_read = 0;
+    stats->cache_bytes_write = 0;
+    stats->cache_read = 0;
+    stats->cache_pages_requested = 0;
+}
+
+static void
+__stat_dsrc_clear_gauges(WT_DSRC_STATS *stats)
+{
+    WT_UNUSED(stats);
+
+    /* not clearing cache_bytes_inuse */
+    /* not clearing cache_bytes_dirty */
 }
 
 static void
@@ -1148,10 +1178,7 @@ __stat_dsrc_clear_none(WT_DSRC_STATS *stats)
     stats->cache_eviction_app_threads_fill_ratio_50_75 = 0;
     stats->cache_eviction_app_threads_fill_ratio_gt_75 = 0;
     stats->cache_eviction_app_threads_skip_updates_dirty_page = 0;
-    /* not clearing cache_bytes_inuse */
     /* not clearing cache_bytes_dirty_total */
-    stats->cache_bytes_read = 0;
-    stats->cache_bytes_write = 0;
     stats->cache_eviction_blocked_checkpoint = 0;
     stats->cache_eviction_blocked_checkpoint_hs = 0;
     stats->cache_write_restore_scrub_skipped_dirty = 0;
@@ -1226,11 +1253,9 @@ __stat_dsrc_clear_none(WT_DSRC_STATS *stats)
     stats->cache_write_hs = 0;
     stats->cache_eviction_dirty_obsolete_tw = 0;
     stats->cache_eviction_ahead_of_last_materialized_lsn = 0;
-    stats->cache_read = 0;
     stats->cache_read_deleted = 0;
     stats->cache_read_deleted_prepared = 0;
     stats->cache_read_checkpoint = 0;
-    stats->cache_pages_requested = 0;
     stats->cache_pages_prefetch = 0;
     stats->cache_pages_requested_internal = 0;
     stats->cache_pages_requested_leaf = 0;
@@ -1253,7 +1278,6 @@ __stat_dsrc_clear_none(WT_DSRC_STATS *stats)
     stats->cache_read_restored_tombstone_bytes = 0;
     stats->cache_hs_insert_full_update = 0;
     stats->cache_hs_insert_reverse_modify = 0;
-    /* not clearing cache_bytes_dirty */
     /* not clearing cache_bytes_dirty_internal */
     /* not clearing cache_bytes_dirty_leaf */
     stats->cache_eviction_blocked_uncommitted_truncate = 0;
@@ -1347,6 +1371,8 @@ __stat_dsrc_clear_none(WT_DSRC_STATS *stats)
     stats->cursor_next_skip_lt_100 = 0;
     stats->cursor_next_skip_ge_100 = 0;
     stats->cursor_next_random_error = 0;
+    stats->cursor_next_raw_kv_batch = 0;
+    stats->cursor_next_raw_kv_batch_error = 0;
     stats->cursor_prev_error = 0;
     stats->cursor_prev_hs_tombstone = 0;
     stats->cursor_prev_skip_ge_100 = 0;
@@ -1365,6 +1391,7 @@ __stat_dsrc_clear_none(WT_DSRC_STATS *stats)
     stats->cursor_modify_bytes = 0;
     stats->cursor_modify_bytes_touch = 0;
     stats->cursor_next = 0;
+    stats->cursor_next_raw_kv_batch_result = 0;
     /* not clearing cursor_open_count */
     /* not clearing cursor_open_time_user_usecs */
     /* not clearing cursor_open_time_internal_usecs */
@@ -1544,8 +1571,10 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats, uint32_t otel_flag)
 {
     switch (otel_flag) {
     case WT_STAT_OTEL_COUNTERS:
+        __stat_dsrc_clear_counters(stats);
         return;
     case WT_STAT_OTEL_GAUGES:
+        __stat_dsrc_clear_gauges(stats);
         return;
     case WT_STAT_OTEL_HISTOGRAMS:
         return;
@@ -1556,6 +1585,8 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats, uint32_t otel_flag)
         break;
     }
 
+    __stat_dsrc_clear_counters(stats);
+    __stat_dsrc_clear_gauges(stats);
     __stat_dsrc_clear_none(stats);
 }
 
@@ -1897,6 +1928,8 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->cursor_next_skip_lt_100 += from->cursor_next_skip_lt_100;
     to->cursor_next_skip_ge_100 += from->cursor_next_skip_ge_100;
     to->cursor_next_random_error += from->cursor_next_random_error;
+    to->cursor_next_raw_kv_batch += from->cursor_next_raw_kv_batch;
+    to->cursor_next_raw_kv_batch_error += from->cursor_next_raw_kv_batch_error;
     to->cursor_prev_error += from->cursor_prev_error;
     to->cursor_prev_hs_tombstone += from->cursor_prev_hs_tombstone;
     to->cursor_prev_skip_ge_100 += from->cursor_prev_skip_ge_100;
@@ -1915,6 +1948,7 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->cursor_modify_bytes += from->cursor_modify_bytes;
     to->cursor_modify_bytes_touch += from->cursor_modify_bytes_touch;
     to->cursor_next += from->cursor_next;
+    to->cursor_next_raw_kv_batch_result += from->cursor_next_raw_kv_batch_result;
     to->cursor_open_count += from->cursor_open_count;
     to->cursor_open_time_user_usecs += from->cursor_open_time_user_usecs;
     to->cursor_open_time_internal_usecs += from->cursor_open_time_internal_usecs;
@@ -2488,6 +2522,8 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->cursor_next_skip_lt_100 += WT_STAT_DSRC_READ(from, cursor_next_skip_lt_100);
     to->cursor_next_skip_ge_100 += WT_STAT_DSRC_READ(from, cursor_next_skip_ge_100);
     to->cursor_next_random_error += WT_STAT_DSRC_READ(from, cursor_next_random_error);
+    to->cursor_next_raw_kv_batch += WT_STAT_DSRC_READ(from, cursor_next_raw_kv_batch);
+    to->cursor_next_raw_kv_batch_error += WT_STAT_DSRC_READ(from, cursor_next_raw_kv_batch_error);
     to->cursor_prev_error += WT_STAT_DSRC_READ(from, cursor_prev_error);
     to->cursor_prev_hs_tombstone += WT_STAT_DSRC_READ(from, cursor_prev_hs_tombstone);
     to->cursor_prev_skip_ge_100 += WT_STAT_DSRC_READ(from, cursor_prev_skip_ge_100);
@@ -2506,6 +2542,7 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->cursor_modify_bytes += WT_STAT_DSRC_READ(from, cursor_modify_bytes);
     to->cursor_modify_bytes_touch += WT_STAT_DSRC_READ(from, cursor_modify_bytes_touch);
     to->cursor_next += WT_STAT_DSRC_READ(from, cursor_next);
+    to->cursor_next_raw_kv_batch_result += WT_STAT_DSRC_READ(from, cursor_next_raw_kv_batch_result);
     to->cursor_open_count += WT_STAT_DSRC_READ(from, cursor_open_count);
     to->cursor_open_time_user_usecs += WT_STAT_DSRC_READ(from, cursor_open_time_user_usecs);
     to->cursor_open_time_internal_usecs += WT_STAT_DSRC_READ(from, cursor_open_time_internal_usecs);
@@ -3331,6 +3368,8 @@ static const char *const __stats_connection_desc[] = {
   "cursor: cursor next calls that skip greater than 1 and fewer than 100 entries",
   "cursor: cursor next calls that skip greater than or equal to 100 entries",
   "cursor: cursor next random calls that return an error",
+  "cursor: cursor next raw key value batch calls",
+  "cursor: cursor next raw kv batch calls that return an error",
   "cursor: cursor operation restarted",
   "cursor: cursor prev calls",
   "cursor: cursor prev calls that return an error",
@@ -3362,6 +3401,7 @@ static const char *const __stats_connection_desc[] = {
   "cursor: cursor update key and value bytes",
   "cursor: cursor update value size change",
   "cursor: cursors reused from cache",
+  "cursor: number of results returned by cursor next raw key value batch",
   "cursor: open cursor count",
   "cursor: open cursor time application (usecs)",
   "cursor: open cursor time internal (usecs)",
@@ -3944,11 +3984,28 @@ __wt_stat_connection_desc(WT_CURSOR_STAT *cst, int slot, const char **p)
 }
 
 static const int __stats_connection_otel_counters[] = {
+  WT_STAT_CONN_CACHE_BYTES_READ,
+  WT_STAT_CONN_CACHE_BYTES_WRITE,
+  WT_STAT_CONN_EVICTION_WORKER_EVICT_ATTEMPT,
+  WT_STAT_CONN_EVICTION_WORKER_EVICT_FAIL,
+  WT_STAT_CONN_EVICTION_GET_REF_EMPTY,
+  WT_STAT_CONN_EVICTION_APP_ATTEMPT,
+  WT_STAT_CONN_EVICTION_APP_FAIL,
+  WT_STAT_CONN_CACHE_READ,
+  WT_STAT_CONN_CACHE_PAGES_REQUESTED,
+  WT_STAT_CONN_CHECKPOINT_TIME_RECENT,
   WT_STAT_CONN_CURSOR_INSERT,
 };
 
 static const int __stats_connection_otel_gauges[] = {
+  WT_STAT_CONN_CACHE_BYTES_INUSE,
+  WT_STAT_CONN_EVICTION_EMPTY_SCORE,
+  WT_STAT_CONN_EVICTION_ACTIVE_WORKERS,
+  WT_STAT_CONN_EVICTION_STABLE_STATE_WORKERS,
+  WT_STAT_CONN_CACHE_BYTES_MAX,
   WT_STAT_CONN_CACHE_PAGES_INUSE,
+  WT_STAT_CONN_CACHE_BYTES_DIRTY,
+  WT_STAT_CONN_DH_CONN_HANDLE_COUNT,
   WT_STAT_CONN_DISAGG_SCHEMA_AWAITING_CHECKPOINT_OLDEST,
   WT_STAT_CONN_DISAGG_SCHEMA_AWAITING_PUBLISH_OLDEST,
   WT_STAT_CONN_DISAGG_SCHEMA_AWAITING_CHECKPOINT,
@@ -4064,12 +4121,9 @@ static const int __stats_connection_otel_none[] = {
   WT_STAT_CONN_CACHE_BYTES_IMAGE_INGEST,
   WT_STAT_CONN_CACHE_BYTES_IMAGE_STABLE,
   WT_STAT_CONN_CACHE_BYTES_HS,
-  WT_STAT_CONN_CACHE_BYTES_INUSE,
   WT_STAT_CONN_CACHE_BYTES_DIRTY_TOTAL,
   WT_STAT_CONN_CACHE_BYTES_OTHER,
   WT_STAT_CONN_CACHE_SCRUB_IMAGE_BYTES,
-  WT_STAT_CONN_CACHE_BYTES_READ,
-  WT_STAT_CONN_CACHE_BYTES_WRITE,
   WT_STAT_CONN_CACHE_TOLERANCE_LEVEL,
   WT_STAT_CONN_CACHE_EVICTION_BLOCKED_CHECKPOINT,
   WT_STAT_CONN_CACHE_EVICTION_BLOCKED_CHECKPOINT_HS,
@@ -4078,13 +4132,9 @@ static const int __stats_connection_otel_none[] = {
   WT_STAT_CONN_CACHE_EVICTION_BLOCKED_DISAGG_DIRTY_INTERNAL_PAGE,
   WT_STAT_CONN_EVICTION_DISAGG_PUBLISH_CLEARED,
   WT_STAT_CONN_EVICTION_SERVER_EVICT_ATTEMPT,
-  WT_STAT_CONN_EVICTION_WORKER_EVICT_ATTEMPT,
   WT_STAT_CONN_EVICTION_SERVER_EVICT_FAIL,
-  WT_STAT_CONN_EVICTION_WORKER_EVICT_FAIL,
-  WT_STAT_CONN_EVICTION_GET_REF_EMPTY,
   WT_STAT_CONN_EVICTION_GET_REF_EMPTY2,
   WT_STAT_CONN_EVICTION_AGGRESSIVE_SET,
-  WT_STAT_CONN_EVICTION_EMPTY_SCORE,
   WT_STAT_CONN_CACHE_EVICTION_BLOCKED_NO_TS_CHECKPOINT_RACE_1,
   WT_STAT_CONN_CACHE_EVICTION_BLOCKED_NO_TS_CHECKPOINT_RACE_2,
   WT_STAT_CONN_CACHE_EVICTION_BLOCKED_NO_TS_CHECKPOINT_RACE_3,
@@ -4175,8 +4225,6 @@ static const int __stats_connection_otel_none[] = {
   WT_STAT_CONN_EVICTION_WALK_RESTART,
   WT_STAT_CONN_EVICTION_WALK_FROM_ROOT,
   WT_STAT_CONN_EVICTION_WALK_SAVED_POS,
-  WT_STAT_CONN_EVICTION_ACTIVE_WORKERS,
-  WT_STAT_CONN_EVICTION_STABLE_STATE_WORKERS,
   WT_STAT_CONN_EVICTION_CKPT_SNAPSHOT_DECLINED,
   WT_STAT_CONN_EVICTION_WALKS_ACTIVE,
   WT_STAT_CONN_EVICTION_WALKS_STARTED,
@@ -4234,7 +4282,6 @@ static const int __stats_connection_otel_none[] = {
   WT_STAT_CONN_CACHE_READ_LEAF,
   WT_STAT_CONN_CACHE_EVICTION_SPLIT_LEAF,
   WT_STAT_CONN_CACHE_EVICTION_RANDOM_SAMPLE_INMEM_ROOT,
-  WT_STAT_CONN_CACHE_BYTES_MAX,
   WT_STAT_CONN_EVICTION_MAXIMUM_CLEAN_PAGE_SIZE_PER_CHECKPOINT,
   WT_STAT_CONN_EVICTION_MAXIMUM_DIRTY_PAGE_SIZE_PER_CHECKPOINT,
   WT_STAT_CONN_EVICTION_MAXIMUM_UNVISITED_GEN_GAP,
@@ -4261,8 +4308,6 @@ static const int __stats_connection_otel_none[] = {
   WT_STAT_CONN_EVICTION_TIMED_OUT_OPS,
   WT_STAT_CONN_CACHE_EVICTION_BLOCKED_OVERFLOW_KEYS,
   WT_STAT_CONN_CACHE_READ_OVERFLOW,
-  WT_STAT_CONN_EVICTION_APP_ATTEMPT,
-  WT_STAT_CONN_EVICTION_APP_FAIL,
   WT_STAT_CONN_CACHE_EVICTION_BLOCKED_MATERIALIZATION,
   WT_STAT_CONN_CACHE_EVICTION_BLOCKED_DISAGG_NEXT_CHECKPOINT,
   WT_STAT_CONN_CACHE_EVICTION_DEEPEN,
@@ -4280,12 +4325,10 @@ static const int __stats_connection_otel_none[] = {
   WT_STAT_CONN_EVICTION_PAGES_QUEUED_URGENT,
   WT_STAT_CONN_EVICTION_PAGES_QUEUED_OLDEST,
   WT_STAT_CONN_EVICTION_PAGES_QUEUED_URGENT_HS_DIRTY,
-  WT_STAT_CONN_CACHE_READ,
   WT_STAT_CONN_CACHE_READ_DELETED,
   WT_STAT_CONN_CACHE_READ_DELETED_PREPARED,
   WT_STAT_CONN_CACHE_READ_CHECKPOINT,
   WT_STAT_CONN_EVICTION_CLEAR_ORDINARY,
-  WT_STAT_CONN_CACHE_PAGES_REQUESTED,
   WT_STAT_CONN_CACHE_PAGES_PREFETCH,
   WT_STAT_CONN_CACHE_PAGES_REQUESTED_INTERNAL,
   WT_STAT_CONN_CACHE_PAGES_REQUESTED_LEAF,
@@ -4337,7 +4380,6 @@ static const int __stats_connection_otel_none[] = {
   WT_STAT_CONN_CACHE_BYTES_LEAF,
   WT_STAT_CONN_CACHE_BYTES_LEAF_INGEST,
   WT_STAT_CONN_CACHE_BYTES_LEAF_STABLE,
-  WT_STAT_CONN_CACHE_BYTES_DIRTY,
   WT_STAT_CONN_CACHE_BYTES_DIRTY_INGEST,
   WT_STAT_CONN_CACHE_BYTES_DIRTY_STABLE,
   WT_STAT_CONN_CACHE_BYTES_DIRTY_INTERNAL,
@@ -4401,7 +4443,6 @@ static const int __stats_connection_otel_none[] = {
   WT_STAT_CONN_CHECKPOINT_HANDLE_LOCKED,
   WT_STAT_CONN_CHECKPOINT_HANDLE_SKIPPED,
   WT_STAT_CONN_CHECKPOINT_HANDLE_WALKED,
-  WT_STAT_CONN_CHECKPOINT_TIME_RECENT,
   WT_STAT_CONN_CHECKPOINT_PAGES_RECONCILED_BYTES,
   WT_STAT_CONN_CHECKPOINTS_API,
   WT_STAT_CONN_CHECKPOINTS_COMPACT,
@@ -4503,6 +4544,8 @@ static const int __stats_connection_otel_none[] = {
   WT_STAT_CONN_CURSOR_NEXT_SKIP_LT_100,
   WT_STAT_CONN_CURSOR_NEXT_SKIP_GE_100,
   WT_STAT_CONN_CURSOR_NEXT_RANDOM_ERROR,
+  WT_STAT_CONN_CURSOR_NEXT_RAW_KV_BATCH,
+  WT_STAT_CONN_CURSOR_NEXT_RAW_KV_BATCH_ERROR,
   WT_STAT_CONN_CURSOR_RESTART,
   WT_STAT_CONN_CURSOR_PREV,
   WT_STAT_CONN_CURSOR_PREV_ERROR,
@@ -4534,6 +4577,7 @@ static const int __stats_connection_otel_none[] = {
   WT_STAT_CONN_CURSOR_UPDATE_BYTES,
   WT_STAT_CONN_CURSOR_UPDATE_BYTES_CHANGED,
   WT_STAT_CONN_CURSOR_REOPEN,
+  WT_STAT_CONN_CURSOR_NEXT_RAW_KV_BATCH_RESULT,
   WT_STAT_CONN_CURSOR_OPEN_COUNT,
   WT_STAT_CONN_CURSOR_OPEN_TIME_USER_USECS,
   WT_STAT_CONN_CURSOR_OPEN_TIME_INTERNAL_USECS,
@@ -4548,7 +4592,6 @@ static const int __stats_connection_otel_none[] = {
   WT_STAT_CONN_DH_CONN_HANDLE_BTREE_COUNT,
   WT_STAT_CONN_DH_CONN_HANDLE_CHECKPOINT_COUNT,
   WT_STAT_CONN_DH_CONN_HANDLE_SIZE,
-  WT_STAT_CONN_DH_CONN_HANDLE_COUNT,
   WT_STAT_CONN_DH_SWEEP_REF,
   WT_STAT_CONN_DH_SWEEP_DEAD_CLOSE,
   WT_STAT_CONN_DH_SWEEP_REMOVE,
@@ -5129,6 +5172,16 @@ __wt_stat_connection_discard(WT_SESSION_IMPL *session, WT_CONNECTION_IMPL *handl
 static void
 __stat_connection_clear_counters(WT_CONNECTION_STATS *stats)
 {
+    stats->cache_bytes_read = 0;
+    stats->cache_bytes_write = 0;
+    stats->eviction_worker_evict_attempt = 0;
+    stats->eviction_worker_evict_fail = 0;
+    stats->eviction_get_ref_empty = 0;
+    stats->eviction_app_attempt = 0;
+    stats->eviction_app_fail = 0;
+    stats->cache_read = 0;
+    stats->cache_pages_requested = 0;
+    stats->checkpoint_time_recent = 0;
     stats->cursor_insert = 0;
 }
 
@@ -5137,7 +5190,14 @@ __stat_connection_clear_gauges(WT_CONNECTION_STATS *stats)
 {
     WT_UNUSED(stats);
 
+    /* not clearing cache_bytes_inuse */
+    /* not clearing eviction_empty_score */
+    /* not clearing eviction_active_workers */
+    /* not clearing eviction_stable_state_workers */
+    /* not clearing cache_bytes_max */
     /* not clearing cache_pages_inuse */
+    /* not clearing cache_bytes_dirty */
+    /* not clearing dh_conn_handle_count */
     /* not clearing disagg_schema_awaiting_checkpoint_oldest */
     /* not clearing disagg_schema_awaiting_publish_oldest */
     /* not clearing disagg_schema_awaiting_checkpoint */
@@ -5257,12 +5317,9 @@ __stat_connection_clear_none(WT_CONNECTION_STATS *stats)
     /* not clearing cache_bytes_image_ingest */
     /* not clearing cache_bytes_image_stable */
     /* not clearing cache_bytes_hs */
-    /* not clearing cache_bytes_inuse */
     /* not clearing cache_bytes_dirty_total */
     /* not clearing cache_bytes_other */
     /* not clearing cache_scrub_image_bytes */
-    stats->cache_bytes_read = 0;
-    stats->cache_bytes_write = 0;
     /* not clearing cache_tolerance_level */
     stats->cache_eviction_blocked_checkpoint = 0;
     stats->cache_eviction_blocked_checkpoint_hs = 0;
@@ -5271,13 +5328,9 @@ __stat_connection_clear_none(WT_CONNECTION_STATS *stats)
     stats->cache_eviction_blocked_disagg_dirty_internal_page = 0;
     stats->eviction_disagg_publish_cleared = 0;
     stats->eviction_server_evict_attempt = 0;
-    stats->eviction_worker_evict_attempt = 0;
     stats->eviction_server_evict_fail = 0;
-    stats->eviction_worker_evict_fail = 0;
-    stats->eviction_get_ref_empty = 0;
     stats->eviction_get_ref_empty2 = 0;
     /* not clearing eviction_aggressive_set */
-    /* not clearing eviction_empty_score */
     stats->cache_eviction_blocked_no_ts_checkpoint_race_1 = 0;
     stats->cache_eviction_blocked_no_ts_checkpoint_race_2 = 0;
     stats->cache_eviction_blocked_no_ts_checkpoint_race_3 = 0;
@@ -5368,8 +5421,6 @@ __stat_connection_clear_none(WT_CONNECTION_STATS *stats)
     stats->eviction_walk_restart = 0;
     stats->eviction_walk_from_root = 0;
     stats->eviction_walk_saved_pos = 0;
-    /* not clearing eviction_active_workers */
-    /* not clearing eviction_stable_state_workers */
     stats->eviction_ckpt_snapshot_declined = 0;
     /* not clearing eviction_walks_active */
     stats->eviction_walks_started = 0;
@@ -5427,7 +5478,6 @@ __stat_connection_clear_none(WT_CONNECTION_STATS *stats)
     stats->cache_read_leaf = 0;
     stats->cache_eviction_split_leaf = 0;
     stats->cache_eviction_random_sample_inmem_root = 0;
-    /* not clearing cache_bytes_max */
     /* not clearing eviction_maximum_clean_page_size_per_checkpoint */
     /* not clearing eviction_maximum_dirty_page_size_per_checkpoint */
     /* not clearing eviction_maximum_unvisited_gen_gap */
@@ -5454,8 +5504,6 @@ __stat_connection_clear_none(WT_CONNECTION_STATS *stats)
     stats->eviction_timed_out_ops = 0;
     stats->cache_eviction_blocked_overflow_keys = 0;
     stats->cache_read_overflow = 0;
-    stats->eviction_app_attempt = 0;
-    stats->eviction_app_fail = 0;
     stats->cache_eviction_blocked_materialization = 0;
     stats->cache_eviction_blocked_disagg_next_checkpoint = 0;
     stats->cache_eviction_deepen = 0;
@@ -5473,12 +5521,10 @@ __stat_connection_clear_none(WT_CONNECTION_STATS *stats)
     stats->eviction_pages_queued_urgent = 0;
     stats->eviction_pages_queued_oldest = 0;
     stats->eviction_pages_queued_urgent_hs_dirty = 0;
-    stats->cache_read = 0;
     stats->cache_read_deleted = 0;
     stats->cache_read_deleted_prepared = 0;
     stats->cache_read_checkpoint = 0;
     stats->eviction_clear_ordinary = 0;
-    stats->cache_pages_requested = 0;
     stats->cache_pages_prefetch = 0;
     stats->cache_pages_requested_internal = 0;
     stats->cache_pages_requested_leaf = 0;
@@ -5530,7 +5576,6 @@ __stat_connection_clear_none(WT_CONNECTION_STATS *stats)
     /* not clearing cache_bytes_leaf */
     /* not clearing cache_bytes_leaf_ingest */
     /* not clearing cache_bytes_leaf_stable */
-    /* not clearing cache_bytes_dirty */
     /* not clearing cache_bytes_dirty_ingest */
     /* not clearing cache_bytes_dirty_stable */
     /* not clearing cache_bytes_dirty_internal */
@@ -5594,7 +5639,6 @@ __stat_connection_clear_none(WT_CONNECTION_STATS *stats)
     stats->checkpoint_handle_locked = 0;
     stats->checkpoint_handle_skipped = 0;
     stats->checkpoint_handle_walked = 0;
-    /* not clearing checkpoint_time_recent */
     stats->checkpoint_pages_reconciled_bytes = 0;
     stats->checkpoints_api = 0;
     stats->checkpoints_compact = 0;
@@ -5696,6 +5740,8 @@ __stat_connection_clear_none(WT_CONNECTION_STATS *stats)
     stats->cursor_next_skip_lt_100 = 0;
     stats->cursor_next_skip_ge_100 = 0;
     stats->cursor_next_random_error = 0;
+    stats->cursor_next_raw_kv_batch = 0;
+    stats->cursor_next_raw_kv_batch_error = 0;
     stats->cursor_restart = 0;
     stats->cursor_prev = 0;
     stats->cursor_prev_error = 0;
@@ -5727,6 +5773,7 @@ __stat_connection_clear_none(WT_CONNECTION_STATS *stats)
     stats->cursor_update_bytes = 0;
     stats->cursor_update_bytes_changed = 0;
     stats->cursor_reopen = 0;
+    stats->cursor_next_raw_kv_batch_result = 0;
     /* not clearing cursor_open_count */
     /* not clearing cursor_open_time_user_usecs */
     /* not clearing cursor_open_time_internal_usecs */
@@ -5741,7 +5788,6 @@ __stat_connection_clear_none(WT_CONNECTION_STATS *stats)
     /* not clearing dh_conn_handle_btree_count */
     /* not clearing dh_conn_handle_checkpoint_count */
     /* not clearing dh_conn_handle_size */
-    /* not clearing dh_conn_handle_count */
     stats->dh_sweep_ref = 0;
     stats->dh_sweep_dead_close = 0;
     stats->dh_sweep_remove = 0;
@@ -7012,6 +7058,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cursor_next_skip_lt_100 += WT_STAT_CONN_READ(from, cursor_next_skip_lt_100);
     to->cursor_next_skip_ge_100 += WT_STAT_CONN_READ(from, cursor_next_skip_ge_100);
     to->cursor_next_random_error += WT_STAT_CONN_READ(from, cursor_next_random_error);
+    to->cursor_next_raw_kv_batch += WT_STAT_CONN_READ(from, cursor_next_raw_kv_batch);
+    to->cursor_next_raw_kv_batch_error += WT_STAT_CONN_READ(from, cursor_next_raw_kv_batch_error);
     to->cursor_restart += WT_STAT_CONN_READ(from, cursor_restart);
     to->cursor_prev += WT_STAT_CONN_READ(from, cursor_prev);
     to->cursor_prev_error += WT_STAT_CONN_READ(from, cursor_prev_error);
@@ -7043,6 +7091,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cursor_update_bytes += WT_STAT_CONN_READ(from, cursor_update_bytes);
     to->cursor_update_bytes_changed += WT_STAT_CONN_READ(from, cursor_update_bytes_changed);
     to->cursor_reopen += WT_STAT_CONN_READ(from, cursor_reopen);
+    to->cursor_next_raw_kv_batch_result += WT_STAT_CONN_READ(from, cursor_next_raw_kv_batch_result);
     to->cursor_open_count += WT_STAT_CONN_READ(from, cursor_open_count);
     to->cursor_open_time_user_usecs += WT_STAT_CONN_READ(from, cursor_open_time_user_usecs);
     to->cursor_open_time_internal_usecs += WT_STAT_CONN_READ(from, cursor_open_time_internal_usecs);

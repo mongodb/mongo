@@ -117,6 +117,22 @@ __wti_cursor_equals_notsup(WT_CURSOR *cursor, WT_CURSOR *other, int *equalp)
 }
 
 /*
+ * __wt_cursor_next_raw_kv_batch_notsup --
+ *     Unsupported cursor batch retrieval.
+ */
+int
+__wt_cursor_next_raw_kv_batch_notsup(
+  WT_CURSOR *cursor, WT_ITEM *keys, WT_ITEM *values, size_t count, size_t *returned_countp)
+{
+    WT_UNUSED(keys);
+    WT_UNUSED(values);
+    WT_UNUSED(count);
+    WT_UNUSED(returned_countp);
+
+    return (__wt_cursor_notsup(cursor));
+}
+
+/*
  * Cursor modify operation is supported only in limited cursor types and also the modify
  * operation is supported only with 'S' and 'u' value formats of the cursors. Because of
  * the conditional support of cursor modify operation, To provide a better error description
@@ -1519,26 +1535,6 @@ __wt_cursor_dup_position(WT_CURSOR *to_dup, WT_CURSOR *cursor)
     F_CLR(cursor, WT_CURSTD_RAW_SEARCH);
 
     return (ret);
-}
-
-/*
- * __wt_cursor_lookup_str --
- *     Search a cursor with string keys and values for a key, and return the value, or NULL if the
- *     cursor has no such key. The value is valid until the cursor moves.
- */
-int
-__wt_cursor_lookup_str(WT_CURSOR *cursor, const char *key, const char **valuep)
-{
-    WT_DECL_RET;
-
-    *valuep = NULL;
-
-    cursor->set_key(cursor, key);
-    WT_RET_NOTFOUND_OK(ret = cursor->search(cursor));
-    if (ret == WT_NOTFOUND)
-        return (0);
-
-    return (cursor->get_value(cursor, valuep));
 }
 
 /*

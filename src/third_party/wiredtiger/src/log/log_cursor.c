@@ -335,6 +335,7 @@ __wt_curlog_open(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], W
       __curlog_compare,                               /* compare */
       __wt_cursor_equals,                             /* equals */
       __curlog_next,                                  /* next */
+      __wt_cursor_next_raw_kv_batch_notsup,           /* next-raw-kv-batch */
       __wt_cursor_notsup,                             /* prev */
       __curlog_reset,                                 /* reset */
       __curlog_search,                                /* search */

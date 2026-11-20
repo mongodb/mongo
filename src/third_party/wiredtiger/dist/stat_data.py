@@ -47,17 +47,14 @@ class AutoCommitStat(Stat):
     prefix = 'autocommit'
     def __init__(self, name, desc, flags='', otel_type='otel_none'):
         Stat.__init__(self, name, AutoCommitStat.prefix, desc, flags, otel_type)
-
 class BackgroundCompactStat(Stat):
     prefix = 'background-compact'
     def __init__(self, name, desc, flags='', otel_type='otel_none'):
         Stat.__init__(self, name, BackgroundCompactStat.prefix, desc, flags, otel_type)
-
 class BackupStat(Stat):
     prefix = 'backup'
     def __init__(self, name, desc, flags='', otel_type='otel_none'):
         Stat.__init__(self, name, BackupStat.prefix, desc, flags, otel_type)
-
 class BlockDisaggStat(Stat):
     prefix = 'block-disagg'
     def __init__(self, name, desc, flags='', otel_type='otel_none'):
@@ -303,7 +300,7 @@ conn_stats = [
     CacheStat('cache_bytes_leaf', 'tracked bytes belonging to leaf pages in the cache', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_leaf_ingest', 'tracked bytes belonging to leaf pages in the cache from the ingest btrees', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_leaf_stable', 'tracked bytes belonging to leaf pages in the cache from the stable btrees', 'no_clear,no_scale,size'),
-    CacheStat('cache_bytes_max', 'maximum bytes configured', 'no_clear,no_scale,size'),
+    CacheStat('cache_bytes_max', 'maximum bytes configured', 'no_clear,no_scale,size', otel_type='otel_gauge'),
     CacheStat('cache_bytes_other', 'bytes not belonging to page images in the cache', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_updates', 'bytes allocated for updates', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_updates_ingest', 'bytes allocated for updates from the ingest btrees', 'no_clear,no_scale,size'),
@@ -348,20 +345,20 @@ conn_stats = [
     ##########################################
     # Eviction statistics
     ##########################################
-    EvictStat('eviction_active_workers', 'eviction worker thread active', 'no_clear'),
+    EvictStat('eviction_active_workers', 'eviction worker thread active', 'no_clear', otel_type='otel_gauge'),
     EvictStat('eviction_aggressive_set', 'eviction currently operating in aggressive mode', 'no_clear,no_scale'),
-    EvictStat('eviction_app_attempt', 'page evict attempts by application threads'),
+    EvictStat('eviction_app_attempt', 'page evict attempts by application threads', otel_type='otel_counter'),
     EvictStat('eviction_app_bounded_wait_exceeded', 'application eviction assists stopped when the bounded wait was exhausted'),
     EvictStat('eviction_app_dirty_attempt', 'modified page evict attempts by application threads'),
     EvictStat('eviction_app_dirty_fail', 'modified page evict failures by application threads'),
-    EvictStat('eviction_app_fail', 'page evict failures by application threads'),
+    EvictStat('eviction_app_fail', 'page evict failures by application threads', otel_type='otel_counter'),
     EvictStat('eviction_app_time', 'application thread time evicting (usecs)'),
     EvictStat('eviction_ckpt_snapshot_declined', 'evictions that found no snapshot published by the running checkpoint'),
     EvictStat('eviction_clear_ordinary', 'pages removed from the ordinary queue to be queued for urgent eviction'),
     EvictStat('eviction_consider_prefetch', 'pages considered for eviction that were brought in by pre-fetch', 'no_clear,no_scale'),
     EvictStat('eviction_dhandle_complete_walk', 'eviction server completed walks of all dhandles', 'no_clear,no_scale'),
     EvictStat('eviction_disagg_publish_cleared', 'disaggregated tables the eviction server published'),
-    EvictStat('eviction_empty_score', 'eviction empty score', 'no_clear,no_scale'),
+    EvictStat('eviction_empty_score', 'eviction empty score', 'no_clear,no_scale', otel_type='otel_gauge'),
     EvictStat('eviction_fail', 'pages selected for eviction unable to be evicted'),
     EvictStat('eviction_fail_active_children_on_an_internal_page', 'pages selected for eviction unable to be evicted because of active children on an internal page'),
     EvictStat('eviction_fail_checkpoint_no_ts', 'pages selected for eviction unable to be evicted because of race between checkpoint and updates without timestamps'),
@@ -379,7 +376,7 @@ conn_stats = [
     EvictStat('eviction_force_ingest_success', 'forced eviction - pages evicted belonging to ingest btrees count'),
     EvictStat('eviction_force_long_update_list', 'forced eviction - pages selected because of a large number of updates to a single item'),
     EvictStat('eviction_force_no_retry', 'forced eviction - do not retry count to evict pages selected to evict during reconciliation'),
-    EvictStat('eviction_get_ref_empty', 'eviction calls to get a page found queue empty'),
+    EvictStat('eviction_get_ref_empty', 'eviction calls to get a page found queue empty', otel_type='otel_counter'),
     EvictStat('eviction_get_ref_empty2', 'eviction calls to get a page found queue empty after locking'),
     EvictStat('eviction_ingest_success', 'ingest pages evicted'),
     EvictStat('eviction_internal_pages_already_queued', 'internal pages seen by eviction walk that are already queued'),
@@ -457,7 +454,7 @@ conn_stats = [
     EvictStat('eviction_server_walk_dominating_cache_unproductive', 'eviction server walks trees within their walk period because they dominate the cache but queues no pages'),
     EvictStat('eviction_server_walk_one_page_target_unproductive', 'eviction server walks trees that queue no pages for a one-page target'),
     EvictStat('eviction_slow', 'eviction server unable to reach eviction goal'),
-    EvictStat('eviction_stable_state_workers', 'eviction worker thread stable number', 'no_clear'),
+    EvictStat('eviction_stable_state_workers', 'eviction worker thread stable number', 'no_clear', otel_type='otel_gauge'),
     EvictStat('eviction_state', 'eviction state', 'no_clear,no_scale'),
     EvictStat('eviction_target_strategy_clean', 'eviction walk target strategy clean pages'),
     EvictStat('eviction_target_strategy_dirty', 'eviction walk target strategy dirty pages'),
@@ -484,8 +481,8 @@ conn_stats = [
     EvictStat('eviction_walks_gave_up_ratio', 'eviction walks gave up because they saw too many pages and found too few candidates'),
     EvictStat('eviction_walks_started', 'files with new eviction walks started'),
     EvictStat('eviction_walks_stopped', 'eviction walks gave up because they restarted their walk twice'),
-    EvictStat('eviction_worker_evict_attempt', 'evict page attempts by eviction worker threads'),
-    EvictStat('eviction_worker_evict_fail', 'evict page failures by eviction worker threads'),
+    EvictStat('eviction_worker_evict_attempt', 'evict page attempts by eviction worker threads', otel_type='otel_counter'),
+    EvictStat('eviction_worker_evict_fail', 'evict page failures by eviction worker threads', otel_type='otel_counter'),
     EvictStat('eviction_worker_lock_wait_time', 'time eviction worker threads spend waiting for locks (usecs)'),
     # Note eviction_worker_evict_attempt - eviction_worker_evict_fail = evict page successes by eviction worker threads.
 
@@ -566,7 +563,7 @@ conn_stats = [
     CheckpointStat('checkpoint_sync_rec_pct', 'the percentage of checkpoint sync time spent in reconciliation across all threads', 'no_clear,no_scale'),
     CheckpointStat('checkpoint_time_max', 'max time (msecs)', 'no_clear,no_scale'),
     CheckpointStat('checkpoint_time_min', 'min time (msecs)', 'no_clear,no_scale'),
-    CheckpointStat('checkpoint_time_recent', 'most recent time (msecs)', 'no_clear,no_scale'),
+    CheckpointStat('checkpoint_time_recent', 'most recent time (msecs)', 'no_scale', otel_type='otel_counter'),
     CheckpointStat('checkpoint_time_total', 'total time (msecs)', 'no_clear,no_scale'),
     CheckpointStat('checkpoint_tree_duration', 'time spent on per-tree checkpoint work (usecs)'),
     CheckpointStat('checkpoint_wait_reduce_dirty', 'wait cycles while cache dirty level is decreasing'),
@@ -589,6 +586,8 @@ conn_stats = [
     CursorStat('cursor_modify_bytes', 'cursor modify key and value bytes affected', 'size'),
     CursorStat('cursor_modify_bytes_touch', 'cursor modify value bytes modified', 'size'),
     CursorStat('cursor_next', 'cursor next calls'),
+    CursorStat('cursor_next_raw_kv_batch', 'cursor next raw key value batch calls'),
+    CursorStat('cursor_next_raw_kv_batch_result', 'number of results returned by cursor next raw key value batch'),
     CursorStat('cursor_prev', 'cursor prev calls'),
     CursorStat('cursor_remove', 'cursor remove calls'),
     CursorStat('cursor_remove_bytes', 'cursor remove key bytes removed', 'size'),
@@ -686,7 +685,7 @@ conn_stats = [
     DhandleStat('dh_conn_handle_btree_count', 'btree connection data handles currently active', 'no_clear,no_scale'),
     DhandleStat('dh_conn_handle_checkpoint_count', 'checkpoint connection data handles currently active', 'no_clear,no_scale'),
     # dh_conn_handle_count = The sum of dh_conn_handle_{btree,table}_count.
-    DhandleStat('dh_conn_handle_count', 'connection data handles currently active', 'no_clear,no_scale'),
+    DhandleStat('dh_conn_handle_count', 'connection data handles currently active', 'no_clear,no_scale', otel_type='otel_gauge'),
     DhandleStat('dh_conn_handle_layered_count', 'Layered connection data handles currently active', 'no_clear,no_scale'),
     DhandleStat('dh_conn_handle_size', 'connection data handle size', 'no_clear,no_scale,size'),
     DhandleStat('dh_conn_handle_table_count', 'Table connection data handles currently active', 'no_clear,no_scale'),
@@ -1236,6 +1235,8 @@ dsrc_stats = [
     CursorStat('cursor_modify_bytes', 'modify key and value bytes affected', 'size'),
     CursorStat('cursor_modify_bytes_touch', 'modify value bytes modified', 'size'),
     CursorStat('cursor_next', 'next calls'),
+    CursorStat('cursor_next_raw_kv_batch', 'cursor next raw key value batch calls'),
+    CursorStat('cursor_next_raw_kv_batch_result', 'number of results returned by cursor next raw key value batch'),
     CursorStat('cursor_prev', 'prev calls'),
     CursorStat('cursor_remove', 'remove calls'),
     CursorStat('cursor_remove_bytes', 'remove key bytes removed', 'size'),
@@ -1285,13 +1286,13 @@ conn_dsrc_stats = [
     ##########################################
     # Cache and eviction statistics
     ##########################################
-    CacheStat('cache_bytes_dirty', 'tracked dirty bytes in the cache', 'no_clear,no_scale,size'),
+    CacheStat('cache_bytes_dirty', 'tracked dirty bytes in the cache', 'no_clear,no_scale,size', otel_type='otel_gauge'),
     CacheStat('cache_bytes_dirty_internal', 'tracked dirty internal page bytes in the cache', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_dirty_leaf', 'tracked dirty leaf page bytes in the cache', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_dirty_total', 'bytes dirty in the cache cumulative', 'no_clear,no_scale,size'),
-    CacheStat('cache_bytes_inuse', 'bytes currently in the cache', 'no_clear,no_scale,size'),
-    CacheStat('cache_bytes_read', 'bytes read into cache', 'size'),
-    CacheStat('cache_bytes_write', 'bytes written from cache', 'size'),
+    CacheStat('cache_bytes_inuse', 'bytes currently in the cache', 'no_clear,no_scale,size', otel_type='otel_gauge'),
+    CacheStat('cache_bytes_read', 'bytes read into cache', 'size', otel_type='otel_counter'),
+    CacheStat('cache_bytes_write', 'bytes written from cache', 'size', otel_type='otel_counter'),
     CacheStat('cache_cas_btree_max_lsn_race', 'number of times when cas update the btree max_lsn failed'),
     CacheStat('cache_evict_split_failed_lock', 'realizing in-memory split after reconciliation failed due to internal lock busy'),
     CacheStat('cache_eviction_ahead_of_last_materialized_lsn', 'pages evicted ahead of the page materialization frontier'),
@@ -1374,11 +1375,11 @@ conn_dsrc_stats = [
     CacheStat('cache_inmem_splittable', 'in-memory page passed criteria to be split'),
     CacheStat('cache_obsolete_updates_removed', 'obsolete updates removed'),
     CacheStat('cache_pages_prefetch', 'pages requested from the cache due to pre-fetch'),
-    CacheStat('cache_pages_requested', 'pages requested from the cache'),
+    CacheStat('cache_pages_requested', 'pages requested from the cache', otel_type='otel_counter'),
     CacheStat('cache_pages_requested_hs', 'pages requested from the history store'),
     CacheStat('cache_pages_requested_internal', 'pages requested from the cache internal'),
     CacheStat('cache_pages_requested_leaf', 'pages requested from the cache leaf'),
-    CacheStat('cache_read', 'pages read into cache'),
+    CacheStat('cache_read', 'pages read into cache', otel_type='otel_counter'),
     CacheStat('cache_read_checkpoint', 'pages read into cache by checkpoint'),
     CacheStat('cache_read_deleted', 'pages read into cache after truncate'),
     CacheStat('cache_read_deleted_prepared', 'pages read into cache after truncate in prepare state'),
@@ -1470,6 +1471,7 @@ conn_dsrc_stats = [
     CursorErrorStat('cursor_modify_error', 'cursor modify calls that return an error'),
     CursorErrorStat('cursor_next_error', 'cursor next calls that return an error'),
     CursorErrorStat('cursor_next_random_error', 'cursor next random calls that return an error'),
+    CursorErrorStat('cursor_next_raw_kv_batch_error', 'cursor next raw kv batch calls that return an error'),
     CursorErrorStat('cursor_prev_error', 'cursor prev calls that return an error'),
     CursorErrorStat('cursor_reconfigure_error', 'cursor reconfigure calls that return an error'),
     CursorErrorStat('cursor_remove_error', 'cursor remove calls that return an error'),
