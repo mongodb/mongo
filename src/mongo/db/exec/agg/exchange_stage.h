@@ -172,6 +172,9 @@ private:
      */
     size_t loadNextBatch();
 
+    enum class NextAction { kWait, kLoad, kError, kReturnDoc };
+    NextAction nextAction(size_t consumerId) const;
+
     /**
      * Detaches the subpipeline from its opCtx.
      *

@@ -46,48 +46,6 @@ using namespace std::literals::string_view_literals;
 REGISTER_AGG_STAGE_MAPPING(exchange, DocumentSourceExchange::id, documentSourceExchangeToStageFn)
 
 MONGO_FAIL_POINT_DEFINE(exchangeFailLoadNextBatch);
-namespace {
-
-class MutexAndResourceLock {
-    OperationContext* _opCtx;
-    ResourceYielder* _resourceYielder;
-    std::unique_lock<std::mutex> _lock;
-
-public:
-    // Must be constructed with the mutex held. 'yielder' may be null if there are no resources
-    // which need to be yielded while waiting.
-    MutexAndResourceLock(OperationContext* opCtx,
-                         std::unique_lock<std::mutex> m,
-                         ResourceYielder* yielder)
-        : _opCtx(opCtx), _resourceYielder(yielder), _lock(std::move(m)) {
-        invariant(_lock.owns_lock());
-    }
-
-    void lock() {
-        // Acquire the operation-wide resources, then the mutex.
-        if (_resourceYielder) {
-            _resourceYielder->unyield(_opCtx);
-        }
-        _lock.lock();
-    }
-    void unlock() {
-        _lock.unlock();
-        if (_resourceYielder) {
-            _resourceYielder->yield(_opCtx);
-        }
-    }
-
-    /**
-     * Releases ownership of the lock to the caller. May only be called when the mutex is held
-     * (after a call to unlock(), for example).
-     */
-    std::unique_lock<std::mutex> releaseLockOwnership() {
-        invariant(_lock.owns_lock());
-        return std::move(_lock);
-    }
-};
-
-}  // namespace
 
 constexpr size_t Exchange::kMaxBufferSize;
 constexpr size_t Exchange::kMaxNumberConsumers;
@@ -353,6 +311,19 @@ void Exchange::detachContextAfterFailedAttach() {
     _pipeline->detachFromOperationContext();
 }
 
+Exchange::NextAction Exchange::nextAction(size_t consumerId) const {
+    if (!_errorInLoadNextBatch.isOK()) {
+        return NextAction::kError;
+    }
+    if (!_consumers[consumerId]->isEmpty()) {
+        return NextAction::kReturnDoc;
+    }
+    if (_loadingThreadId == kInvalidThreadId) {
+        return NextAction::kLoad;
+    }
+    return NextAction::kWait;
+}
+
 DocumentSource::GetNextResult Exchange::getNext(OperationContext* opCtx,
                                                 size_t consumerId,
                                                 ResourceYielder* resourceYielder) {
@@ -360,86 +331,100 @@ DocumentSource::GetNextResult Exchange::getNext(OperationContext* opCtx,
     std::unique_lock<std::mutex> lk(_mutex);
 
     for (;;) {
-        // Guard against some of the trickiness we do with moving the lock to/from the
-        // MutexAndResourceLock.
+        // Guard against some of the trickiness we do with releasing and re-taking the lock around
+        // the wait.
         invariant(lk.owns_lock());
-        // Execute only in case we have not encountered an error.
-        if (!_errorInLoadNextBatch.isOK()) {
-            uasserted(ErrorCodes::ExchangePassthrough,
-                      "Exchange failed due to an error on different thread.");
-        }
+        switch (nextAction(consumerId)) {
+            // Execute only in case we have not encountered an error.
+            case NextAction::kError:
+                uasserted(ErrorCodes::ExchangePassthrough,
+                          "Exchange failed due to an error on different thread.");
 
-        // Check if we have a document.
-        if (!_consumers[consumerId]->isEmpty()) {
-            auto doc = _consumers[consumerId]->getNext();
-            unblockLoading(consumerId);
+            // Check if we have a document.
+            case NextAction::kReturnDoc: {
+                auto doc = _consumers[consumerId]->getNext();
+                unblockLoading(consumerId);
 
-            return doc;
-        }
-
-        // There is not any document so try to load more from the source.
-        if (_loadingThreadId == kInvalidThreadId) {
-            LOGV2_DEBUG(20896, 3, "A consumer begins loading", "consumerId"_attr = consumerId);
-
-            try {
-                attachContext(opCtx, consumerId);
-            } catch (...) {
-                detachContextAfterFailedAttach();
-                throw;
+                return doc;
             }
-            // From this point forward, we need to call detachContext(), no matter what. RAII
-            // helpers like ScopeGuard are not appropriate here because detaching may throw from a
-            // destructor, which can cause std::terminate() to be called if we are already
-            // unwinding. Instead, we call detachContext() below the try/catch for the happy path,
-            // and also inside the catch block if an exception was raised.
-            try {
-                // This consumer won the race and will fill the buffers.
-                _loadingThreadId = consumerId;
+
+            // There is not any document so try to load more from the source.
+            case NextAction::kLoad: {
+                LOGV2_DEBUG(20896, 3, "A consumer begins loading", "consumerId"_attr = consumerId);
+
+                try {
+                    attachContext(opCtx, consumerId);
+                } catch (...) {
+                    detachContextAfterFailedAttach();
+                    throw;
+                }
+                // From this point forward, we need to call detachContext(), no matter what. RAII
+                // helpers like ScopeGuard are not appropriate here because detaching may throw from
+                // a destructor, which can cause std::terminate() to be called if we are already
+                // unwinding. Instead, we call detachContext() below the try/catch for the happy
+                // path, and also inside the catch block if an exception was raised.
+                try {
+                    // This consumer won the race and will fill the buffers.
+                    _loadingThreadId = consumerId;
 
 
-                // This will execute the subpipeline and return when some exchange buffer is full
-                // and we cannot make any forward progress anymore. The return value is an index of
-                // a full consumer buffer.
-                size_t fullConsumerId = loadNextBatch();
+                    // This will execute the subpipeline and return when some exchange buffer is
+                    // full and we cannot make any forward progress anymore. The return value is an
+                    // index of a full consumer buffer.
+                    size_t fullConsumerId = loadNextBatch();
 
-                if (MONGO_unlikely(exchangeFailLoadNextBatch.shouldFail())) {
-                    LOGV2(20897, "exchangeFailLoadNextBatch fail point enabled.");
-                    uasserted(ErrorCodes::FailPointEnabled,
-                              "Asserting on loading the next batch due to failpoint.");
+                    if (MONGO_unlikely(exchangeFailLoadNextBatch.shouldFail())) {
+                        LOGV2(20897, "exchangeFailLoadNextBatch fail point enabled.");
+                        uasserted(ErrorCodes::FailPointEnabled,
+                                  "Asserting on loading the next batch due to failpoint.");
+                    }
+
+                    // The loading cannot continue until the consumer with the full buffer consumes
+                    // some documents.
+                    _loadingThreadId = fullConsumerId;
+                } catch (const DBException& ex) {
+                    _errorInLoadNextBatch = ex.toStatus();
+
+                    LOGV2_DEBUG(10878900,
+                                3,
+                                "Exchange failed while loading the next batch",
+                                "error"_attr = ex.toStatus());
+
+                    // We have to wake up all other blocked threads so they can detect the error and
+                    // fail too. They can be woken up only after _errorInLoadNextBatch has been set.
+                    _haveBufferSpace.notify_all();
+
+                    // If this happens to throw, the original exception will be lost.
+                    detachContext(opCtx, consumerId);
+
+                    throw;
                 }
 
-                // The loading cannot continue until the consumer with the full buffer consumes some
-                // documents.
-                _loadingThreadId = fullConsumerId;
-            } catch (const DBException& ex) {
-                _errorInLoadNextBatch = ex.toStatus();
-
-                LOGV2_DEBUG(10878900,
-                            3,
-                            "Exchange failed while loading the next batch",
-                            "error"_attr = ex.toStatus());
-
-                // We have to wake up all other blocked threads so they can detect the error and
-                // fail too. They can be woken up only after _errorInLoadNextBatch has been set.
-                _haveBufferSpace.notify_all();
-
-                // If this happens to throw, the original exception will be lost.
                 detachContext(opCtx, consumerId);
 
-                throw;
+                // Wake up everybody and try to make some progress.
+                _haveBufferSpace.notify_all();
+                break;
             }
 
-            detachContext(opCtx, consumerId);
-
-            // Wake up everybody and try to make some progress.
-            _haveBufferSpace.notify_all();
-
-        } else {
             // Some other consumer is already loading the buffers. There is nothing else we can do
             // but wait.
-            MutexAndResourceLock mutexAndResourceLock(opCtx, std::move(lk), resourceYielder);
-            _haveBufferSpace.wait(mutexAndResourceLock);
-            lk = mutexAndResourceLock.releaseLockOwnership();
+            case NextAction::kWait: {
+                lk.unlock();
+                runWithYielding(opCtx, resourceYielder, [&] {
+                    std::unique_lock<std::mutex> waitLk(_mutex);
+                    // Sleep on _haveBufferSpace until one of these is true: the loading thread hit
+                    // an error, this consumer's buffer has a document to return, or no thread is
+                    // currently loading (so this consumer can take over loading). Also wakes on
+                    // interrupt.
+                    return opCtx->waitForConditionOrInterruptUntil(
+                        _haveBufferSpace, waitLk, Date_t::max(), [&] {
+                            return nextAction(consumerId) != NextAction::kWait;
+                        });
+                });
+                lk.lock();
+                break;
+            }
         }
     }
 }

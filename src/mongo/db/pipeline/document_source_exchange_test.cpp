@@ -2141,4 +2141,47 @@ DEATH_TEST_F(DocumentSourceExchangeDeathTest, SetDynamicBatchSizeOnUnsupportedSt
     stage->setDynamicBatchSize(&dbs);
 }
 
+namespace {
+class UnyieldFailsWhenKilledYielder : public ResourceYielder {
+public:
+    void yield(OperationContext* opCtx) override {
+        ++yields;
+    }
+
+    void unyield(OperationContext* opCtx) override {
+        ++unyields;
+        opCtx->checkForInterrupt();
+    }
+
+    int yields = 0;
+    int unyields = 0;
+};
+}  // namespace
+
+TEST_F(DocumentSourceExchangeTest, KilledConsumerDoesNotWaitForFullBuffer) {
+    ExchangeSpec spec;
+    spec.setPolicy(ExchangePolicyEnum::kKeyRange);
+    spec.setKey(BSON("a" << 1));
+    spec.setBoundaries(
+        std::vector<BSONObj>{BSON("a" << MINKEY), BSON("a" << -1), BSON("a" << MAXKEY)});
+    spec.setConsumers(2);
+    spec.setBufferSize(64);
+
+    boost::intrusive_ptr<exec::agg::Exchange> ex = new exec::agg::Exchange(
+        getOpCtx(), spec, Pipeline::create({getMockSource(100)}, getExpCtx()));
+
+    auto client = getServiceContext()->getService()->makeClient("exchange client");
+    auto opCtx = getServiceContext()->makeOperationContext(client.get());
+    auto yielder = std::make_shared<UnyieldFailsWhenKilledYielder>();
+    boost::intrusive_ptr<DocumentSourceExchange> consumer = new DocumentSourceExchange(
+        ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(kTestNss).build(), ex, 0, yielder);
+
+    opCtx->markKilled(ErrorCodes::Interrupted);
+
+    ASSERT_THROWS_CODE(
+        exec::agg::buildStage(consumer)->getNext(), DBException, ErrorCodes::Interrupted);
+    ASSERT_EQ(yielder->yields, 1);
+    ASSERT_EQ(yielder->unyields, 1);
+}
+
 }  // namespace mongo
