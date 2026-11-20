@@ -1,11 +1,13 @@
 """Tests for the merge-queue quota gate (SERVER-138460)."""
 
+import contextlib
+import io
 import itertools
 import json
 import pathlib
 import tempfile
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import buildscripts.monitor_build_status.merge_queue_quota_check as under_test
 
@@ -107,31 +109,81 @@ class TestTicketFromSubject(unittest.TestCase):
 
 
 class TestLinkedProjects(unittest.TestCase):
-    """The BF/AF/security exemption rests entirely on this reading the links."""
+    """The fix-work exemption rests entirely on this reading the links."""
 
     @staticmethod
     def issue(*links):
         return MagicMock(fields=MagicMock(issuelinks=list(links)))
 
-    def test_outward_link(self):
-        issue = self.issue(MagicMock(outwardIssue=MagicMock(key="BF-47170"), inwardIssue=None))
+    @staticmethod
+    def link(link_type, key, side):
+        """A link as the Jira library hands it back."""
+        kind = MagicMock()
+        kind.name = link_type
+        far = "inwardIssue" if side == "outwardIssue" else "outwardIssue"
+        return MagicMock(type=kind, **{side: MagicMock(key=key), far: None})
+
+    def test_a_fixes_link_counts(self):
+        issue = self.issue(self.link("Fix", "BF-47170", "outwardIssue"))
         self.assertEqual(under_test.linked_projects(issue), {"BF"})
 
-    def test_inward_link(self):
-        """A link is stored on whichever side it was created from."""
-        issue = self.issue(MagicMock(outwardIssue=None, inwardIssue=MagicMock(key="SECBUG-6225")))
+    def test_a_depends_link_counts_on_the_inward_side(self):
+        """SERVER is depended on by the BF, so the BF sits on the inward side."""
+        issue = self.issue(self.link("Depends", "SECBUG-6225", "inwardIssue"))
         self.assertEqual(under_test.linked_projects(issue), {"SECBUG"})
 
-    def test_both_directions_and_deduplication(self):
+    def test_related_does_not_count(self):
+        """It is a bookmark. Most BFs carry one and it says nothing about a fix."""
+        issue = self.issue(self.link("Related", "BF-1", "outwardIssue"))
+        self.assertEqual(under_test.linked_projects(issue), frozenset())
+
+    def test_problem_incident_does_not_count(self):
+        """It marks the change that caused the failure, not the fix."""
+        issue = self.issue(self.link("Problem/Incident", "BF-1", "inwardIssue"))
+        self.assertEqual(under_test.linked_projects(issue), frozenset())
+
+    def test_depends_the_other_way_round_does_not_count(self):
+        """SERVER depending on the BF is not SERVER fixing it."""
+        issue = self.issue(self.link("Depends", "BF-1", "outwardIssue"))
+        self.assertEqual(under_test.linked_projects(issue), frozenset())
+
+    def test_fixes_the_other_way_round_does_not_count(self):
+        issue = self.issue(self.link("Fix", "BF-1", "inwardIssue"))
+        self.assertEqual(under_test.linked_projects(issue), frozenset())
+
+    def test_mixes_and_deduplicates(self):
         issue = self.issue(
-            MagicMock(outwardIssue=MagicMock(key="BF-1"), inwardIssue=None),
-            MagicMock(outwardIssue=None, inwardIssue=MagicMock(key="BF-2")),
-            MagicMock(outwardIssue=MagicMock(key="SERVER-139220"), inwardIssue=None),
+            self.link("Depends", "BF-1", "inwardIssue"),
+            self.link("Depends", "BF-2", "inwardIssue"),
+            self.link("Fix", "AF-9", "outwardIssue"),
+            self.link("Related", "BF-3", "outwardIssue"),
+            self.link("Fix", "SERVER-139220", "outwardIssue"),
         )
-        self.assertEqual(under_test.linked_projects(issue), {"BF", "SERVER"})
+        self.assertEqual(under_test.linked_projects(issue), {"BF", "AF", "SERVER"})
+
+    def test_a_link_without_a_type_is_skipped(self):
+        """Ignoring it beats raising, which would fail the whole run open."""
+        link = MagicMock(spec=["outwardIssue", "inwardIssue"])
+        link.outwardIssue = MagicMock(key="BF-1")
+        link.inwardIssue = None
+        self.assertEqual(under_test.linked_projects(self.issue(link)), frozenset())
 
     def test_no_links(self):
         self.assertEqual(under_test.linked_projects(self.issue()), frozenset())
+
+    def test_evidence_keeps_the_type_of_every_link(self):
+        """The log has to say why a link did not count, not just that it did not."""
+        issue = self.issue(
+            self.link("Related", "BF-1", "outwardIssue"),
+            self.link("Fix", "AF-2", "outwardIssue"),
+        )
+        self.assertEqual(
+            under_test.links_seen(issue),
+            (
+                under_test.Link(key="BF-1", link_type="Related", counted=False),
+                under_test.Link(key="AF-2", link_type="Fix", counted=True),
+            ),
+        )
 
     def test_issue_without_a_links_field(self):
         """The Jira library omits the field entirely when there are no links."""
@@ -147,6 +199,54 @@ class TestAssigneeEmail(unittest.TestCase):
 
     def test_unassigned(self):
         self.assertIsNone(under_test.assignee_email(MagicMock(fields=MagicMock(assignee=None))))
+
+
+class TestMainFailsOpen(unittest.TestCase):
+    """The gate must never fail a merge-queue build. A crash stops every merge."""
+
+    def setUp(self):
+        for name, value in (
+            ("CodeLockdownConfig", MagicMock()),
+            ("JiraClient", MagicMock()),
+            ("JiraAuth", MagicMock()),
+            ("approved_emails", frozenset()),
+            ("enable_logging", MagicMock()),
+        ):
+            patcher = (
+                patch.object(under_test, name, return_value=value)
+                if name == "approved_emails"
+                else patch.object(under_test, name, value)
+            )
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    @staticmethod
+    def run_main(**kwargs):
+        """main() prints the audit; keep it out of the test output."""
+        with contextlib.redirect_stdout(io.StringIO()):
+            return under_test.main(**kwargs)
+
+    def test_evaluation_raising_returns_zero(self):
+        with patch.object(under_test, "evaluate", side_effect=RuntimeError("jira is down")):
+            self.assertEqual(self.run_main(commit_message="SERVER-1 x (#1)"), 0)
+
+    def test_the_audit_print_raising_returns_zero(self):
+        """A diagnostic must not be able to stop merges."""
+        with patch.object(under_test, "evaluate", return_value=(under_test.FAILED, None)):
+            with patch.object(under_test, "print_audit", side_effect=RuntimeError("boom")):
+                self.assertEqual(self.run_main(commit_message="SERVER-1 x (#1)"), 0)
+
+    def test_the_record_is_written_even_when_evaluation_raises(self):
+        """The upload step expects the file; a missing one fails the task."""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = str(pathlib.Path(tmp) / "verdict.json")
+            with patch.object(under_test, "evaluate", side_effect=RuntimeError("jira is down")):
+                self.assertEqual(
+                    self.run_main(commit_message="SERVER-1 x (#1)", verdict_file=path), 0
+                )
+            record = json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
+        self.assertEqual(record["verdict"], "unresolved")
+        self.assertEqual(record["rule"], "lookup-failed")
 
 
 class TestVerdictRecord(unittest.TestCase):

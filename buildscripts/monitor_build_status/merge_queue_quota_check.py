@@ -40,6 +40,9 @@ TICKET = re.compile(r"\b([A-Z][A-Z0-9]{1,9}-\d+)\b")
 # Merge-queue subjects end with the pull request, e.g. "... (#66955)".
 PULL_REQUEST = re.compile(r"\(#(\d+)\)")
 EXEMPT_PROJECTS = frozenset({"BF", "AF", "SECBUG"})
+# Only the link types that mean "this fixes that". Related is a bookmark, and
+# Problem/Incident marks the change that caused the failure.
+FIX_LINKS = frozenset({("Fix", "outwardIssue"), ("Depends", "inwardIssue")})
 
 CODE_LOCKDOWN_CONFIG = "etc/code_lockdown.yml"
 EXCEPTIONS_CONFIG = "etc/block_on_red_exceptions.yml"
@@ -62,6 +65,7 @@ class Facts:
     over_quota: bool | None = None
     exempt: bool = False
     linked_projects: frozenset[str] = frozenset()
+    links: tuple[Link, ...] = ()  # every link seen, counted or not
     hot_count: int | None = None  # informational, for the audit line
     hot_limit: int | None = None
 
@@ -86,7 +90,7 @@ RULES: tuple[tuple[str, object, Verdict, str], ...] = (
         "fix-work",
         lambda f: bool(f.linked_projects & EXEMPT_PROJECTS),
         Verdict.PASS,
-        "linked to BF/AF/security",
+        "fixes a BF/AF/security issue",
     ),
 )
 
@@ -158,15 +162,38 @@ def assignee_email(issue) -> str | None:
     return (getattr(assignee, "emailAddress", None) or None) if assignee else None
 
 
-def linked_projects(issue) -> frozenset[str]:
-    """Project keys of every issue linked to this one, either direction."""
-    keys = []
+@dataclass(frozen=True)
+class Link:
+    """One link on the ticket, and whether it counts as fix work."""
+
+    key: str
+    link_type: str
+    counted: bool
+
+
+def links_seen(issue) -> tuple[Link, ...]:
+    """Every link on the ticket, so the log can say why one did not count."""
+    seen = []
     for link in getattr(issue.fields, "issuelinks", None) or []:
+        link_type = getattr(link, "type", None)
+        if link_type is None:
+            continue
         for side in ("inwardIssue", "outwardIssue"):
             other = getattr(link, side, None)
             if other is not None:
-                keys.append(other.key.split("-")[0])
-    return frozenset(keys)
+                seen.append(
+                    Link(
+                        key=other.key,
+                        link_type=link_type.name,
+                        counted=(link_type.name, side) in FIX_LINKS,
+                    )
+                )
+    return tuple(seen)
+
+
+def linked_projects(issue) -> frozenset[str]:
+    """Project keys of the issues this one fixes, by link type."""
+    return frozenset(link.key.split("-")[0] for link in links_seen(issue) if link.counted)
 
 
 def hot_quota(team: str, jira_service: JiraService, config: CodeLockdownConfig) -> tuple[int, int]:
@@ -205,9 +232,16 @@ def gather(
     assignee = assignee_email(issue)
     exempt = bool(assignee) and assignee.lower() in exceptions
     team = IssueTuple.from_jira_issue(issue).assigned_team
-    links = linked_projects(issue)
+    links = links_seen(issue)
+    fix_projects = frozenset(link.key.split("-")[0] for link in links if link.counted)
     if team == UNASSIGNED_LABEL:
-        return Facts(ticket=ticket, assignee=assignee, exempt=exempt, linked_projects=links)
+        return Facts(
+            ticket=ticket,
+            assignee=assignee,
+            exempt=exempt,
+            linked_projects=fix_projects,
+            links=links,
+        )
 
     count, limit = hot_quota(team, JiraService(jira_client), config)
     return Facts(
@@ -216,7 +250,8 @@ def gather(
         assignee=assignee,
         over_quota=count > limit,
         exempt=exempt,
-        linked_projects=links,
+        linked_projects=fix_projects,
+        links=links,
         hot_count=count,
         hot_limit=limit,
     )
@@ -247,6 +282,42 @@ def enforce_requested() -> bool:
     config edit.
     """
     return os.environ.get("MERGE_QUEUE_QUOTA_ENFORCE", "").strip().lower() == "true"
+
+
+def print_audit(finding: Finding, facts: Facts | None) -> None:
+    """The whole decision, so a block can be read without a Jira round trip."""
+    print(f"{finding.verdict.value}: {finding.detail}  [{finding.rule}]")
+    if facts is None:
+        return
+    print(f"  ticket    {facts.ticket or '-'}")
+    print(f"  team      {facts.team or '-'}  hot={facts.hot_count}/{facts.hot_limit}")
+    print(f"  assignee  {facts.assignee or '(unassigned)'}  exempt={facts.exempt}")
+    print_links(facts.links)
+
+
+NOT_COUNTED = "not counted (only Fix and Depends count)"
+
+
+def print_links(links: tuple[Link, ...]) -> None:
+    """Name the type, so a rejected link is not mistaken for a missing one.
+
+    Only the projects the rule can use: a link to another SERVER ticket cannot
+    change the verdict, and listing it only buries the one that could.
+    """
+    relevant = [link for link in links if link.key.split("-")[0] in EXEMPT_PROJECTS]
+    if not relevant:
+        print("  links     none to a BF, AF or security issue")
+        return
+
+    # One line per linked issue: a pair can carry more than one link.
+    by_key: dict[str, list[Link]] = {}
+    for link in relevant:
+        by_key.setdefault(link.key, []).append(link)
+    for index, (key, group) in enumerate(by_key.items()):
+        lead = "  links   " if index == 0 else "          "
+        kinds = ", ".join(dict.fromkeys(link.link_type for link in group))
+        note = "counted" if any(link.counted for link in group) else NOT_COUNTED
+        print(f"{lead} {key}  {kinds}  {note}")
 
 
 def write_verdict(
@@ -293,13 +364,10 @@ def main(
         print("  failing open: a lookup failure must not block a merge")
         finding, facts = FAILED, None
 
-    print(f"{finding.verdict.value}: {finding.detail}  [{finding.rule}]")
-    if facts is not None:
-        print(
-            f"  ticket={facts.ticket} team={facts.team} "
-            f"hot={facts.hot_count}/{facts.hot_limit} links={sorted(facts.linked_projects) or '-'}"
-        )
-        print(f"  assignee={facts.assignee or '(unassigned)'} exempt={facts.exempt}")
+    try:
+        print_audit(finding, facts)
+    except Exception as exc:  # noqa: BLE001 - diagnostics must never fail the gate
+        print(f"  could not print the audit line: {type(exc).__name__}: {exc}")
 
     # Written on every path, including the fail-open one: the upload step
     # expects the file, and a missing one would fail the task.
