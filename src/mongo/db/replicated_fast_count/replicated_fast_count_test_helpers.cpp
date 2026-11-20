@@ -262,7 +262,7 @@ OplogCursorMock::OplogCursorMock(std::list<repl::OplogEntry> entries,
     _throwOnNthCall = throwWriteConflictOnNthCall;
 }
 
-boost::optional<Record> OplogCursorMock::next() {
+boost::optional<Record> OplogCursorMock::next(size_t) {
     if (++_nextCallCount == _throwOnNthCall) {
         throwWriteConflictException("OplogCursorMock injected WriteConflictException");
     }

@@ -201,7 +201,7 @@ std::unique_ptr<InputStream<NamedPipeInput>> MultiBsonStreamCursor::getInputStre
  * Returns the next record from the vector of streams or boost::none if exhausted or error.
  * '_streamReader' is initialized to the first stream, if there is one, in the constructor.
  */
-boost::optional<Record> MultiBsonStreamCursor::next() {
+boost::optional<Record> MultiBsonStreamCursor::next(size_t) {
     while (_streamIdx < _numStreams) {
         auto record = nextFromCurrentStream();
         if (MONGO_likely(record)) {

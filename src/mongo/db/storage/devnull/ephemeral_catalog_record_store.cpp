@@ -95,7 +95,7 @@ public:
     Cursor(OperationContext* opCtx, const EphemeralForTestRecordStore& rs)
         : _records(rs._data->records), _isCapped(rs.isCapped()) {}
 
-    boost::optional<Record> next() final {
+    boost::optional<Record> next(size_t) final {
         if (_needFirstSeek) {
             _needFirstSeek = false;
             _it = _records.begin();
@@ -164,7 +164,7 @@ public:
     ReverseCursor(OperationContext* opCtx, const EphemeralForTestRecordStore& rs)
         : _records(rs._data->records), _isCapped(rs.isCapped()) {}
 
-    boost::optional<Record> next() final {
+    boost::optional<Record> next(size_t) final {
         if (_needFirstSeek) {
             _needFirstSeek = false;
             _it = _records.rbegin();

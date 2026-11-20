@@ -1015,7 +1015,7 @@ public:
     boost::optional<Record> seek(const RecordId&, BoundInclusion) override {
         return boost::none;
     }
-    boost::optional<Record> next() override {
+    boost::optional<Record> next(size_t) override {
         return boost::none;
     }
     void save() override {}

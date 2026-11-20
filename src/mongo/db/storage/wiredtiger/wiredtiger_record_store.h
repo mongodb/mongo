@@ -507,7 +507,7 @@ public:
      */
     void init();
 
-    boost::optional<Record> next() override;
+    boost::optional<Record> next(size_t) override;
 
     boost::optional<Record> seek(const RecordId& start, BoundInclusion boundInclusion) override;
 
@@ -621,7 +621,7 @@ public:
                                const WiredTigerRecordStore& rs,
                                bool forward);
 
-    boost::optional<Record> next() override;
+    boost::optional<Record> next(size_t) override;
 
     boost::optional<Record> seek(const RecordId& start, BoundInclusion boundInclusion) override;
 
@@ -675,7 +675,7 @@ public:
                           const WiredTigerRecordStore& rs,
                           bool forward);
 
-    boost::optional<Record> next() override;
+    boost::optional<Record> next(size_t) override;
     boost::optional<Record> seek(const RecordId& start, BoundInclusion boundInclusion) override;
 
 protected:

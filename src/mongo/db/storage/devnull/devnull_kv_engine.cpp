@@ -39,7 +39,7 @@
 namespace mongo {
 class EmptyRecordCursor final : public SeekableRecordCursor {
 public:
-    boost::optional<Record> next() final {
+    boost::optional<Record> next(size_t) final {
         return {};
     }
     boost::optional<Record> seek(const RecordId& start, BoundInclusion boundInclusion) override {

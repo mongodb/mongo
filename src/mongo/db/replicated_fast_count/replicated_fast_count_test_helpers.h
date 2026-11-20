@@ -259,7 +259,7 @@ public:
 
     ~OplogCursorMock() override {}
 
-    boost::optional<Record> next() override;
+    boost::optional<Record> next(size_t = 0) override;
 
     boost::optional<Record> seekExact(const RecordId& id) override;
 

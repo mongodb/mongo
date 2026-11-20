@@ -71,7 +71,7 @@ public:
 
     ~ChangeStreamOplogCursorMock() override {}
 
-    boost::optional<Record> next() override {
+    boost::optional<Record> next(size_t) override {
         if (_records->empty()) {
             return boost::none;
         }

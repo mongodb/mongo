@@ -107,7 +107,7 @@ public:
      * Continues returning boost::none once it reaches EOF unlike stl iterators.
      * Returns records in RecordId order.
      */
-    virtual boost::optional<Record> next() = 0;
+    virtual boost::optional<Record> next(size_t maxBatch = 0) = 0;
 
     //
     // Saving and restoring state

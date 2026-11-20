@@ -50,7 +50,7 @@ public:
 
     ~CursorMock() override {}
 
-    boost::optional<Record> next() override {
+    boost::optional<Record> next(size_t = 0) override {
         if (_records->empty()) {
             return boost::none;
         }

@@ -45,7 +45,7 @@ public:
     boost::optional<Record> seekExact(const RecordId&) override {
         return boost::none;
     }
-    boost::optional<Record> next() override {
+    boost::optional<Record> next(size_t = 0) override {
         if (_idx >= _entries->size()) {
             return boost::none;
         }

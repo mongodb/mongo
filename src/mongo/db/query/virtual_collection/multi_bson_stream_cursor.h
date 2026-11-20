@@ -30,7 +30,7 @@ public:
         _streamReader = getInputStream(_vopts.dataSources[_streamIdx].url);
     }
 
-    boost::optional<Record> next() override;
+    boost::optional<Record> next(size_t maxBatch = 0) override;
 
     // This block of overrides are all essentially no-ops as they are for lock yielding but the
     // external data source is read-only.

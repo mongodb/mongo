@@ -553,7 +553,7 @@ public:
 
     ~RandomCursor() override = default;
 
-    boost::optional<Record> next() final {
+    boost::optional<Record> next(size_t) final {
         auto c = _cursor->get();
         int advanceRet = wiredTigerPrepareConflictRetry(
             *_opCtx, StorageExecutionContext::get(_opCtx)->getPrepareConflictTracker(), *_ru, [&] {
@@ -1869,7 +1869,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::nextCommon() {
     return getRecord(*_cursor, _keyFormat);
 }
 
-boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
+boost::optional<Record> WiredTigerRecordStoreCursorBase::next(size_t) {
     auto toReturn = nextCommon();
     if (toReturn) {
         checkOrder(toReturn->id);
@@ -2119,7 +2119,7 @@ boost::optional<Record> WiredTigerCappedCursorBase::seek(const RecordId& start,
     return toReturn;
 }
 
-boost::optional<Record> WiredTigerCappedCursorBase::next() {
+boost::optional<Record> WiredTigerCappedCursorBase::next(size_t) {
     auto toReturn = nextCommon();
     if (toReturn) {
         if (!isVisible(toReturn->id)) {
@@ -2242,7 +2242,7 @@ void WiredTigerOplogCursor::resetVisibility() {
     _readTimestampForOplog = boost::none;
 }
 
-boost::optional<Record> WiredTigerOplogCursor::next() {
+boost::optional<Record> WiredTigerOplogCursor::next(size_t) {
     auto record = nextCommon();
     if (!record) {
         return record;
