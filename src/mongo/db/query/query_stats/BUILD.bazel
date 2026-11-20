@@ -109,7 +109,9 @@ mongo_cc_library(
     deps = [
         ":query_stats",
         ":write_key",
+        "//src/mongo/db/commands/query_cmd:bulk_write_parser",
         "//src/mongo/db/query/query_shape",
+        "//src/mongo/db/query/query_shape:bulk_write_cmd_shape",
         "//src/mongo/db/query/query_shape:delete_cmd_shape",
         "//src/mongo/db/query/query_shape:insert_cmd_shape",
         "//src/mongo/db/query/query_shape:update_cmd_shape",
@@ -201,6 +203,8 @@ mongo_cc_unit_test(
         ":query_stats",
         ":write_cmd_shape_registration",
         "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/commands/query_cmd:bulk_write_common",
+        "//src/mongo/db/commands/query_cmd:bulk_write_parser",
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/query/write_ops:canonical_update_and_delete",
         "//src/mongo/db/query/write_ops:parsed_update",

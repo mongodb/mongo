@@ -3,13 +3,16 @@
 
 #include "mongo/db/query/query_stats/write_cmd_shape_registration.h"
 
+#include "mongo/db/commands/query_cmd/bulk_write_gen.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_shape/bulk_write_cmd_shape.h"
 #include "mongo/db/query/query_shape/insert_cmd_shape.h"
 #include "mongo/db/query/query_shape/query_shape_hash.h"
 #include "mongo/db/query/query_shape/shape_helpers.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/server_options.h"
+#include "mongo/util/functional.h"
 
 namespace mongo::query_stats {
 
@@ -45,7 +48,71 @@ bool shouldComputeQueryShape(OperationContext* opCtx,
     return true;
 }
 
+void registerBulkWriteOp(
+    OperationContext* opCtx,
+    const BulkWriteCommandRequest& request,
+    size_t opIdx,
+    const NamespaceString& nss,
+    query_shape::CollectionType collType,
+    function_ref<StatusWith<std::unique_ptr<query_shape::Shape>>()> makeShape) {
+    if (!shouldComputeBulkWriteQueryShape(opCtx, request, opIdx, collType)) {
+        return;
+    }
+
+    query_stats::registerWriteRequest(opCtx, nss, [&]() {
+        auto shape = makeShape();
+        uassertStatusOKWithContext(shape.getStatus(), "Failed to compute query shape");
+        return std::make_unique<query_stats::BulkWriteKey>(
+            opCtx, request, opIdx, std::move(shape.getValue()), collType);
+    });
+}
+
 }  // namespace
+
+void registerBulkWriteUpdateOpQueryStats(OperationContext* opCtx,
+                                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                         const BulkWriteCommandRequest& request,
+                                         size_t opIdx,
+                                         const ParsedUpdate& parsedUpdate,
+                                         query_shape::CollectionType collType) {
+    registerBulkWriteOp(
+        opCtx, request, opIdx, parsedUpdate.getRequest()->getNamespaceString(), collType, [&]() {
+            return shape_helpers::tryMakeShape<query_shape::BulkWriteUpdateCmdShape>(
+                request, parsedUpdate, expCtx);
+        });
+}
+
+void registerBulkWriteDeleteOpQueryStats(OperationContext* opCtx,
+                                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                         const BulkWriteCommandRequest& request,
+                                         size_t opIdx,
+                                         const ParsedDelete& parsedDelete,
+                                         query_shape::CollectionType collType) {
+    registerBulkWriteOp(
+        opCtx, request, opIdx, parsedDelete.getRequest()->getNsString(), collType, [&]() {
+            return shape_helpers::tryMakeShape<query_shape::BulkWriteDeleteCmdShape>(
+                request, parsedDelete, expCtx);
+        });
+}
+
+void registerBulkWriteInsertGroupQueryStats(OperationContext* opCtx,
+                                            const BulkWriteCommandRequest& request,
+                                            size_t firstOpIdx,
+                                            const NamespaceString& nss,
+                                            query_shape::CollectionType collType) {
+    tassert(13830600,
+            "bulkWrite insert group op index is out of range",
+            firstOpIdx < request.getOps().size());
+    const auto* firstOp = std::get_if<BulkWriteInsertOp>(&request.getOps()[firstOpIdx]);
+    tassert(13830601, "bulkWrite insert group must start at an insert op", firstOp);
+    tassert(13830602,
+            "bulkWrite insert group namespace must match its first op's namespace",
+            request.getNsInfo()[firstOp->getNsInfoIdx()].getNs() == nss);
+
+    registerBulkWriteOp(opCtx, request, firstOpIdx, nss, collType, [&]() {
+        return shape_helpers::tryMakeShape<query_shape::BulkWriteInsertCmdShape>(request, nss);
+    });
+}
 
 void computeInsertShapeAndRegisterQueryStats(OperationContext* opCtx,
                                              const write_ops::InsertCommandRequest& wholeOp,

@@ -93,4 +93,40 @@ void computeInsertShapeAndRegisterQueryStats(OperationContext* opCtx,
                                              const write_ops::InsertCommandRequest& wholeOp,
                                              query_shape::CollectionType collType);
 
+/**
+ * Registers the update op at 'opIdx' of a bulkWrite command with the query stats store. The shape
+ * is built only if the op is sampled.
+ *
+ * TODO SERVER-134827: Compute the op's query shape hash and record it in CurOp.
+ *
+ * Skips registration if query stats collection is unsupported for this op.
+ */
+void registerBulkWriteUpdateOpQueryStats(OperationContext* opCtx,
+                                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                         const BulkWriteCommandRequest& request,
+                                         size_t opIdx,
+                                         const ParsedUpdate& parsedUpdate,
+                                         query_shape::CollectionType collType);
+
+/**
+ * Same as registerBulkWriteUpdateOpQueryStats(), for the delete op at 'opIdx'.
+ */
+void registerBulkWriteDeleteOpQueryStats(OperationContext* opCtx,
+                                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                         const BulkWriteCommandRequest& request,
+                                         size_t opIdx,
+                                         const ParsedDelete& parsedDelete,
+                                         query_shape::CollectionType collType);
+
+/**
+ * Registers a group of consecutive insert ops of a bulkWrite command on 'nss', starting at
+ * 'firstOpIdx', as a single execution. All inserts in a group share one query stats key.
+ * 'firstOpIdx' must be an insert op on 'nss'.
+ */
+void registerBulkWriteInsertGroupQueryStats(OperationContext* opCtx,
+                                            const BulkWriteCommandRequest& request,
+                                            size_t firstOpIdx,
+                                            const NamespaceString& nss,
+                                            query_shape::CollectionType collType);
+
 }  // namespace mongo::query_stats
