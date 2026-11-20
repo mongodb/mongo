@@ -36,6 +36,7 @@
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
+#include <fmt/format.h>
 
 namespace {
 using namespace std::literals::string_view_literals;
@@ -810,6 +811,22 @@ TEST(BSONObj, SpanMustContainObject) {
 
     ASSERT_TASSERT_CODE(BSONObj(full.first(full.size() - 1)), ErrorCodes::BSONInternalError);
     ASSERT_TASSERT_CODE(BSONObj(std::span<const char>{}), ErrorCodes::BSONInternalError);
+}
+
+TEST(BSONObj, InvalidSizeError) {
+    auto assertSizeError = [](std::int32_t size) {
+        std::vector<char> buffer{0, 0, 0, 0, 0x10, 'a', 0, 1, 0, 0, 0, 0};
+        DataView(buffer.data()).write(LittleEndian<std::int32_t>(size));
+        ASSERT_THROWS_CODE_AND_WHAT(BSONObj(buffer.data()),
+                                    DBException,
+                                    ErrorCodes::BSONObjectTooLarge,
+                                    unittest::match::HasSubstr("Size must be between 5 and"));
+    };
+
+    assertSizeError(130 * 1024 * 1024);
+    assertSizeError(-7);
+    assertSizeError(0);
+    assertSizeError(4);
 }
 
 TEST(BSONObj, OwnedBufferMustContainObject) {

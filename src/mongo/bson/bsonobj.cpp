@@ -95,16 +95,9 @@ void BSONObj::_throwInvalidSize(int size, int maxSize) const {
         fmt::format("BSONObj size: {} ({:#x}) is invalid. Size must be between {} and {} ({} MiB).",
                     size,
                     size,
-                    kMinBSONLength,
+                    static_cast<int>(kMinBSONLength),
                     maxSize,
                     maxSize >> 20);
-    if (size >= kMinBSONLength) {
-        try {
-            fmt::format_to(
-                std::back_inserter(msg), " First element: {}", firstElement().toString());
-        } catch (...) {
-        }
-    }
     massert(ErrorCodes::BSONObjectTooLarge, msg, 0);
 }
 

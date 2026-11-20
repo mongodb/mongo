@@ -1805,7 +1805,7 @@ public:
             ASSERT_THROWS_EXCEPTION_MATCHING(
                 BSONObj(buffer.get()),
                 ExceptionFor<ErrorCodes::BSONObjectTooLarge>,
-                unittest::match::WhatIs(::testing::HasSubstr("_id: 5")));
+                unittest::match::WhatIs(::testing::HasSubstr("BSONObj size: 1231231231")));
         }
     }
 };
