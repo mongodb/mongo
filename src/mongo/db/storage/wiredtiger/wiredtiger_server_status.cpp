@@ -30,7 +30,9 @@ BSONObj WiredTigerServerStatusSection::generateSection(OperationContext* opCtx,
         opCtx->getServiceContext()->getStorageEngine()->getEngine());
 
     BSONObjBuilder bob;
-    if (!WiredTigerUtil::collectConnectionStatistics(*engine, bob)) {
+    if (WiredTigerUtil::collectConnectionStatistics(*engine, bob)) {
+        engine->reportLayeredDataHandleCount(bob.asTempObj());
+    } else {
         LOGV2_DEBUG(7003148, 2, "WiredTiger is not ready to collect statistics.");
     }
 

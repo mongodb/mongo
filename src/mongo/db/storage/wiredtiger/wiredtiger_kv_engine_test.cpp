@@ -9,6 +9,7 @@
 #include "mongo/base/initializer.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/client.h"
 #include "mongo/db/namespace_string.h"
@@ -1277,47 +1278,35 @@ TEST_F(WiredTigerKVEngineTest, TestGetBackupCheckpointTimestampWithoutOpenBackup
     ASSERT_EQ(Timestamp::min(), engine->getBackupCheckpointTimestamp());
 }
 
-TEST_F(WiredTigerKVEngineTest, CollectStorageStatsReturnsNestedCategories) {
-    auto* engine = _helper->getWiredTigerKVEngine();
-    ASSERT(engine->isWtConnReadyForStatsCollection_UNSAFE());
-
-    auto stats = engine->collectStorageStats();
-    ASSERT(stats);
-
-    // Ensure all 3 categories we expect are present.
-    for (std::string_view category : {"cache", "data-handle", "checkpoint"}) {
-        auto elem = (*stats)[category];
-        ASSERT(!elem.eoo()) << "missing category: " << category;
-        ASSERT_EQ(elem.type(), BSONType::object) << "category not an object: " << category;
+boost::optional<BSONObj> collectConnectionStatistics(WiredTigerKVEngine& engine) {
+    BSONObjBuilder bob;
+    if (!WiredTigerUtil::collectConnectionStatistics(engine, bob)) {
+        return boost::none;
     }
-
-    // Check that a representative sample of fields are present.
-    const BSONObj cache = stats->getObjectField("cache");
-    for (std::string_view measurement : {"bytes read into cache",
-                                         "bytes written from cache",
-                                         "bytes currently in the cache",
-                                         "maximum bytes configured"}) {
-        auto elem = cache[measurement];
-        ASSERT(!elem.eoo()) << "missing cache measurement: " << measurement;
-        ASSERT(elem.isNumber()) << "cache measurement not numeric: " << measurement;
-    }
-
-    ASSERT(stats->getObjectField("data-handle")["connection data handles currently active"]
-               .isNumber());
-    ASSERT(stats->getObjectField("checkpoint")["most recent time (msecs)"].isNumber());
+    return bob.obj();
 }
 
-TEST_F(WiredTigerKVEngineTest, CollectStorageStatsReturnsNoneWhenConnectionNotReady) {
+TEST_F(WiredTigerKVEngineTest, ConnectionStatisticsIncludeLayeredDataHandleCount) {
+    auto* engine = _helper->getWiredTigerKVEngine();
+    auto stats = collectConnectionStatistics(*engine);
+    ASSERT(stats);
+
+    // reportLayeredDataHandleCount() reads this field from the wiredTiger serverStatus section.
+    ASSERT(stats->getObjectField("data-handle")["Layered connection data handles currently active"]
+               .isNumber());
+}
+
+TEST_F(WiredTigerKVEngineTest, CollectConnectionStatisticsFailsWhenConnectionNotReady) {
     auto* engine = _helper->getWiredTigerKVEngine();
     ASSERT(engine->isWtConnReadyForStatsCollection_UNSAFE());
-    ASSERT(engine->collectStorageStats());
+    ASSERT(collectConnectionStatistics(*engine));
 
     engine->cleanShutdown(kMemLeakAllowed);
     ASSERT(!engine->isWtConnReadyForStatsCollection_UNSAFE());
-    ASSERT(!engine->collectStorageStats());
+    ASSERT(!collectConnectionStatistics(*engine));
 }
 
-TEST_F(WiredTigerKVEngineTest, CollectStorageStatsRecordsEngineNotReadyError) {
+TEST_F(WiredTigerKVEngineTest, CollectConnectionStatisticsRecordsEngineNotReadyError) {
     if (!otel::metrics::OtelMetricsCapturer::canReadMetrics()) {
         GTEST_SKIP() << "Skipping test: OTel metrics unavailable on this platform";
     }
@@ -1329,15 +1318,15 @@ TEST_F(WiredTigerKVEngineTest, CollectStorageStatsRecordsEngineNotReadyError) {
 
     auto* engine = _helper->getWiredTigerKVEngine();
     const auto initialErrors = readEngineNotReadyErrors();
-    ASSERT(engine->collectStorageStats());
+    ASSERT(collectConnectionStatistics(*engine));
     ASSERT_EQ(readEngineNotReadyErrors(), initialErrors);
 
     engine->cleanShutdown(kMemLeakAllowed);
-    ASSERT(!engine->collectStorageStats());
+    ASSERT(!collectConnectionStatistics(*engine));
     ASSERT_EQ(readEngineNotReadyErrors(), initialErrors + 1);
 }
 
-TEST_F(WiredTigerKVEngineTest, CollectStorageStatsRecordsCollectError) {
+TEST_F(WiredTigerKVEngineTest, CollectConnectionStatisticsRecordsCollectError) {
     if (!otel::metrics::OtelMetricsCapturer::canReadMetrics()) {
         GTEST_SKIP() << "Skipping test: OTel metrics unavailable on this platform";
     }
@@ -1354,7 +1343,7 @@ TEST_F(WiredTigerKVEngineTest, CollectStorageStatsRecordsCollectError) {
     const auto initialCollectErrors = readCollectErrors();
     const auto initialEngineNotReadyErrors = readEngineNotReadyErrors();
 
-    auto stats = engine->collectStorageStats();
+    auto stats = collectConnectionStatistics(*engine);
     ASSERT(stats);
     ASSERT(!stats->hasField("error"));
     ASSERT_EQ(readCollectErrors(), initialCollectErrors);
@@ -1366,7 +1355,7 @@ TEST_F(WiredTigerKVEngineTest, CollectStorageStatsRecordsCollectError) {
     ON_BLOCK_EXIT([&] { wiredTigerGlobalOptions.statisticsSetting = originalSetting; });
     wiredTigerGlobalOptions.statisticsSetting = "invalid";
 
-    stats = engine->collectStorageStats();
+    stats = collectConnectionStatistics(*engine);
     ASSERT(stats);
     ASSERT_EQ(stats->getIntField("code"), ErrorCodes::CursorNotFound);
     ASSERT_EQ(readCollectErrors(), initialCollectErrors + 1);

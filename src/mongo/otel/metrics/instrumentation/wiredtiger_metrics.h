@@ -14,30 +14,6 @@ namespace mongo {
 class BSONObj;
 
 /**
- * Point-in-time sample of a curated set of WiredTiger connection statistics
- */
-struct WiredTigerStatsSnapshot {
-    int64_t evictionCallsToGetPageFoundQueueEmpty{0};
-    int64_t evictPageAttemptsByWorkerThreads{0};
-    int64_t evictPageFailuresByWorkerThreads{0};
-    int64_t pageEvictAttemptsByAppThreads{0};
-    int64_t pageEvictFailuresByAppThreads{0};
-    int64_t bytesReadIntoCache{0};
-    int64_t bytesWrittenFromCache{0};
-    int64_t pagesReadIntoCache{0};
-    int64_t pagesRequestedFromCache{0};
-
-    int64_t evictionEmptyScore{0};
-    int64_t evictionWorkerThreadActive{0};
-    int64_t evictionWorkerThreadStableNumber{0};
-    int64_t bytesCurrentlyInCache{0};
-    int64_t trackedDirtyBytesInCache{0};
-    int64_t maximumBytesConfigured{0};
-    int64_t connectionDataHandlesCurrentlyActive{0};
-    int64_t transactionCheckpointMostRecentTimeMsecs{0};
-};
-
-/**
  * Point-in-time sample of a curated set of TicketingSystem connection statistics
  */
 struct TicketingSystemStatsSnapshot {
@@ -46,27 +22,18 @@ struct TicketingSystemStatsSnapshot {
 };
 
 /**
- * Parse the raw BSON connection statistics from WiredTiger into a snapshot
- */
-[[MONGO_MOD_PUBLIC]] WiredTigerStatsSnapshot parseWiredTigerStats(const BSONObj& stats);
-
-/**
  * Parse the raw BSON connection statistics from the TicketingSystem into a snapshot
  */
 [[MONGO_MOD_PUBLIC]] TicketingSystemStatsSnapshot parseTicketingSystemStats(const BSONObj& stats);
 
 /**
- * Owns the OpenTelemetry instruments for WiredTiger metrics
+ * Owns the OpenTelemetry instruments for the server-side WiredTiger metrics. Statistics read from
+ * WiredTiger itself are published by WiredTigerMetricRegistry.
  */
 class WiredTigerMetrics {
 public:
     WiredTigerMetrics();
     ~WiredTigerMetrics();
-
-    /**
-     * Update metrics tracking WiredTiger storage stats
-     */
-    void updateWiredTiger(const WiredTigerStatsSnapshot& snap);
 
     /**
      * Update metrics tracking ticketing system stats

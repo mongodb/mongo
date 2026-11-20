@@ -769,7 +769,11 @@ public:
     boost::optional<StorageTierLevelEnum> getStorageTierFromStorageOptions(
         const BSONObj& storageEngineOptions) const override;
 
-    boost::optional<BSONObj> collectStorageStats() override;
+    /**
+     * Reports the active layered data handle count found in 'connStats', the output of
+     * WiredTigerUtil::collectConnectionStatistics(), to the persistence provider.
+     */
+    void reportLayeredDataHandleCount(const BSONObj& connStats) const;
 
     WiredTigerMetricRegistry* getOTelMetricRegistry() override {
         return &_otelMetricRegistry;

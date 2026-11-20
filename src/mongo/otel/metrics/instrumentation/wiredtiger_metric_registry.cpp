@@ -27,36 +27,6 @@ using otel::metrics::MetricUnit;
 
 constexpr std::string_view kOtelNamePrefix = "mongodb.serverStatus.wiredTiger.";
 
-constexpr std::string_view kLegacyStats[] = {
-    "cache: eviction calls to get a page found queue empty",
-    "cache: evict page attempts by eviction worker threads",
-    "cache: evict page failures by eviction worker threads",
-    "cache: page evict attempts by application threads",
-    "cache: page evict failures by application threads",
-    "cache: bytes read into cache",
-    "cache: bytes written from cache",
-    "cache: pages read into cache",
-    "cache: pages requested from the cache",
-    "cache: eviction empty score",
-    "cache: eviction worker thread active",
-    "cache: eviction worker thread stable number",
-    "cache: bytes currently in the cache",
-    "cache: tracked dirty bytes in the cache",
-    "cache: maximum bytes configured",
-    "data-handle: connection data handles currently active",
-    "checkpoint: most recent time (msecs)",
-};
-
-// TODO (SERVER-136509): Remove this exclusion list when WiredTigerMetrics is retired.
-bool isHandledByLegacyCollector(std::string_view statName) {
-    for (auto legacyStat : kLegacyStats) {
-        if (statName == legacyStat) {
-            return true;
-        }
-    }
-    return false;
-}
-
 /**
  * Keeps the alphanumerics and hyphens of one section of a WiredTiger stat name. Replaces other
  * characters (spaces, parentheses, ...) with a single underscore (unless it results in leading or
@@ -113,10 +83,6 @@ namespace {
  * registered at alle.
  */
 boost::optional<std::string> resolveOtelName(std::string_view statName) {
-    if (isHandledByLegacyCollector(statName)) {
-        return boost::none;
-    }
-
     auto name = wtStatNameToOtelName(statName);
     if (Status s = otel::metrics::validateOtelMetricName(name); !s.isOK()) {
         LOGV2_DEBUG(13501000,
