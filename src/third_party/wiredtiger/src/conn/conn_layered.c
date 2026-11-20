@@ -2098,12 +2098,12 @@ err:
 }
 
 /*
- * __disagg_mark_btree_readonly_and_outdated --
- *     Drain eviction from an open disaggregated btree, make it read-only and mark its dhandle
- *     outdated. Eviction can then discard dirty pages without reconciliation.
+ * __disagg_mark_btree_outdated --
+ *     Drain eviction from an open disaggregated btree and mark its dhandle outdated. Eviction can
+ *     then discard dirty pages without reconciliation.
  */
 static int
-__disagg_mark_btree_readonly_and_outdated(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle)
+__disagg_mark_btree_outdated(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle)
 {
     WT_BTREE *btree;
     WT_DECL_RET;
@@ -2111,15 +2111,14 @@ __disagg_mark_btree_readonly_and_outdated(WT_SESSION_IMPL *session, WT_DATA_HAND
     if (!WT_DHANDLE_BTREE(dhandle) || !F_ISSET(dhandle, WT_DHANDLE_OPEN))
         return (0);
 
+    /* Read-only btrees, such as checkpoint views, are never written and need no marking. */
     btree = (WT_BTREE *)dhandle->handle;
-    if (!F_ISSET(btree, WT_BTREE_DISAGGREGATED) || F_ISSET_ATOMIC_32(btree, WT_BTREE_READONLY))
+    if (!F_ISSET(btree, WT_BTREE_DISAGGREGATED) || F_ISSET_ATOMIC_32(btree, WT_BTREE_READONLY) ||
+      __wt_atomic_load_bool_relaxed(&dhandle->outdated))
         return (0);
 
     WT_WITH_BTREE(session, btree, ret = __wt_evict_file_exclusive_on(session));
     WT_RET(ret);
-
-    /* Mark the disaggregated as readonly. */
-    F_SET_ATOMIC_32(btree, WT_BTREE_READONLY);
 
     /*
      * Mark the handle outdated so that if we step back up as leader in the future, we open a fresh
@@ -2134,12 +2133,12 @@ __disagg_mark_btree_readonly_and_outdated(WT_SESSION_IMPL *session, WT_DATA_HAND
 }
 
 /*
- * __disagg_mark_btrees_readonly_and_outdated_then_step_down --
- *     Mark all disaggregated btrees read-only and outdated, then step down to follower mode. The
- *     outdated mark makes the next leader open fresh handles instead of reusing them.
+ * __disagg_mark_btrees_outdated_then_step_down --
+ *     Mark all disaggregated btrees outdated, then step down to follower mode. The outdated mark
+ *     makes the next leader open fresh handles instead of reusing them.
  */
 static int
-__disagg_mark_btrees_readonly_and_outdated_then_step_down(WT_SESSION_IMPL *session)
+__disagg_mark_btrees_outdated_then_step_down(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DATA_HANDLE *dhandle;
@@ -2168,7 +2167,7 @@ __disagg_mark_btrees_readonly_and_outdated_then_step_down(WT_SESSION_IMPL *sessi
             continue;
         }
 
-        WT_RET(__disagg_mark_btree_readonly_and_outdated(session, dhandle));
+        WT_RET(__disagg_mark_btree_outdated(session, dhandle));
     }
 
     /*
@@ -2181,7 +2180,7 @@ __disagg_mark_btrees_readonly_and_outdated_then_step_down(WT_SESSION_IMPL *sessi
     if (ret == 0) {
         dhandle = session->dhandle;
         WT_DHANDLE_CLEAR(session);
-        ret = __disagg_mark_btree_readonly_and_outdated(session, dhandle);
+        ret = __disagg_mark_btree_outdated(session, dhandle);
     }
     WT_RET_NOTFOUND_OK(ret);
 
@@ -2260,12 +2259,11 @@ __disagg_step_down_int(WT_SESSION_IMPL *session)
 #endif
 
     /*
-     * Mark disaggregated btrees read-only before switching role to follower to prevent concurrent
-     * eviction paths, especially parent split path, from dirtying pages during the step-down
-     * window.
+     * Mark disaggregated btrees outdated before switching role to follower so eviction discards
+     * their pages instead of writing them, and the split paths refuse to run on them.
      */
     WT_WITH_HANDLE_LIST_READ_LOCK(
-      session, ret = __disagg_mark_btrees_readonly_and_outdated_then_step_down(session));
+      session, ret = __disagg_mark_btrees_outdated_then_step_down(session));
     WT_ERR(ret);
 
     /*

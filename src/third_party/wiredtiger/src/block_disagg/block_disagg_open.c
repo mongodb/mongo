@@ -42,9 +42,13 @@ __block_disagg_destroy(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *block_disagg)
     uint64_t bucket, hash;
 
     conn = S2C(session);
-    hash = __wt_hash_city64(block_disagg->name, strlen(block_disagg->name));
-    bucket = hash & (conn->hash_size - 1);
-    WT_CONN_BLOCK_REMOVE(conn, block_disagg, bucket);
+
+    /* A handle whose initialization failed may never have joined the block lists. */
+    if (block_disagg->name != NULL) {
+        hash = __wt_hash_city64(block_disagg->name, strlen(block_disagg->name));
+        bucket = hash & (conn->hash_size - 1);
+        WT_CONN_BLOCK_REMOVE(conn, block_disagg, bucket);
+    }
 
     __wt_free(session, block_disagg->name);
 
@@ -112,13 +116,14 @@ __wti_block_disagg_open(WT_SESSION_IMPL *session, const char *filename, const ch
      */
     WT_ERR(__wt_calloc_one(session, &block_disagg));
     block_disagg->ref = 1;
-    WT_CONN_BLOCK_INSERT(conn, (WT_BLOCK *)block_disagg, bucket);
 
     WT_ERR(__wt_strdup(session, filename, &block_disagg->name));
     if (WT_STREQ(block_disagg->name, WT_HS_FILE_SHARED))
         F_SET(block_disagg, WT_BLOCK_DISAGG_HS);
 
     block_disagg->tableid = tableid;
+
+    WT_CONN_BLOCK_INSERT(conn, (WT_BLOCK *)block_disagg, bucket);
 
     WT_ERR(S2BT(session)->page_log->pl_open_handle(
       S2BT(session)->page_log, &session->iface, tableid, &block_disagg->plhandle));

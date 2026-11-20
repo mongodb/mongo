@@ -215,3 +215,79 @@ class test_layered_cursor30_prepare_stall(LayeredFastTruncateConfigMixin,
                 while step() == 0:
                     actual.append((cursor.get_key(), cursor.get_value()))
                 self.assertEqual(actual, remaining)
+
+    # After returning every available key before a prepared key, the walk's own transaction inserts
+    # another key before the blocked position; reversing returns the inserted key first.
+    def test_reverse_after_insert_before_blocked(self):
+        key = (lambda k: k) if self.forward else (lambda k: 1000 - k)
+        self.session.create(self.uri, 'key_format=i,value_format=S')
+        self.write(self.session, [key(100), key(300)], 10)
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
+        self.session.checkpoint()
+        self.conn_follow, self.session_follow = self.open_follower()
+        self.disagg_wait_for_adoption(self.conn_follow)
+        self.write(self.session_follow, [key(200)], 20)
+
+        prep_session = self.conn_follow.open_session()
+        with closing(prep_session.open_cursor(self.uri)) as prep_cursor:
+            prep_session.begin_transaction()
+            prep_cursor[key(500)] = 'prepared'
+        prep_session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(30) +
+                                         ',prepared_id=' + self.prepared_id_str(1))
+
+        with closing(self.session_follow.open_cursor(self.uri)) as cursor:
+            with self.transaction(session=self.session_follow, rollback=True):
+                step = cursor.next if self.forward else cursor.prev
+                step_back = cursor.prev if self.forward else cursor.next
+                for k in (100, 200, 300):
+                    self.assertEqual(step(), 0)
+                    self.assertEqual(cursor.get_key(), key(k))
+                self.assertRaisesException(wiredtiger.WiredTigerError, step,
+                                           '/conflict with a prepared update/')
+
+                with closing(self.session_follow.open_cursor(self.uri)) as writer:
+                    writer[key(400)] = 'new'
+                actual = []
+                while step_back() == 0:
+                    actual.append(cursor.get_key())
+                self.assertEqual(actual, [key(400), key(300), key(200), key(100)])
+        prep_session.rollback_transaction()
+        prep_session.close()
+
+    # A read-uncommitted walk blocks on ingest right after returning a key both constituents hold,
+    # then reverses. The shared key is returned again from ingest, once, followed by earlier keys.
+    def test_reverse_read_uncommitted(self):
+        key = (lambda k: k) if self.forward else (lambda k: 1000 - k)
+        self.session.create(self.uri, 'key_format=i,value_format=S')
+        self.write(self.session, [key(100), key(200), key(640)], 10)
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
+        self.session.checkpoint()
+        self.conn_follow, self.session_follow = self.open_follower()
+        self.disagg_wait_for_adoption(self.conn_follow)
+        with closing(self.session_follow.open_cursor(self.uri)) as cursor:
+            with self.transaction(session=self.session_follow, commit_timestamp=20):
+                cursor[key(200)] = 'ingest'
+
+        prep_session = self.conn_follow.open_session()
+        with closing(prep_session.open_cursor(self.uri)) as prep_cursor:
+            prep_session.begin_transaction()
+            prep_cursor[key(300)] = 'prepared'
+        prep_session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(30) +
+                                         ',prepared_id=' + self.prepared_id_str(1))
+
+        with closing(self.session_follow.open_cursor(self.uri)) as cursor:
+            self.session_follow.begin_transaction('isolation=read-uncommitted')
+            step = cursor.next if self.forward else cursor.prev
+            step_back = cursor.prev if self.forward else cursor.next
+            for k in (100, 200):
+                self.assertEqual(step(), 0)
+                self.assertEqual(cursor.get_key(), key(k))
+            self.assertRaisesException(wiredtiger.WiredTigerError, step,
+                                       '/conflict with a prepared update/')
+            actual = []
+            while step_back() == 0:
+                actual.append((cursor.get_key(), cursor.get_value()))
+            self.session_follow.rollback_transaction()
+        prep_session.rollback_transaction()
+        prep_session.close()
+        self.assertEqual(actual, [(key(200), 'ingest'), (key(100), 'value')])

@@ -44,4 +44,32 @@ guarantee: the `current_cursor` pointer must reference the constituent cursor fr
 value was obtained. This constituent cursor is expected to be positioned on the equal key/value pair
 as the `iface` cursor within its respective B-tree.
 
+@subsection layered-cursor-prepare Iteration over prepared updates
+
+A constituent blocked on a prepared update retains its key and page reference, with a B-tree
+iteration retry flag recording the direction. Although its internal-key flag is cleared, that key
+participates in the ordinary merge. When possible, the logic compares the two constituents to
+determine which key should be returned next and reports a prepare conflict if that key is blocked.
+A cached blocked winner is retried before reporting a prepare conflict, unless it has already been
+positioned or stepped in the current merge pass. The merge is repeated after the retry, so a later
+prepared key cannot hide a readable key in the other constituent. Each constituent needs at most one
+such retry per merge pass.
+
+When a prepare conflict leaves a constituent positioned, subsequent `next()` or `prev()` calls use
+that constituent's retained position to retry the blocked key or change direction. A conflict during
+initial bounded positioning that retains no key instead resets the walk for a fresh retry.
+Repositioning an alternate with `search_near()` can encounter a prepared key outside the requested
+scan direction. After that prepared transaction commits or rolls back, retrying the cursor operation
+completes the repositioning before the scan continues.
+Reversing after an alternate-positioning conflict re-reads both constituents inclusively from the
+last returned key, so updates and removals by the same transaction are visible. If this re-read
+conflicts, its saved key remains the anchor for the next attempt.
+
+Reopening blocked stable on a role change closes the cursor retaining its key. If ingest is current
+and retains a usable key, readable or prepare-blocked, invalidating the iteration flags makes stable
+reposition from ingest. Otherwise, the layered cursor saves the blocked key and direction until both
+constituents can be restored.
+Resetting or starting a different cursor operation clears this saved walk state, including any key
+saved while reopening stable for that operation.
+
 */

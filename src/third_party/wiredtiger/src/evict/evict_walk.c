@@ -525,10 +525,12 @@ retry:
          * Skip a read-only btree on a pass that isn't looking for clean pages if it holds none of
          * the content the pass is looking for. Most read-only btrees are read-only from open and
          * never dirty, but can hold updates when a fast-truncated page is instantiated. A step-down
-         * can make a live btree read-only while it still holds dirty pages and updates that only
+         * can make a live btree outdated while it still holds dirty pages and updates that only
          * eviction can discard.
          */
-        if (F_ISSET_ATOMIC_32(btree, WT_BTREE_READONLY) && !F_ISSET(evict, WT_EVICT_CACHE_CLEAN)) {
+        if ((F_ISSET_ATOMIC_32(btree, WT_BTREE_READONLY) ||
+              __wt_btree_dhandle_is_outdated_disagg(dhandle, btree)) &&
+          !F_ISSET(evict, WT_EVICT_CACHE_CLEAN)) {
             uint64_t bytes_dirty = __wt_atomic_load_uint64_relaxed(&btree->bytes_dirty_intl) +
               __wt_atomic_load_uint64_relaxed(&btree->bytes_dirty_leaf);
             uint64_t bytes_updates = __wt_atomic_load_uint64_relaxed(&btree->bytes_updates);
@@ -978,13 +980,14 @@ __evict_skip_dirty_candidate(WT_SESSION_IMPL *session, WT_PAGE *page)
      * pressure if cache usage is less than 90% of the eviction dirty trigger threshold. Currently
      * only for disaggregated storage.
      *
-     * A read-only tree is exempt. The only read-only tree that reaches here with dirty pages is a
-     * live btree that a step-down made read-only: nothing can modify its pages again, and eviction
-     * is the only way those pages are discarded.
+     * A read-only or outdated tree is exempt. The only such tree that reaches here with dirty pages
+     * is a live btree that a step-down made outdated: nothing will write its pages again, and
+     * eviction is the only way those pages are discarded.
      */
 #define WT_DIRTY_PAGE_LOW_PRESSURE_THRESHOLD \
     0.9 /* Cache usage below 90% of the eviction trigger threshold is considered low pressure */
     if (__wt_conn_is_disagg(session) && !F_ISSET_ATOMIC_32(btree, WT_BTREE_READONLY) &&
+      !__wt_btree_is_outdated_disagg(session) &&
       __wt_atomic_load_uint32_relaxed(&page->modify->page_state) < WT_EVICT_MODIFY_COUNT_MIN) {
         double pct_dirty = 0.0, pct_updates = 0.0;
         bool high_pressure = false;

@@ -245,6 +245,18 @@ struct __wt_btree {
     ((session)->syncing ||                  \
       __wt_atomic_load_enum_acquire(&S2BT(session)->syncing) != WT_BTREE_SYNC_RUNNING)
 
+#ifdef HAVE_DIAGNOSTIC
+/*
+ * WT_BTREE_DISAGG_DIRTY_ALLOWED indicates if the session's btree may be dirtied. A disaggregated
+ * btree may only be dirtied by the leader, except that an outdated one can still be dirtied, for
+ * example when resolving prepared updates; eviction discards its dirty pages without writing them.
+ */
+#define WT_BTREE_DISAGG_DIRTY_ALLOWED(session)                                      \
+    (!F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED) ||                             \
+      __wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader) || \
+      __wt_btree_is_outdated_disagg(session))
+#endif
+
     wt_shared uint64_t bytes_dirty_intl;  /* Bytes in dirty internal pages. */
     wt_shared uint64_t bytes_dirty_leaf;  /* Bytes in dirty leaf pages. */
     wt_shared uint64_t bytes_dirty_total; /* Bytes ever dirtied in cache. */

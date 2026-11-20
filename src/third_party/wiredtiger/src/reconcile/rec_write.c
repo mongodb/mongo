@@ -140,6 +140,8 @@ __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage
 
     WT_ASSERT_ALWAYS(session, !F_ISSET_ATOMIC_32(btree, WT_BTREE_READONLY),
       "Attempting reconciliation on a read-only page");
+    WT_ASSERT_ALWAYS(session, !__wt_btree_is_outdated_disagg(session),
+      "Attempting reconciliation on outdated page");
 
     /*
      * Sanity check flags.

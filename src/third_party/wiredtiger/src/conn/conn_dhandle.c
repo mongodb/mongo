@@ -280,19 +280,16 @@ __wt_conn_dhandle_find(WT_SESSION_IMPL *session, const char *uri, const char *ch
                 continue;
             if (__wt_atomic_load_bool_relaxed(&dhandle->outdated)) {
                 /*
-                 * An outdated read-only stable handle is only safe to reuse in its checkpoint-view
-                 * form (a "<uri>/WiredTigerCheckpoint.N" name): those checkpoint handles span eras
-                 * and sweep keeps them alive for readers and the checkpoint tracking logic. A live
+                 * An outdated stable handle is only safe to reuse in its checkpoint-view form (a
+                 * "<uri>/WiredTigerCheckpoint.N" name): those checkpoint handles span eras and
+                 * sweep keeps them alive for readers and the checkpoint tracking logic. A live
                  * stable handle must be reopened fresh instead -- draining through an outdated one
                  * hits resident inserts or unresolved prepared updates left by the previous leader
                  * era.
                  */
-                if (WT_DHANDLE_BTREE(dhandle) &&
-                  F_ISSET_ATOMIC_32((WT_BTREE *)dhandle->handle, WT_BTREE_READONLY)) {
-                    if (__wt_atomic_load_int32_acquire(&dhandle->session_inuse) == 0 ||
-                      __wt_dhandle_shared_btree_kind(dhandle) != WT_SHARED_BTREE_CHECKPOINT)
-                        continue;
-                } else
+                if (!WT_DHANDLE_BTREE(dhandle) ||
+                  __wt_atomic_load_int32_acquire(&dhandle->session_inuse) == 0 ||
+                  __wt_dhandle_shared_btree_kind(dhandle) != WT_SHARED_BTREE_CHECKPOINT)
                     continue;
             }
             if (dhandle->checkpoint == NULL && strcmp(uri, dhandle->name) == 0) {

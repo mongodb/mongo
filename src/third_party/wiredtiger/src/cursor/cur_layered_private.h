@@ -45,14 +45,18 @@ struct __wti_cursor_layered {
     uint64_t read_timestamp;             /* Read timestamp on last access */
     uint64_t stable_checkpoint_meta_lsn; /* Checkpoint LSN stable cursor is on */
     WTI_CLAYERED_ROLE last_role;         /* Last-observed leader/follower role (change-detection) */
+    WT_ITEM prepare_blocked_key;         /* Prepare-blocked stable key saved across reopening */
+    bool prepare_blocked_next;           /* Saved key was blocked by next, not prev */
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WTI_CLAYERED_ACTIVE 0x01u       /* Incremented the session count */
-#define WTI_CLAYERED_ITERATE_NEXT 0x02u /* Forward iteration */
-#define WTI_CLAYERED_ITERATE_PREV 0x04u /* Backward iteration */
-#define WTI_CLAYERED_RANDOM 0x08u       /* Random cursor operations only */
-#define WTI_CLAYERED_SIZE_STAT 0x10u    /* Accumulate the size summary on the active btree */
-                                        /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
+#define WTI_CLAYERED_ACTIVE 0x01u                   /* Incremented the session count */
+#define WTI_CLAYERED_ITERATE_ALT_BLOCKED_NEXT 0x02u /* Forward alternate blocked */
+#define WTI_CLAYERED_ITERATE_ALT_BLOCKED_PREV 0x04u /* Backward alternate blocked */
+#define WTI_CLAYERED_ITERATE_NEXT 0x08u             /* Forward iteration */
+#define WTI_CLAYERED_ITERATE_PREV 0x10u             /* Backward iteration */
+#define WTI_CLAYERED_RANDOM 0x20u                   /* Random cursor operations only */
+#define WTI_CLAYERED_SIZE_STAT 0x40u /* Accumulate the size summary on the active btree */
+                                     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 };
 
@@ -85,4 +89,6 @@ struct __wti_clayered_op {
     WT_COLLATOR *collator;
     WTI_CLAYERED_WRITE_TARGET write_target;
     bool follower_blind_remove;
+    bool ingest_refreshed; /* Ingest positioned or stepped in this merge pass */
+    bool stable_refreshed; /* Stable positioned or stepped in this merge pass */
 };

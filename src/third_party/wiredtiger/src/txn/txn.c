@@ -1231,77 +1231,92 @@ __txn_prepare_rollback_delete_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_UP
 
 /*
  * __txn_resolve_prepared_update_chain --
- *     Helper for resolving updates. Recursively visit the update chain and resolve the updates on
- *     the way back out, so older updates are resolved first. This ensures that a reconciliation
- *     racing with us will always see the newest update from the prepared transaction if any updates
- *     are still unresolved.
+ *     Helper for resolving updates. Resolve the transaction's updates on a single key oldest-first,
+ *     so a reconciliation racing with us will always see the newest update from the prepared
+ *     transaction if any updates are still unresolved. The chain is collected into a vector rather
+ *     than walked recursively because a single key's chain can be arbitrarily long, and it is never
+ *     reversed in place because concurrent readers may be traversing it.
  */
-static void
+static int
 __txn_resolve_prepared_update_chain(
   WT_SESSION_IMPL *session, WT_TXN_TIME_POINT *txn_time_point, WT_UPDATE *upd, bool commit)
 {
-    /*
-     * Aborted updates can exist in the update chain of our transaction. Generally this will occur
-     * due to a reserved update. As such we should skip over these updates entirely.
-     */
-    while (upd != NULL && upd->txnid == WT_TXN_ABORTED)
-        upd = upd->next;
+    WT_DECL_RET;
+    WT_UPDATE *curr;
+    WT_UPDATE_VECTOR updates;
 
-    /*
-     * The previous loop exits on null, check that here. Additionally if the transaction id is then
-     * different or update's state is not in progress, we know we've reached the end of our update
-     * chain and don't need to look deeper.
-     */
-    if (upd == NULL || (upd->txnid != WT_TXN_NONE && upd->txnid != txn_time_point->id))
-        return;
+    __wt_update_vector_init(session, &updates);
 
-    if (upd->prepare_state != WT_PREPARE_INPROGRESS)
-        return;
-
-    WT_ASSERT(session,
-      !F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED) ||
-        upd->prepared_id == txn_time_point->prepared_id);
-
-    /* Go down the chain. Do the resolves on the way back up. */
-    __txn_resolve_prepared_update_chain(session, txn_time_point, upd->next, commit);
-
-    if (!commit) {
-        /* As updating timestamp might not be an atomic operation, we will manage using state. */
-        __wt_atomic_store_uint8_v_relaxed(&upd->prepare_state, WT_PREPARE_LOCKED);
+    for (; upd != NULL; upd = upd->next) {
         /*
-         * A release store would only prevent prior writes from being reordered after it; it would
-         * not prevent the subsequent timestamp writes from being reordered before it on
-         * weakly-ordered architectures. The explicit release barrier ensures this prepare state
-         * write is ordered before any timestamp field is modified, so a concurrent reader can never
-         * observe updated timestamps while the prepare state appears unchanged.
+         * Aborted updates can exist in the update chain of our transaction. Generally this will
+         * occur due to a reserved update. As such we should skip over these updates entirely.
          */
-        WT_RELEASE_BARRIER();
-        if (F_ISSET(txn_time_point, WT_TXN_TIME_POINT_HAS_TS_ROLLBACK))
-            __wt_atomic_store_uint64_relaxed(
-              &upd->upd_rollback_ts, txn_time_point->rollback_timestamp);
-        __wt_atomic_store_uint64_relaxed(&upd->upd_saved_txnid, upd->txnid);
-        __wt_atomic_store_uint64_v_release(&upd->txnid, WT_TXN_ABORTED);
-        __wt_atomic_store_uint8_v_release(&upd->prepare_state, WT_PREPARE_INPROGRESS);
-        WT_STAT_CONN_INCR(session, txn_prepared_updates_rolledback);
-        return;
+        if (upd->txnid == WT_TXN_ABORTED)
+            continue;
+
+        /*
+         * If the transaction id is different or update's state is not in progress, we know we've
+         * reached the end of our update chain and don't need to look deeper.
+         */
+        if ((upd->txnid != WT_TXN_NONE && upd->txnid != txn_time_point->id) ||
+          upd->prepare_state != WT_PREPARE_INPROGRESS)
+            break;
+
+        WT_ASSERT(session,
+          !F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED) ||
+            upd->prepared_id == txn_time_point->prepared_id);
+
+        WT_ERR(__wt_update_vector_push(&updates, upd));
     }
 
-    /*
-     * Performing an update on the same key where the truncate operation is performed can lead to
-     * updates that are already resolved in the updated list. Ignore the already resolved updates.
-     */
-    if (upd->prepare_state == WT_PREPARE_RESOLVED) {
-        WT_ASSERT(session, upd->type == WT_UPDATE_TOMBSTONE);
-        return;
+    while (updates.size > 0) {
+        __wt_update_vector_pop(&updates, &curr);
+
+        if (!commit) {
+            /* Updating the timestamp might not be atomic, so manage it using the prepare state. */
+            __wt_atomic_store_uint8_v_relaxed(&curr->prepare_state, WT_PREPARE_LOCKED);
+            /*
+             * A release store would only prevent prior writes from being reordered after it; it
+             * would not prevent the subsequent timestamp writes from being reordered before it on
+             * weakly-ordered architectures. The explicit release barrier ensures this prepare state
+             * write is ordered before any timestamp field is modified, so a concurrent reader can
+             * never observe updated timestamps while the prepare state appears unchanged.
+             */
+            WT_RELEASE_BARRIER();
+
+            if (F_ISSET(txn_time_point, WT_TXN_TIME_POINT_HAS_TS_ROLLBACK))
+                __wt_atomic_store_uint64_relaxed(
+                  &curr->upd_rollback_ts, txn_time_point->rollback_timestamp);
+            __wt_atomic_store_uint64_relaxed(&curr->upd_saved_txnid, curr->txnid);
+            __wt_atomic_store_uint64_v_release(&curr->txnid, WT_TXN_ABORTED);
+            __wt_atomic_store_uint8_v_release(&curr->prepare_state, WT_PREPARE_INPROGRESS);
+            WT_STAT_CONN_INCR(session, txn_prepared_updates_rolledback);
+            continue;
+        }
+
+        /*
+         * Performing an update on the same key where the truncate operation is performed can lead
+         * to updates that are already resolved in the updated list. Ignore the already resolved
+         * updates.
+         */
+        if (curr->prepare_state == WT_PREPARE_RESOLVED) {
+            WT_ASSERT(session, curr->type == WT_UPDATE_TOMBSTONE);
+            continue;
+        }
+
+        /* Resolve the prepared update to be a committed update. */
+        __txn_apply_prepare_state_update(session, curr, txn_time_point, true);
+
+        /* Sleep for 1 second in the prepared resolution path if configured. */
+        if (FLD_ISSET(S2C(session)->timing_stress_flags, WT_TIMING_STRESS_PREPARE_RESOLUTION_2))
+            __wt_sleep(0, 1000 * WT_THOUSAND);
+        WT_STAT_CONN_INCR(session, txn_prepared_updates_committed);
     }
 
-    /* Resolve the prepared update to be a committed update. */
-    __txn_apply_prepare_state_update(session, upd, txn_time_point, true);
-
-    /* Sleep for 1 second in the prepared resolution path if configured. */
-    if (FLD_ISSET(S2C(session)->timing_stress_flags, WT_TIMING_STRESS_PREPARE_RESOLUTION_2))
-        __wt_sleep(0, 1000 * WT_THOUSAND);
-    WT_STAT_CONN_INCR(session, txn_prepared_updates_committed);
+err:
+    __wt_update_vector_free(&updates);
+    return (ret);
 }
 
 /*
@@ -1466,7 +1481,6 @@ __wt_txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_BTREE *btree,
             /* Restore the history store update to the update chain. */
             WT_ERR(__txn_prepare_rollback_restore_hs_update(session, hs_cursor, page, upd, commit));
         else {
-            ret = 0;
             /*
              * Append a globally visible tombstone to the end of the chain. When reconciliation
              * later drops the rolled-back prepared cell, the tombstone remains as the correct
@@ -1505,7 +1519,7 @@ __wt_txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_BTREE *btree,
      * In the above example, we will resolve "u2" and "u1" as part of resolving "txn_op1" and will
      * not do any significant thing as part of "txn_op2".
      */
-    __txn_resolve_prepared_update_chain(session, txn_time_point, upd, commit);
+    WT_ERR(__txn_resolve_prepared_update_chain(session, txn_time_point, upd, commit));
 
     /* Mark the page dirty once the prepared updates are resolved. */
     __wt_page_modify_set(session, page);

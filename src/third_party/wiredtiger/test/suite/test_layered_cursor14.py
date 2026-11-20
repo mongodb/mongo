@@ -26,8 +26,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
+import random, wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
+from suite_random import suite_random
 from wtscenario import make_scenarios
 
 # Test cursor iteration and iteration after search/search_near on layered cursors
@@ -305,6 +306,123 @@ class test_layered_cursor14(wttest.WiredTigerTestCase):
         for _ in range(20):
             self.assertEqual(self.walk_next(cursor, 1), [self.fmt_key(501)])
             self.assertEqual(self.walk_prev(cursor, 1), [self.fmt_key(500)])
+        cursor.close()
+
+    def check_reverse_read_uncommitted(self, stable, ingest, walked, inserted, expected, forward,
+                                       commit=True):
+        """
+        Walk in one direction under read-uncommitted, have another session insert a key into
+        ingest, committed or not, then reverse: the walk must continue from the last key it
+        returned.
+        """
+        self.insert_stable(stable)
+        self.insert_ingest(ingest)
+
+        cursor = self.open_cursor()
+        self.session_follow.begin_transaction('isolation=read-uncommitted')
+        step, back = (cursor.next, cursor.prev) if forward else (cursor.prev, cursor.next)
+        for k in walked:
+            self.assertEqual(step(), 0)
+            self.assertEqual(cursor.get_key(), self.fmt_key(k))
+
+        writer_session = self.conn_follow.open_session('')
+        if commit:
+            self.insert_on(writer_session, [inserted])
+        else:
+            writer = writer_session.open_cursor(self.uri)
+            writer_session.begin_transaction()
+            writer[self.fmt_key(inserted)] = self.fmt_val(inserted)
+
+        actual = []
+        while back() == 0:
+            actual.append(cursor.get_key())
+        self.session_follow.rollback_transaction()
+        cursor.close()
+        if not commit:
+            writer_session.rollback_transaction()
+        writer_session.close()
+        self.assertEqual(actual, [self.fmt_key(k) for k in expected])
+
+    def test_direction_switch_read_uncommitted_between(self):
+        """A key inserted between the current key and the ingest cursor's key is not returned."""
+        self.check_reverse_read_uncommitted(
+            [10, 20, 30], [50], [10, 20, 30], 40, [20, 10], forward=True)
+
+    def test_direction_switch_read_uncommitted_between_prev(self):
+        """As above, walking backward and then forward."""
+        self.check_reverse_read_uncommitted(
+            [30, 40, 50], [10], [50, 40, 30], 20, [40, 50], forward=False)
+
+    def test_direction_switch_read_uncommitted_between_uncommitted(self):
+        """As above, with the inserted key left uncommitted."""
+        self.check_reverse_read_uncommitted(
+            [10, 20, 30], [50], [10, 20, 30], 40, [20, 10], forward=True, commit=False)
+
+    def test_direction_switch_read_uncommitted_between_uncommitted_prev(self):
+        """As above, walking backward and then forward."""
+        self.check_reverse_read_uncommitted(
+            [30, 40, 50], [10], [50, 40, 30], 20, [40, 50], forward=False, commit=False)
+
+    def test_direction_switch_read_uncommitted_same(self):
+        """A key inserted into ingest on the current key is not returned again."""
+        self.check_reverse_read_uncommitted(
+            [10, 20, 30], [50], [10, 20, 30], 30, [20, 10], forward=True)
+
+    def test_direction_switch_read_uncommitted_same_prev(self):
+        """As above, walking backward and then forward."""
+        self.check_reverse_read_uncommitted(
+            [30, 40, 50], [10], [50, 40, 30], 30, [40, 50], forward=False)
+
+    def test_direction_zigzag_overlapping(self):
+        """Random direction switches over shared, removed and one-sided keys match a model."""
+        seedw, seedz = wttest.getseed()
+        seed = suite_random().rand32()
+        self.prhead(f'Model seed {seed}; reproduce with --seed {seedw}.{seedz}')
+        rng = random.Random(seed)
+
+        stable = list(range(0, 150, 2))
+        ingest_only = list(range(51, 200, 2))
+        shared = list(range(50, 150, 10))
+        removed = list(range(56, 150, 14))
+
+        self.insert_stable(stable)
+        self.insert_ingest(ingest_only)
+        cursor = self.session_follow.open_cursor(self.uri)
+        for k in shared:
+            self.session_follow.begin_transaction()
+            cursor[self.fmt_key(k)] = 'ingest'
+            self.session_follow.commit_transaction(
+                f"commit_timestamp={self.timestamp_str(self.next_ts())}")
+        cursor.close()
+        self.remove_ingest(removed)
+
+        # The model: every visible key in order, with the value the walk must return.
+        values = {k: self.fmt_val(k) for k in stable + ingest_only}
+        values.update({k: 'ingest' for k in shared})
+        for k in removed:
+            del values[k]
+        model = sorted(values)
+
+        cursor = self.open_cursor()
+        pos = None
+        forward = True
+        for step in range(3000):
+            if rng.random() < 0.35:
+                forward = not forward
+            if forward:
+                pos = 0 if pos is None else pos + 1
+                ret = cursor.next()
+            else:
+                pos = len(model) - 1 if pos is None else pos - 1
+                ret = cursor.prev()
+            msg = f'seed {seed} step {step} {"next" if forward else "prev"}'
+            if pos < 0 or pos >= len(model):
+                self.assertEqual(ret, wiredtiger.WT_NOTFOUND, msg)
+                pos = None
+                continue
+            self.assertEqual(ret, 0, msg)
+            self.assertEqual(cursor.get_key(), self.fmt_key(model[pos]), msg)
+            self.assertEqual(cursor.get_value(), values[model[pos]], msg)
         cursor.close()
 
     # =====================================================================

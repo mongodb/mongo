@@ -377,9 +377,18 @@ class test_disagg_fast_truncate03(test_cc_base):
             after["leaf_read"], before["leaf_read"],
             "step 8: checkpoint cleanup read a fast-deleted leaf page",
         )
-        self.assertEqual(
-            after["cleanup_removed"] - before["cleanup_removed"], fast_deleted,
-            "step 8: checkpoint cleanup did not process every fast-deleted leaf reference",
+        # The checkpoint that triggers cleanup can reconcile a parent made dirty since the last
+        # checkpoint, which discards its now globally visible deleted children before cleanup
+        # runs, and cleanup does not count those again. Step 9 checks that every fast-deleted
+        # leaf is discarded.
+        removed = after["cleanup_removed"] - before["cleanup_removed"]
+        self.assertGreater(
+            removed, 0,
+            "step 8: checkpoint cleanup did not process any fast-deleted leaf reference",
+        )
+        self.assertLessEqual(
+            removed, fast_deleted,
+            "step 8: checkpoint cleanup counted a fast-deleted leaf reference more than once",
         )
         self.assertEqual(
             after["not_visible_all"], before["not_visible_all"],

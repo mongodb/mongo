@@ -44,8 +44,8 @@ __wt_btree_disable_bulk(WT_SESSION_IMPL *session)
 static WT_INLINE bool
 __wt_btree_dhandle_is_outdated_disagg(WT_DATA_HANDLE *dhandle, WT_BTREE *btree)
 {
-    return (F_ISSET(btree, WT_BTREE_DISAGGREGATED) && F_ISSET_ATOMIC_32(btree, WT_BTREE_READONLY) &&
-      __wt_atomic_load_bool_relaxed(&dhandle->outdated));
+    return (
+      F_ISSET(btree, WT_BTREE_DISAGGREGATED) && __wt_atomic_load_bool_relaxed(&dhandle->outdated));
 }
 
 /*
@@ -1165,9 +1165,7 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
     if (F_ISSET(page->modify, WT_PAGE_MODIFY_INSTANTIATING))
         return;
 
-    WT_ASSERT(session,
-      !F_ISSET(btree, WT_BTREE_DISAGGREGATED) ||
-        __wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader));
+    WT_ASSERT(session, WT_BTREE_DISAGG_DIRTY_ALLOWED(session));
 
     /*
      * This is a relatively complex dance of operations so pay attention prior to modifying the code
@@ -1277,9 +1275,7 @@ __wt_tree_modify_set(WT_SESSION_IMPL *session)
     if (F_ISSET_ATOMIC_32(btree, WT_BTREE_READONLY))
         return;
 
-    WT_ASSERT(session,
-      !F_ISSET(btree, WT_BTREE_DISAGGREGATED) ||
-        __wt_atomic_load_bool_relaxed(&conn->layered_table_manager.leader));
+    WT_ASSERT(session, WT_BTREE_DISAGG_DIRTY_ALLOWED(session));
 
     /*
      * Test before setting the dirty flag, it's a hot cache line.
@@ -1403,9 +1399,7 @@ __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
     if (F_ISSET(page->modify, WT_PAGE_MODIFY_INSTANTIATING))
         return;
 
-    WT_ASSERT(session,
-      !F_ISSET(btree, WT_BTREE_DISAGGREGATED) ||
-        __wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader));
+    WT_ASSERT(session, WT_BTREE_DISAGG_DIRTY_ALLOWED(session));
 
     /*
      * Mark the tree dirty (even if the page is already marked dirty), newly created pages to
@@ -1444,9 +1438,7 @@ __wt_page_parent_modify_set(WT_SESSION_IMPL *session, WT_REF *ref, bool page_onl
     if (F_ISSET_ATOMIC_32(btree, WT_BTREE_READONLY))
         return (0);
 
-    WT_ASSERT(session,
-      !F_ISSET(btree, WT_BTREE_DISAGGREGATED) ||
-        __wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader));
+    WT_ASSERT(session, WT_BTREE_DISAGG_DIRTY_ALLOWED(session));
 
     /*
      * This function exists as a place to stash this comment. There are a few places where we need
@@ -2737,7 +2729,8 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
         return (false);
     }
 
-    if (F_ISSET_ATOMIC_32(btree, WT_BTREE_READONLY))
+    /* An outdated btree's pages are discarded rather than written, so they are always evictable. */
+    if (F_ISSET_ATOMIC_32(btree, WT_BTREE_READONLY) || __wt_btree_is_outdated_disagg(session))
         return (true);
 
     /*

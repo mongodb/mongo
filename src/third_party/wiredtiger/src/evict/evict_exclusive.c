@@ -112,7 +112,15 @@ __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session)
 
     /* Hold the walk lock to turn off eviction. */
     __wt_spin_lock(session, &evict->evict_walk_lock);
-    if (++btree->evict_disabled > 1) {
+    /*
+     * Turn eviction off before waiting for the busy count to reach zero. Waiting first would let a
+     * direct eviction start after we saw zero and keep running once we return. Direct eviction does
+     * not take the walk lock, so the add below and the busy count read in the wait loop are
+     * sequentially consistent, as are the busy count add and the eviction-off check done when a
+     * page is evicted directly. That guarantees at least one side sees the other: either the direct
+     * eviction backs out or we wait for it.
+     */
+    if (__wt_atomic_add_int32(&btree->evict_disabled, 1) > 1) {
         __wt_spin_unlock(session, &evict->evict_walk_lock);
         return (0);
     }
@@ -158,14 +166,15 @@ __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session)
     __wt_spin_unlock(session, &evict->evict_queue_lock);
 
     /*
-     * We have disabled further eviction: wait for concurrent LRU eviction activity to drain.
+     * We have turned off further eviction: wait for evictions already in progress to finish. This
+     * read is sequentially consistent, pairing with the add that turned eviction off.
      */
-    while (__wt_tsan_suppress_load_uint32_v(&btree->evict_busy) > 0)
+    while (__wt_atomic_load_uint32_v(&btree->evict_busy) > 0)
         __wt_yield();
 
     if (0) {
 err:
-        --btree->evict_disabled;
+        (void)__wt_atomic_sub_int32(&btree->evict_disabled, 1);
     }
     __wt_spin_unlock(session, &evict->evict_walk_lock);
     return (ret);

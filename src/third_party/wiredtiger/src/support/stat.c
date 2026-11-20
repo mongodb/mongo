@@ -376,8 +376,9 @@ static const char *const __stats_dsrc_desc[] = {
   "layered: Layered table cursor search operations from the stable btrees",
   "layered: Layered table cursor stable open raced a checkpoint pickup",
   "layered: Layered table cursor stable open refused to preserve a transaction snapshot",
-  "layered: Layered table cursor stable open rolled back after racing a step-down",
+  "layered: Layered table cursor stable open retried after racing a step-down",
   "layered: Layered table cursor update operations",
+  "layered: Layered table cursor walk restoration attempts after prepare conflicts",
   "layered: Layered table live stable open refused on a follower",
   "layered: Layered table stable values beginning with the tombstone byte sequence and ending with "
   "a non-tombstone byte",
@@ -887,6 +888,7 @@ static const int __stats_dsrc_otel_none[] = {
   WT_STAT_DSRC_LAYERED_CURS_OPEN_STABLE_REFUSED,
   WT_STAT_DSRC_LAYERED_CURS_OPEN_STABLE_STEPDOWN_RACE,
   WT_STAT_DSRC_LAYERED_CURS_UPDATE,
+  WT_STAT_DSRC_LAYERED_CURS_RESTORE_WALK,
   WT_STAT_DSRC_LAYERED_STABLE_LIVE_OPEN_REFUSED,
   WT_STAT_DSRC_LAYERED_CURS_STABLE_VALUE_TOMBSTONE_PREFIX,
   WT_STAT_DSRC_LAYERED_CURS_STABLE_VALUE_TOMBSTONE_SUFFIX,
@@ -1437,6 +1439,7 @@ __stat_dsrc_clear_none(WT_DSRC_STATS *stats)
     stats->layered_curs_open_stable_refused = 0;
     stats->layered_curs_open_stable_stepdown_race = 0;
     stats->layered_curs_update = 0;
+    stats->layered_curs_restore_walk = 0;
     stats->layered_stable_live_open_refused = 0;
     stats->layered_curs_stable_value_tombstone_prefix = 0;
     stats->layered_curs_stable_value_tombstone_suffix = 0;
@@ -1998,6 +2001,7 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->layered_curs_open_stable_refused += from->layered_curs_open_stable_refused;
     to->layered_curs_open_stable_stepdown_race += from->layered_curs_open_stable_stepdown_race;
     to->layered_curs_update += from->layered_curs_update;
+    to->layered_curs_restore_walk += from->layered_curs_restore_walk;
     to->layered_stable_live_open_refused += from->layered_stable_live_open_refused;
     to->layered_curs_stable_value_tombstone_prefix +=
       from->layered_curs_stable_value_tombstone_prefix;
@@ -2599,6 +2603,7 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->layered_curs_open_stable_stepdown_race +=
       WT_STAT_DSRC_READ(from, layered_curs_open_stable_stepdown_race);
     to->layered_curs_update += WT_STAT_DSRC_READ(from, layered_curs_update);
+    to->layered_curs_restore_walk += WT_STAT_DSRC_READ(from, layered_curs_restore_walk);
     to->layered_stable_live_open_refused +=
       WT_STAT_DSRC_READ(from, layered_stable_live_open_refused);
     to->layered_curs_stable_value_tombstone_prefix +=
@@ -3293,6 +3298,9 @@ static const char *const __stats_connection_desc[] = {
   "checkpoint: stop timing stress active",
   "checkpoint: the percentage of checkpoint sync time spent in reconciliation across all threads",
   "checkpoint: time spent on per-tree checkpoint work (usecs)",
+  "checkpoint: time the checkpoint thread spent waiting for parallel reconciliation workers "
+  "(usecs)",
+  "checkpoint: time the checkpoint thread spent walking trees during checkpoint (usecs)",
   "checkpoint: total failed number of checkpoints",
   "checkpoint: total succeed number of checkpoints",
   "checkpoint: total time (msecs)",
@@ -3504,8 +3512,9 @@ static const char *const __stats_connection_desc[] = {
   "layered: Layered table cursor search operations from the stable btrees",
   "layered: Layered table cursor stable open raced a checkpoint pickup",
   "layered: Layered table cursor stable open refused to preserve a transaction snapshot",
-  "layered: Layered table cursor stable open rolled back after racing a step-down",
+  "layered: Layered table cursor stable open retried after racing a step-down",
   "layered: Layered table cursor update operations",
+  "layered: Layered table cursor walk restoration attempts after prepare conflicts",
   "layered: Layered table live stable open refused on a follower",
   "layered: Layered table stable values beginning with the tombstone byte sequence and ending with "
   "a non-tombstone byte",
@@ -4473,6 +4482,8 @@ static const int __stats_connection_otel_none[] = {
   WT_STAT_CONN_CHECKPOINT_STOP_STRESS_ACTIVE,
   WT_STAT_CONN_CHECKPOINT_SYNC_REC_PCT,
   WT_STAT_CONN_CHECKPOINT_TREE_DURATION,
+  WT_STAT_CONN_CHECKPOINT_PARALLEL_WAIT_TIME,
+  WT_STAT_CONN_CHECKPOINT_WALK_TIME,
   WT_STAT_CONN_CHECKPOINTS_TOTAL_FAILED,
   WT_STAT_CONN_CHECKPOINTS_TOTAL_SUCCEED,
   WT_STAT_CONN_CHECKPOINT_TIME_TOTAL,
@@ -4674,6 +4685,7 @@ static const int __stats_connection_otel_none[] = {
   WT_STAT_CONN_LAYERED_CURS_OPEN_STABLE_REFUSED,
   WT_STAT_CONN_LAYERED_CURS_OPEN_STABLE_STEPDOWN_RACE,
   WT_STAT_CONN_LAYERED_CURS_UPDATE,
+  WT_STAT_CONN_LAYERED_CURS_RESTORE_WALK,
   WT_STAT_CONN_LAYERED_STABLE_LIVE_OPEN_REFUSED,
   WT_STAT_CONN_LAYERED_CURS_STABLE_VALUE_TOMBSTONE_PREFIX,
   WT_STAT_CONN_LAYERED_CURS_STABLE_VALUE_TOMBSTONE_SUFFIX,
@@ -5669,6 +5681,8 @@ __stat_connection_clear_none(WT_CONNECTION_STATS *stats)
     /* not clearing checkpoint_stop_stress_active */
     /* not clearing checkpoint_sync_rec_pct */
     stats->checkpoint_tree_duration = 0;
+    /* not clearing checkpoint_parallel_wait_time */
+    /* not clearing checkpoint_walk_time */
     stats->checkpoints_total_failed = 0;
     stats->checkpoints_total_succeed = 0;
     /* not clearing checkpoint_time_total */
@@ -5870,6 +5884,7 @@ __stat_connection_clear_none(WT_CONNECTION_STATS *stats)
     stats->layered_curs_open_stable_refused = 0;
     stats->layered_curs_open_stable_stepdown_race = 0;
     stats->layered_curs_update = 0;
+    stats->layered_curs_restore_walk = 0;
     stats->layered_stable_live_open_refused = 0;
     stats->layered_curs_stable_value_tombstone_prefix = 0;
     stats->layered_curs_stable_value_tombstone_suffix = 0;
@@ -6978,6 +6993,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->checkpoint_stop_stress_active += WT_STAT_CONN_READ(from, checkpoint_stop_stress_active);
     to->checkpoint_sync_rec_pct += WT_STAT_CONN_READ(from, checkpoint_sync_rec_pct);
     to->checkpoint_tree_duration += WT_STAT_CONN_READ(from, checkpoint_tree_duration);
+    to->checkpoint_parallel_wait_time += WT_STAT_CONN_READ(from, checkpoint_parallel_wait_time);
+    to->checkpoint_walk_time += WT_STAT_CONN_READ(from, checkpoint_walk_time);
     to->checkpoints_total_failed += WT_STAT_CONN_READ(from, checkpoints_total_failed);
     to->checkpoints_total_succeed += WT_STAT_CONN_READ(from, checkpoints_total_succeed);
     to->checkpoint_time_total += WT_STAT_CONN_READ(from, checkpoint_time_total);
@@ -7237,6 +7254,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->layered_curs_open_stable_stepdown_race +=
       WT_STAT_CONN_READ(from, layered_curs_open_stable_stepdown_race);
     to->layered_curs_update += WT_STAT_CONN_READ(from, layered_curs_update);
+    to->layered_curs_restore_walk += WT_STAT_CONN_READ(from, layered_curs_restore_walk);
     to->layered_stable_live_open_refused +=
       WT_STAT_CONN_READ(from, layered_stable_live_open_refused);
     to->layered_curs_stable_value_tombstone_prefix +=

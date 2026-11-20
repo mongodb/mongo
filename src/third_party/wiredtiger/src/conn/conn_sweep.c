@@ -166,10 +166,12 @@ __sweep_close_dhandle_locked(WT_SESSION_IMPL *session)
         return (0);
 
     /*
-     * Sweep only closes clean trees, with one exception: an ingest btree whose entire contents are
+     * Sweep only closes clean trees, with two exceptions: an outdated disaggregated btree, whose
+     * dirty pages are discarded rather than written, and an ingest btree whose entire contents are
      * known to be durable in the stable table.
      */
-    if (btree != NULL && __wt_atomic_load_bool_relaxed(&btree->modified)) {
+    if (btree != NULL && __wt_atomic_load_bool_relaxed(&btree->modified) &&
+      !__wt_btree_dhandle_is_outdated_disagg(dhandle, btree)) {
         /*
          * We check that there are no cursors open that can be adding new content, and we hold the
          * dhandle write lock, which blocks new opens. Open transaction modifications also bump the

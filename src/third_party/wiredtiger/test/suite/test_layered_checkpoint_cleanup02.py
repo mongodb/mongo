@@ -114,11 +114,17 @@ class test_layered_checkpoint_cleanup02(wttest.WiredTigerTestCase):
 
         removed_before = self.get_stat(stat.dsrc.checkpoint_cleanup_pages_removed, self.uri)
 
+        # Checkpoint the truncation while it is not yet globally visible, so the parents are
+        # written with the fast-delete information and left clean. Otherwise the checkpoint that
+        # triggers cleanup would reconcile them with the truncation already globally visible and
+        # discard the deleted pages itself, leaving cleanup nothing to do.
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
+        self.session.checkpoint()
+
         # Make the truncation globally visible and run checkpoint cleanup: page-level cleanup
         # is unaffected by the disagg guard on key-level cleanup, so the fast-deleted pages are
         # still reclaimed.
-        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20) +
-          ',oldest_timestamp=' + self.timestamp_str(20))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(20))
         self.force_checkpoint_cleanup()
 
         self.assertGreaterEqual(

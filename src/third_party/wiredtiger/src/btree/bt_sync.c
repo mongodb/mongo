@@ -295,6 +295,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
     uint64_t internal_bytes, internal_pages, leaf_bytes, leaf_pages, oldest_id;
     uint64_t reconcile_time_pct, reconcile_time, reconcile_start;
     uint64_t saved_pinned_id, t, time_start, time_stop;
+    uint64_t walk_start, walk_time, wait_start, wait_time;
     uint32_t flags, rec_flags;
     bool checkpoint_scrub, dirty, is_hs, is_internal, tried_eviction;
 
@@ -315,6 +316,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 
     internal_bytes = leaf_bytes = 0;
     internal_pages = leaf_pages = 0;
+    walk_time = wait_time = 0;
     reconcile_time = 0;
     saved_pinned_id = __wt_atomic_load_uint64_v_relaxed(&WT_SESSION_TXN_SHARED(session)->pinned_id);
     time_start = __wt_clock(session);
@@ -437,8 +439,10 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
             LF_SET(WT_READ_VISIBLE_ALL);
 
         for (;;) {
+            walk_start = __wt_clock(session);
             WT_ERR(__sync_dup_walk(session, walk, flags, &prev));
             WT_ERR(__wt_tree_walk_custom_skip(session, &walk, NULL, NULL, flags));
+            walk_time += __wt_clock(session) - walk_start;
 
             if (walk == NULL)
                 break;
@@ -459,7 +463,9 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
              */
             if (WT_PARALLEL_CHECKPOINTS_ENABLED(session))
                 if (WT_SESSION_IS_CHECKPOINT(session) && is_internal) {
+                    wait_start = __wt_clock(session);
                     WT_ERR(__wt_checkpoint_parallel_finish(session, &t));
+                    wait_time += __wt_clock(session) - wait_start;
                     reconcile_time += t;
                 }
 
@@ -578,7 +584,9 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 
         /* Wait for the workers to finish; we need this if the root page is also a leaf page. */
         if (WT_PARALLEL_CHECKPOINTS_ENABLED(session) && WT_SESSION_IS_CHECKPOINT(session)) {
+            wait_start = __wt_clock(session);
             WT_ERR(__wt_checkpoint_parallel_finish(session, &t));
+            wait_time += __wt_clock(session) - wait_start;
             reconcile_time += t;
         }
 
@@ -642,8 +650,17 @@ err:
      * Wait for the workers to finish, as they may be still doing work if we got here because of an
      * error.
      */
-    if (WT_PARALLEL_CHECKPOINTS_ENABLED(session) && WT_SESSION_IS_CHECKPOINT(session))
+    if (WT_PARALLEL_CHECKPOINTS_ENABLED(session) && WT_SESSION_IS_CHECKPOINT(session)) {
+        wait_start = __wt_clock(session);
         WT_TRET(__wt_checkpoint_parallel_finish(session, NULL));
+        wait_time += __wt_clock(session) - wait_start;
+    }
+
+    /* Accumulate the per-tree times even when the tree failed. */
+    if (WT_SESSION_IS_CHECKPOINT(session)) {
+        (void)__wt_atomic_add_uint64(&conn->ckpt.parallel_wait_ticks, wait_time);
+        (void)__wt_atomic_add_uint64(&conn->ckpt.walk_ticks, walk_time);
+    }
 
     /*
      * If we got a snapshot in order to write pages, and there was no snapshot active when we

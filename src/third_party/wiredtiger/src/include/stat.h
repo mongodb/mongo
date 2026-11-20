@@ -41,21 +41,23 @@
  * number of CPUs (presumably, the application architect has figured out how many CPUs are
  * available). However, inside WiredTiger we don't know when the application creates its threads.
  *
- * Connection statistics use a fixed number of slots. Ideally, we would approximate the largest
- * number of cores we expect on any machine where WiredTiger might be run, however, we don't want to
- * waste that much memory on smaller machines. As of 2015, machines with more than 24 CPUs are
- * relatively rare.
+ * For now, we use a fixed number of slots. Ideally, we would approximate the largest number of
+ * cores we expect on any machine where WiredTiger might be run, however, we don't want to waste
+ * that much memory on smaller machines. As of 2015, machines with more than 24 CPUs are relatively
+ * rare.
  *
  * Default hash table size; use a prime number of buckets rather than assuming a good hash
  * (Reference Sedgewick, Algorithms in C, "Hash Functions").
  *
  * The counter slots are split into two separate counters, one for connection and the other for
- * data-source, so either count can change on its own. The data-source count is small because each
- * open btree dhandle pays for every slot.
+ * data-source. This is because we want to be able to independently increase one counter slot
+ * without increasing the other, as for example, increasing the data-source counter by a small
+ * number would have a greater impact than increasing the connection counter by the same number -
+ * depending on the number of dhandles in the system.
  *
  */
 #define WT_STAT_CONN_COUNTER_SLOTS 23
-#define WT_STAT_DSRC_COUNTER_SLOTS 4
+#define WT_STAT_DSRC_COUNTER_SLOTS 23
 
 /*
  * WT_STATS_###_SLOT_ID is the thread's slot ID for the array of structures.
@@ -887,6 +889,8 @@ struct __wt_connection_stats {
     int64_t checkpoint_stop_stress_active;
     int64_t checkpoint_sync_rec_pct;
     int64_t checkpoint_tree_duration;
+    int64_t checkpoint_parallel_wait_time;
+    int64_t checkpoint_walk_time;
     int64_t checkpoints_total_failed;
     int64_t checkpoints_total_succeed;
     int64_t checkpoint_time_total;
@@ -1094,6 +1098,7 @@ struct __wt_connection_stats {
     int64_t layered_curs_open_stable_refused;
     int64_t layered_curs_open_stable_stepdown_race;
     int64_t layered_curs_update;
+    int64_t layered_curs_restore_walk;
     int64_t layered_stable_live_open_refused;
     int64_t layered_curs_stable_value_tombstone_prefix;
     int64_t layered_curs_stable_value_tombstone_suffix;
@@ -1904,6 +1909,7 @@ struct __wt_dsrc_stats {
     int64_t layered_curs_open_stable_refused;
     int64_t layered_curs_open_stable_stepdown_race;
     int64_t layered_curs_update;
+    int64_t layered_curs_restore_walk;
     int64_t layered_stable_live_open_refused;
     int64_t layered_curs_stable_value_tombstone_prefix;
     int64_t layered_curs_stable_value_tombstone_suffix;
