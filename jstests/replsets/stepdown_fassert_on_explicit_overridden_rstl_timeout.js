@@ -125,7 +125,24 @@ describe("stepDown fasserts after the explicitly overridden RSTL timeout", funct
 
             const stepDowner = startParallelShell(stepDownCmd, primary.port);
 
-            jsTestLog("Waiting for primary to be down");
+            jsTest.log.info("Waiting for primary to stop accepting connections");
+            assert.soon(() => {
+                let conn;
+                try {
+                    // Attempt to connect to the primary.
+                    conn = new Mongo(`mongodb://${primary.host}/?socketTimeoutMS=5000`);
+                } catch (e) {
+                    jsTest.log.info("Primary no longer accepts connections", {error: e});
+                    return true;
+                } finally {
+                    if (conn) {
+                        conn.close();
+                    }
+                }
+                return false;
+            }, "primary still accepting connections after fassert");
+
+            jsTest.log.info("Waiting for primary to be down");
             replSet.waitForState(primary, ReplSetTest.State.DOWN);
 
             // Measure when the fassert fired from the log timestamps. The override is
