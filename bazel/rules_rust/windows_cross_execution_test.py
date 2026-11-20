@@ -13,6 +13,39 @@ BUILD_SCRIPT = Path(sys.argv.pop(1))
 
 
 class WindowsCrossExecutionTest(unittest.TestCase):
+    def test_cargo_prefix_map_uses_the_compiler_driver_syntax(self) -> None:
+        tree = ast.parse(BUILD_SCRIPT.read_text())
+        prefix_map = next(
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.If)
+            and any(
+                isinstance(statement, ast.Assign)
+                and any(
+                    isinstance(target, ast.Name) and target.id == "prefix_map"
+                    for target in statement.targets
+                )
+                for statement in node.body
+            )
+        )
+        code = compile(ast.Module(body=[prefix_map], type_ignores=[]), str(BUILD_SCRIPT), "exec")
+        for compiler, expected_map in (
+            ("clang-cl", "/clang:-ffile-prefix-map=${pwd}=."),
+            ("clang", "-ffile-prefix-map=${pwd}=."),
+            ("gcc", "-ffile-prefix-map=${pwd}=."),
+            ("msvc-cl", ""),
+        ):
+            for original in ("", "-DKEEP_EXISTING_FLAG"):
+                with self.subTest(compiler=compiler, original=original):
+                    env = {"CFLAGS": original, "CXXFLAGS": original}
+                    namespace = {
+                        "cc_toolchain": SimpleNamespace(compiler=compiler),
+                        "env": env,
+                    }
+                    exec(code, namespace)
+                    expected = " ".join(part for part in (original, expected_map) if part)
+                    self.assertEqual(env, {"CFLAGS": expected, "CXXFLAGS": expected})
+
     def test_copy_action_routes_by_copy_tool_os(self) -> None:
         tree = ast.parse(BUILD_SCRIPT.read_text())
         function = next(
