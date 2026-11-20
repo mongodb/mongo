@@ -40,12 +40,11 @@ namespace mongo {
  * File rotation and cleanup is not handled by this class.
  */
 class FTDCFileWriter {
-    FTDCFileWriter(const FTDCFileWriter&) = delete;
-    FTDCFileWriter& operator=(const FTDCFileWriter&) = delete;
-
 public:
     FTDCFileWriter(const FTDCConfig* config) : _config(config), _compressor(_config) {}
     ~FTDCFileWriter();
+    FTDCFileWriter(const FTDCFileWriter&) = delete;
+    FTDCFileWriter& operator=(const FTDCFileWriter&) = delete;
 
     /**
      * Open both an archive file, and interim file.

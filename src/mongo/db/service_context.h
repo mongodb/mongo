@@ -340,8 +340,6 @@ enum class ClientExcludedFromInterruptAtShutdown : bool {};
  * zero or more Clients, which in turn each own OperationContexts.
  */
 class ServiceContext final : public Decorable<ServiceContext> {
-    ServiceContext(const ServiceContext&) = delete;
-    ServiceContext& operator=(const ServiceContext&) = delete;
     template <typename T>
     using SyncUnique = service_context_detail::SyncUnique<T>;
 
@@ -489,6 +487,8 @@ public:
                    std::unique_ptr<ClockSource> preciseClockSource,
                    std::unique_ptr<TickSource> tickSource);
     ~ServiceContext() override;
+    ServiceContext(const ServiceContext&) = delete;
+    ServiceContext& operator=(const ServiceContext&) = delete;
 
     /**
      * Registers an observer of lifecycle events on Clients created by this ServiceContext.

@@ -27,9 +27,6 @@ namespace repl {
 class OpTime;
 
 class MultiApplier {
-    MultiApplier(const MultiApplier&) = delete;
-    MultiApplier& operator=(const MultiApplier&) = delete;
-
 public:
     /**
      * Callback function to report final status of applying operations.
@@ -61,6 +58,8 @@ public:
      * Blocks while applier is active.
      */
     virtual ~MultiApplier();
+    MultiApplier(const MultiApplier&) = delete;
+    MultiApplier& operator=(const MultiApplier&) = delete;
 
     /**
      * Returns true if the applier has been started (but has not completed).

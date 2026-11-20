@@ -19,11 +19,10 @@ namespace mongo {
 namespace {
 
 class EndSessionsCommand final : public EndSessionsCmdVersion1Gen<EndSessionsCommand> {
-    EndSessionsCommand(const EndSessionsCommand&) = delete;
-    EndSessionsCommand& operator=(const EndSessionsCommand&) = delete;
-
 public:
     EndSessionsCommand() = default;
+    EndSessionsCommand(const EndSessionsCommand&) = delete;
+    EndSessionsCommand& operator=(const EndSessionsCommand&) = delete;
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kAlways;

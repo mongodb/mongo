@@ -17,9 +17,6 @@
 namespace mongo {
 
 class BSONElementHasher {
-    BSONElementHasher(const BSONElementHasher&) = delete;
-    BSONElementHasher& operator=(const BSONElementHasher&) = delete;
-
 public:
     using HashSeed = int32_t;
 
@@ -48,5 +45,7 @@ public:
 
 private:
     BSONElementHasher();
+    BSONElementHasher(const BSONElementHasher&) = delete;
+    BSONElementHasher& operator=(const BSONElementHasher&) = delete;
 };
 }  // namespace mongo

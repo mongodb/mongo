@@ -111,9 +111,6 @@ struct CappedInsertNotifierData;
 
 
 class PlanExecutorImpl : public PlanExecutor {
-    PlanExecutorImpl(const PlanExecutorImpl&) = delete;
-    PlanExecutorImpl& operator=(const PlanExecutorImpl&) = delete;
-
 public:
     /**
      * Callers should obtain PlanExecutorImpl instances uses the 'plan_executor_factory' methods, in
@@ -136,6 +133,8 @@ public:
                      boost::optional<PlanSelectionStrategy> planSelectionStrategy = boost::none);
 
     ~PlanExecutorImpl() override;
+    PlanExecutorImpl(const PlanExecutorImpl&) = delete;
+    PlanExecutorImpl& operator=(const PlanExecutorImpl&) = delete;
     CanonicalQuery* getCanonicalQuery() const final;
     const NamespaceString& nss() const final;
     const std::vector<NamespaceStringOrUUID>& getSecondaryNamespaces() const final;

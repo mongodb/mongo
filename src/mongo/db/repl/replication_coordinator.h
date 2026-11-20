@@ -101,9 +101,6 @@ class UpdatePositionArgs;
  * API that the replication subsystem presents to the rest of the codebase.
  */
 class [[MONGO_MOD_PUBLIC]] ReplicationCoordinator : public SyncSourceSelector {
-    ReplicationCoordinator(const ReplicationCoordinator&) = delete;
-    ReplicationCoordinator& operator=(const ReplicationCoordinator&) = delete;
-
 public:
     static ReplicationCoordinator* get(ServiceContext* service);
     static ReplicationCoordinator* get(ServiceContext& service);
@@ -121,6 +118,8 @@ public:
     };
 
     ~ReplicationCoordinator() override;
+    ReplicationCoordinator(const ReplicationCoordinator&) = delete;
+    ReplicationCoordinator& operator=(const ReplicationCoordinator&) = delete;
 
     /**
      * Does any initial bookkeeping needed to start replication, and instructs the other

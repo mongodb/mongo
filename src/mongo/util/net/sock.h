@@ -59,9 +59,6 @@ typedef int SOCKET;
  * todo: ssl
  */
 class Socket {
-    Socket(const Socket&) = delete;
-    Socket& operator=(const Socket&) = delete;
-
 public:
     static const int errorPollIntervalSecs;
 
@@ -76,6 +73,8 @@ public:
     Socket(double so_timeout = 0, logv2::LogSeverity logLevel = logv2::LogSeverity::Log());
 
     ~Socket();
+    Socket(const Socket&) = delete;
+    Socket& operator=(const Socket&) = delete;
 
     /** The correct way to initialize and connect to a socket is as follows: (1) construct the
      *  SockAddr, (2) check whether the SockAddr isValid(), (3) if the SockAddr is valid, a

@@ -36,12 +36,11 @@ public:
 
 private:
     class PeriodicJobImpl : public ControllableJob {
-        PeriodicJobImpl(const PeriodicJobImpl&) = delete;
-        PeriodicJobImpl& operator=(const PeriodicJobImpl&) = delete;
-
     public:
         friend class PeriodicRunnerImpl;
         PeriodicJobImpl(PeriodicJob job, ClockSource* source, ServiceContext* svc);
+        PeriodicJobImpl(const PeriodicJobImpl&) = delete;
+        PeriodicJobImpl& operator=(const PeriodicJobImpl&) = delete;
 
         void start() override;
         void pause() override;

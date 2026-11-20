@@ -57,9 +57,6 @@ struct ConnectionPoolStats;
  */
 class [[MONGO_MOD_OPEN]] TaskExecutor : public OutOfLineExecutor,
                                         public std::enable_shared_from_this<TaskExecutor> {
-    TaskExecutor(const TaskExecutor&) = delete;
-    TaskExecutor& operator=(const TaskExecutor&) = delete;
-
 public:
     /**
      * Error status that should be used by implementations of TaskExecutor when
@@ -102,6 +99,8 @@ public:
      * before returning, if necessary.
      */
     ~TaskExecutor() override;
+    TaskExecutor(const TaskExecutor&) = delete;
+    TaskExecutor& operator=(const TaskExecutor&) = delete;
 
     /**
      * Causes the executor to initialize its internal state (start threads if appropriate, create
@@ -422,11 +421,10 @@ protected:
  * Class representing a scheduled callback and providing methods for interacting with it.
  */
 class [[MONGO_MOD_OPEN]] TaskExecutor::CallbackState {
-    CallbackState(const CallbackState&) = delete;
-    CallbackState& operator=(const CallbackState&) = delete;
-
 public:
     virtual ~CallbackState();
+    CallbackState(const CallbackState&) = delete;
+    CallbackState& operator=(const CallbackState&) = delete;
 
     virtual void cancel() = 0;
     virtual void waitForCompletion() = 0;
@@ -492,11 +490,10 @@ private:
  * Class representing a scheduled event and providing methods for interacting with it.
  */
 class TaskExecutor::EventState {
-    EventState(const EventState&) = delete;
-    EventState& operator=(const EventState&) = delete;
-
 public:
     virtual ~EventState();
+    EventState(const EventState&) = delete;
+    EventState& operator=(const EventState&) = delete;
 
     virtual void signal() = 0;
     virtual void waitUntilSignaled() = 0;

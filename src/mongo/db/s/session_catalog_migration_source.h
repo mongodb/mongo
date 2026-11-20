@@ -59,9 +59,6 @@ class ServiceContext;
  * it would be wrong to wait for the highest opTime in this case.
  */
 class SessionCatalogMigrationSource {
-    SessionCatalogMigrationSource(const SessionCatalogMigrationSource&) = delete;
-    SessionCatalogMigrationSource& operator=(const SessionCatalogMigrationSource&) = delete;
-
 public:
     enum class EntryAtOpTimeType { kTransaction, kRetryableWrite };
 
@@ -81,6 +78,8 @@ public:
                                   NamespaceString ns,
                                   ChunkRange chunk,
                                   KeyPattern shardKey);
+    SessionCatalogMigrationSource(const SessionCatalogMigrationSource&) = delete;
+    SessionCatalogMigrationSource& operator=(const SessionCatalogMigrationSource&) = delete;
 
     /**
      * Gets the session oplog entries to be sent to the destination. The initialization is separated

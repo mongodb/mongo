@@ -67,9 +67,6 @@ namespace repl {
  * into dbtests.
  */
 class [[MONGO_MOD_OPEN]] ReplicationCoordinatorMock : public ReplicationCoordinator {
-    ReplicationCoordinatorMock(const ReplicationCoordinatorMock&) = delete;
-    ReplicationCoordinatorMock& operator=(const ReplicationCoordinatorMock&) = delete;
-
 public:
     ReplicationCoordinatorMock(ServiceContext* service, const ReplSettings& settings);
 
@@ -81,6 +78,8 @@ public:
     explicit ReplicationCoordinatorMock(ServiceContext* service);
 
     ~ReplicationCoordinatorMock() override;
+    ReplicationCoordinatorMock(const ReplicationCoordinatorMock&) = delete;
+    ReplicationCoordinatorMock& operator=(const ReplicationCoordinatorMock&) = delete;
 
     void startup(OperationContext* opCtx,
                  StorageEngine::LastShutdownState lastShutdownState) override;

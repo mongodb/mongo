@@ -19,14 +19,13 @@ namespace unittest {
  * All threads are unblocked when the counter reaches zero and the counter is reset.
  */
 class [[MONGO_MOD_PUBLIC]] Barrier {
-    Barrier(const Barrier&) = delete;
-    Barrier& operator=(const Barrier&) = delete;
-
 public:
     /**
      * Initializes barrier with a default thread count.
      */
     explicit Barrier(size_t threadCount);
+    Barrier(const Barrier&) = delete;
+    Barrier& operator=(const Barrier&) = delete;
 
     /**
      * Decrements thread counter by 1. If the thread counter is not zero, the thread blocks

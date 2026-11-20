@@ -21,12 +21,11 @@ namespace mongo {
  * three states: building, serving, or abandoned. See SequentialDocumentCache::CacheStatus.
  */
 class SequentialDocumentCache {
-    SequentialDocumentCache(const SequentialDocumentCache&) = delete;
-    SequentialDocumentCache& operator=(const SequentialDocumentCache&) = delete;
-
 public:
     explicit SequentialDocumentCache(size_t maxCacheSizeBytes) : _maxSizeBytes(maxCacheSizeBytes) {}
 
+    SequentialDocumentCache(const SequentialDocumentCache&) = delete;
+    SequentialDocumentCache& operator=(const SequentialDocumentCache&) = delete;
     SequentialDocumentCache(SequentialDocumentCache&& moveFrom)
         : _status(moveFrom._status),
           _maxSizeBytes(moveFrom._maxSizeBytes),

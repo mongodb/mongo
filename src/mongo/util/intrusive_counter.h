@@ -16,9 +16,6 @@ namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /// This is an alternative base class to the above ones (will replace them eventually)
 class [[MONGO_MOD_OPEN]] RefCountable {
-    RefCountable(const RefCountable&) = delete;
-    RefCountable& operator=(const RefCountable&) = delete;
-
 public:
     /// If false you have exclusive access to this object. This is useful for implementing COW.
     bool isShared() const {
@@ -64,6 +61,9 @@ public:
 protected:
     RefCountable() {}
     virtual ~RefCountable() {}
+
+    RefCountable(const RefCountable&) = delete;
+    RefCountable& operator=(const RefCountable&) = delete;
 
 private:
     mutable std::atomic<uint32_t> _count{0};  // NOLINT

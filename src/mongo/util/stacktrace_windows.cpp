@@ -45,9 +45,6 @@ const size_t kPathBufferSize = 1024;
 // symbol handler. Because access to the symbol handler API is not thread-safe, it also provides
 // a lock/unlock method so the whole symbol handler can be used with a std::lock_guard.
 class SymbolHandler {
-    SymbolHandler(const SymbolHandler&) = delete;
-    SymbolHandler& operator=(const SymbolHandler&) = delete;
-
 public:
     SymbolHandler() {
         auto handle = GetCurrentProcess();
@@ -81,6 +78,9 @@ public:
             SymCleanup(getHandle());
         }
     }
+
+    SymbolHandler(const SymbolHandler&) = delete;
+    SymbolHandler& operator=(const SymbolHandler&) = delete;
 
     HANDLE getHandle() const {
         return _processHandle.value();

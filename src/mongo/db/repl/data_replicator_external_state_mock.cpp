@@ -21,9 +21,6 @@ constexpr std::size_t kTestOplogBufferSize = 64 * 1024 * 1024;
 constexpr std::size_t kTestOplogBufferCount = std::numeric_limits<std::size_t>::max();
 
 class OplogApplierMock : public OplogApplier {
-    OplogApplierMock(const OplogApplierMock&) = delete;
-    OplogApplierMock& operator=(const OplogApplierMock&) = delete;
-
 public:
     OplogApplierMock(executor::TaskExecutor* executor,
                      OplogBuffer* oplogBuffer,
@@ -35,6 +32,9 @@ public:
                        OplogApplier::Options(OplogApplication::Mode::kSecondary)),
           _observer(observer),
           _externalState(externalState) {}
+
+    OplogApplierMock(const OplogApplierMock&) = delete;
+    OplogApplierMock& operator=(const OplogApplierMock&) = delete;
 
 private:
     void _run(OplogBuffer* oplogBuffer) final {}

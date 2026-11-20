@@ -18,13 +18,12 @@ namespace mongo {
 namespace repl {
 
 class [[MONGO_MOD_OPEN]] OplogInterface {
-    OplogInterface(const OplogInterface&) = delete;
-    OplogInterface& operator=(const OplogInterface&) = delete;
-
 public:
     class Iterator;
 
     virtual ~OplogInterface() = default;
+    OplogInterface(const OplogInterface&) = delete;
+    OplogInterface& operator=(const OplogInterface&) = delete;
 
     /**
      * Diagnostic information.
@@ -53,14 +52,13 @@ protected:
 };
 
 class OplogInterface::Iterator {
-    Iterator(const Iterator&) = delete;
-    Iterator& operator=(const Iterator&) = delete;
-
 public:
     using Value = std::pair<BSONObj, RecordId>;
 
     Iterator() = default;
     virtual ~Iterator() = default;
+    Iterator(const Iterator&) = delete;
+    Iterator& operator=(const Iterator&) = delete;
 
     /**
      * Returns next operation and record id (if applicable) in the oplog.

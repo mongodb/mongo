@@ -31,9 +31,6 @@ namespace mongo {
  * FieldRefSets do not own the FieldRef paths they contain.
  */
 class [[MONGO_MOD_PUBLIC]] FieldRefSet {
-    FieldRefSet(const FieldRefSet&) = delete;
-    FieldRefSet& operator=(const FieldRefSet&) = delete;
-
     struct FieldRefPtrLessThan {
         bool operator()(const FieldRef* lhs, const FieldRef* rhs) const;
     };
@@ -49,6 +46,8 @@ public:
     FieldRefSet(const std::vector<std::unique_ptr<FieldRef>>& paths);
     FieldRefSet(const std::vector<const FieldRef*>& paths);
     FieldRefSet(const std::vector<FieldRef*>& paths);
+    FieldRefSet(const FieldRefSet&) = delete;
+    FieldRefSet& operator=(const FieldRefSet&) = delete;
 
     /** Returns 'true' if the set is empty */
     bool empty() const {

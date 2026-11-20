@@ -15,12 +15,11 @@ namespace [[MONGO_MOD_PUBLIC]] mongo {
  * TimestampBlock is in scope.
  */
 class TimestampBlock {
-    TimestampBlock(const TimestampBlock&) = delete;
-    TimestampBlock& operator=(const TimestampBlock&) = delete;
-
 public:
     TimestampBlock(OperationContext* opCtx, Timestamp ts);
     ~TimestampBlock();
+    TimestampBlock(const TimestampBlock&) = delete;
+    TimestampBlock& operator=(const TimestampBlock&) = delete;
 
 private:
     OperationContext* const _opCtx;

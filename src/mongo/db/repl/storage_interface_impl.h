@@ -34,14 +34,13 @@ namespace mongo {
 namespace repl {
 
 class [[MONGO_MOD_OPEN]] StorageInterfaceImpl : public StorageInterface {
-    StorageInterfaceImpl(const StorageInterfaceImpl&) = delete;
-    StorageInterfaceImpl& operator=(const StorageInterfaceImpl&) = delete;
-
 public:
     static const char kRollbackIdFieldName[];
     static const char kRollbackIdDocumentId[];
 
     StorageInterfaceImpl();
+    StorageInterfaceImpl(const StorageInterfaceImpl&) = delete;
+    StorageInterfaceImpl& operator=(const StorageInterfaceImpl&) = delete;
 
     StatusWith<int> getRollbackID(OperationContext* opCtx) override;
     StatusWith<int> initializeRollbackID(OperationContext* opCtx) override;

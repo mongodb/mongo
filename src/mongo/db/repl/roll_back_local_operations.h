@@ -23,9 +23,6 @@ namespace repl {
 extern FailPoint rollbackHangAfterTransitionToRollback;
 
 class RollBackLocalOperations {
-    RollBackLocalOperations(const RollBackLocalOperations&) = delete;
-    RollBackLocalOperations& operator=(const RollBackLocalOperations&) = delete;
-
 public:
     class RollbackCommonPoint {
 
@@ -71,6 +68,8 @@ public:
                             const RollbackOperationFn& rollbackOperation);
 
     virtual ~RollBackLocalOperations() = default;
+    RollBackLocalOperations(const RollBackLocalOperations&) = delete;
+    RollBackLocalOperations& operator=(const RollBackLocalOperations&) = delete;
 
     /**
      * Process single remote operation.

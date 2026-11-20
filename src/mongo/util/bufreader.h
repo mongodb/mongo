@@ -25,12 +25,12 @@ namespace mongo {
     buffer with which we are working.
 */
 class [[MONGO_MOD_PUBLIC]] BufReader {
-    BufReader(const BufReader&) = delete;
-    BufReader& operator=(const BufReader&) = delete;
-
 public:
     BufReader(const void* p, unsigned len)
         : _start(reinterpret_cast<const char*>(p)), _pos(_start), _end(_start + len) {}
+
+    BufReader(const BufReader&) = delete;
+    BufReader& operator=(const BufReader&) = delete;
 
     bool atEof() const {
         return _pos == _end;

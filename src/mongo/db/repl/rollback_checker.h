@@ -38,9 +38,6 @@ namespace repl {
  *
  */
 class [[MONGO_MOD_PUBLIC]] RollbackChecker {
-    RollbackChecker(const RollbackChecker&) = delete;
-    RollbackChecker& operator=(const RollbackChecker&) = delete;
-
 public:
     // Rollback checker result - true if rollback occurred; false if rollback IDs
     // were the same; Otherwise, error status indicating why rollback check failed.
@@ -52,6 +49,8 @@ public:
     RollbackChecker(executor::TaskExecutor* executor, HostAndPort syncSource);
 
     virtual ~RollbackChecker();
+    RollbackChecker(const RollbackChecker&) = delete;
+    RollbackChecker& operator=(const RollbackChecker&) = delete;
 
     // Checks whether the the sync source has had a rollback since the last time reset was called,
     // and then calls the nextAction with the rollback checker result. An error status

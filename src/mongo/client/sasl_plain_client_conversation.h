@@ -15,9 +15,6 @@ namespace mongo {
  *  Client side authentication session for SASL PLAIN.
  */
 class SaslPLAINClientConversation : public SaslClientConversation {
-    SaslPLAINClientConversation(const SaslPLAINClientConversation&) = delete;
-    SaslPLAINClientConversation& operator=(const SaslPLAINClientConversation&) = delete;
-
 public:
     /**
      * Implements the client side of a SASL PLAIN mechanism session.
@@ -26,6 +23,8 @@ public:
     explicit SaslPLAINClientConversation(SaslClientSession* saslClientSession);
 
     ~SaslPLAINClientConversation() override;
+    SaslPLAINClientConversation(const SaslPLAINClientConversation&) = delete;
+    SaslPLAINClientConversation& operator=(const SaslPLAINClientConversation&) = delete;
 
     StatusWith<bool> step(std::string_view inputData, std::string* outputData) override;
 

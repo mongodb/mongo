@@ -32,11 +32,10 @@ namespace rpc {
  * Constructs an RPC Reply.
  */
 class [[MONGO_MOD_OPEN]] ReplyBuilderInterface {
-    ReplyBuilderInterface(const ReplyBuilderInterface&) = delete;
-    ReplyBuilderInterface& operator=(const ReplyBuilderInterface&) = delete;
-
 public:
     virtual ~ReplyBuilderInterface() = default;
+    ReplyBuilderInterface(const ReplyBuilderInterface&) = delete;
+    ReplyBuilderInterface& operator=(const ReplyBuilderInterface&) = delete;
 
     /**
      * Sets the raw command reply. This should probably not be used in favor of the

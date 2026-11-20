@@ -406,9 +406,6 @@ BSONObj DBClientBase::_countCmd(const NamespaceStringOrUUID& nsOrUuid,
 
 namespace {
 class ScopedMetadataWriterRemover {
-    ScopedMetadataWriterRemover(const ScopedMetadataWriterRemover&) = delete;
-    ScopedMetadataWriterRemover& operator=(const ScopedMetadataWriterRemover&) = delete;
-
 public:
     ScopedMetadataWriterRemover(DBClientBase* cli)
         : _cli(cli), _oldWriter(cli->getRequestMetadataWriter()) {
@@ -417,6 +414,9 @@ public:
     ~ScopedMetadataWriterRemover() {
         _cli->setRequestMetadataWriter(_oldWriter);
     }
+
+    ScopedMetadataWriterRemover(const ScopedMetadataWriterRemover&) = delete;
+    ScopedMetadataWriterRemover& operator=(const ScopedMetadataWriterRemover&) = delete;
 
 private:
     DBClientBase* const _cli;

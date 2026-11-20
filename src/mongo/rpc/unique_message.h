@@ -18,13 +18,12 @@ namespace [[MONGO_MOD_PUBLIC]] rpc {
  */
 template <typename MessageViewType>
 class UniqueMessage {
-    UniqueMessage(const UniqueMessage&) = delete;
-    UniqueMessage& operator=(const UniqueMessage&) = delete;
-
 public:
     UniqueMessage(Message message, std::unique_ptr<MessageViewType> view)
         : _message{std::move(message)}, _view{std::move(view)} {}
 
+    UniqueMessage(const UniqueMessage&) = delete;
+    UniqueMessage& operator=(const UniqueMessage&) = delete;
     UniqueMessage(UniqueMessage&&) = default;
     UniqueMessage& operator=(UniqueMessage&&) = default;
 

@@ -40,12 +40,11 @@ class DBClientBase;
 class OperationContext;
 
 class [[MONGO_MOD_OPEN]] Scope {
-    Scope(const Scope&) = delete;
-    Scope& operator=(const Scope&) = delete;
-
 public:
     Scope();
     virtual ~Scope();
+    Scope(const Scope&) = delete;
+    Scope& operator=(const Scope&) = delete;
 
     virtual void reset() = 0;
     virtual void init(const BSONObj* data) = 0;
@@ -207,12 +206,11 @@ protected:
 enum class [[MONGO_MOD_PUBLIC]] ExecutionEnvironment { Server, TestRunner };
 
 class [[MONGO_MOD_OPEN]] ScriptEngine : public KillOpListenerInterface {
-    ScriptEngine(const ScriptEngine&) = delete;
-    ScriptEngine& operator=(const ScriptEngine&) = delete;
-
 public:
     ScriptEngine();
     ~ScriptEngine() override = default;
+    ScriptEngine(const ScriptEngine&) = delete;
+    ScriptEngine& operator=(const ScriptEngine&) = delete;
 
     virtual Scope* newScope() {
         return createScope();

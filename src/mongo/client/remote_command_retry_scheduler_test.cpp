@@ -57,11 +57,10 @@ protected:
 };
 
 class CallbackResponseSaver {
-    CallbackResponseSaver(const CallbackResponseSaver&) = delete;
-    CallbackResponseSaver& operator=(const CallbackResponseSaver&) = delete;
-
 public:
     CallbackResponseSaver();
+    CallbackResponseSaver(const CallbackResponseSaver&) = delete;
+    CallbackResponseSaver& operator=(const CallbackResponseSaver&) = delete;
 
     /**
      * Use this for scheduler callback.
@@ -616,14 +615,14 @@ TEST_F(RemoteCommandRetrySchedulerTest,
 
 bool sharedCallbackStateDestroyed = false;
 class SharedCallbackState {
-    SharedCallbackState(const SharedCallbackState&) = delete;
-    SharedCallbackState& operator=(const SharedCallbackState&) = delete;
-
 public:
     SharedCallbackState() {}
     ~SharedCallbackState() {
         sharedCallbackStateDestroyed = true;
     }
+
+    SharedCallbackState(const SharedCallbackState&) = delete;
+    SharedCallbackState& operator=(const SharedCallbackState&) = delete;
 };
 
 TEST_F(RemoteCommandRetrySchedulerTest,

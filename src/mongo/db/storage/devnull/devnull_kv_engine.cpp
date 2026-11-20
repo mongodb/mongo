@@ -335,11 +335,11 @@ private:
 };
 
 class DevNullSortedDataBuilderInterface : public SortedDataBuilderInterface {
-    DevNullSortedDataBuilderInterface(const DevNullSortedDataBuilderInterface&) = delete;
-    DevNullSortedDataBuilderInterface& operator=(const DevNullSortedDataBuilderInterface&) = delete;
-
 public:
     DevNullSortedDataBuilderInterface() {}
+
+    DevNullSortedDataBuilderInterface(const DevNullSortedDataBuilderInterface&) = delete;
+    DevNullSortedDataBuilderInterface& operator=(const DevNullSortedDataBuilderInterface&) = delete;
 
     void addKey(RecoveryUnit& ru, const key_string::View& keyString) override {}
 };

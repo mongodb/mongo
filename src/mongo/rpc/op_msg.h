@@ -214,13 +214,13 @@ struct OpMsgRequest : public OpMsg {
  * sent.
  */
 class OpMsgBuilder {
-    OpMsgBuilder(const OpMsgBuilder&) = delete;
-    OpMsgBuilder& operator=(const OpMsgBuilder&) = delete;
-
 public:
     OpMsgBuilder() {
         skipHeaderAndFlags();
     }
+
+    OpMsgBuilder(const OpMsgBuilder&) = delete;
+    OpMsgBuilder& operator=(const OpMsgBuilder&) = delete;
 
     /**
      * See the documentation for DocSequenceBuilder below.
@@ -347,10 +347,9 @@ private:
  * docSeq.done(); // Or just let it go out of scope.
  */
 class OpMsgBuilder::DocSequenceBuilder {
+public:
     DocSequenceBuilder(const DocSequenceBuilder&) = delete;
     DocSequenceBuilder& operator=(const DocSequenceBuilder&) = delete;
-
-public:
     DocSequenceBuilder(DocSequenceBuilder&& other)
         : _buf(other._buf), _msgBuilder(other._msgBuilder), _sizeOffset(other._sizeOffset) {
         other._buf = nullptr;

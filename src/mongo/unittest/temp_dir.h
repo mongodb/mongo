@@ -17,9 +17,6 @@ namespace unittest {
  * An RAII temporary directory that deletes itself and all contents files on scope exit.
  */
 class TempDir {
-    TempDir(const TempDir&) = delete;
-    TempDir& operator=(const TempDir&) = delete;
-
 public:
     /**
      * Creates a new unique temporary directory.
@@ -40,6 +37,8 @@ public:
      * once the TempDir goes out of scope. Any errors are logged and ignored.
      */
     ~TempDir();
+    TempDir(const TempDir&) = delete;
+    TempDir& operator=(const TempDir&) = delete;
 
     /**
      * Release the path encapsulated by this TempDir to be cleaned up by the caller as necessary.

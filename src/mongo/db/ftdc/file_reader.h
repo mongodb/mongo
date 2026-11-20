@@ -27,12 +27,11 @@ namespace mongo {
  * Does not recover interim files into archive files.
  */
 class FTDCFileReader {
-    FTDCFileReader(const FTDCFileReader&) = delete;
-    FTDCFileReader& operator=(const FTDCFileReader&) = delete;
-
 public:
     FTDCFileReader() : _state(State::kNeedsDoc) {}
     ~FTDCFileReader();
+    FTDCFileReader(const FTDCFileReader&) = delete;
+    FTDCFileReader& operator=(const FTDCFileReader&) = delete;
 
     /**
      * Open the specified file

@@ -15,11 +15,10 @@ namespace executor {
  * An asynchronous waitable timer interface.
  */
 class AsyncTimerInterface {
-    AsyncTimerInterface(const AsyncTimerInterface&) = delete;
-    AsyncTimerInterface& operator=(const AsyncTimerInterface&) = delete;
-
 public:
     virtual ~AsyncTimerInterface() = default;
+    AsyncTimerInterface(const AsyncTimerInterface&) = delete;
+    AsyncTimerInterface& operator=(const AsyncTimerInterface&) = delete;
 
     using Handler = std::function<void(std::error_code)>;
 
@@ -55,11 +54,10 @@ protected:
  * A factory for AsyncTimers.
  */
 class AsyncTimerFactoryInterface {
-    AsyncTimerFactoryInterface(const AsyncTimerFactoryInterface&) = delete;
-    AsyncTimerFactoryInterface& operator=(const AsyncTimerFactoryInterface&) = delete;
-
 public:
     virtual ~AsyncTimerFactoryInterface() = default;
+    AsyncTimerFactoryInterface(const AsyncTimerFactoryInterface&) = delete;
+    AsyncTimerFactoryInterface& operator=(const AsyncTimerFactoryInterface&) = delete;
 
     virtual std::unique_ptr<AsyncTimerInterface> make(Milliseconds expiration) = 0;
 

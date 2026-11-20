@@ -35,11 +35,10 @@ class StopWords;
  * Optionally supports returning case sensitive search terms.
  */
 class UnicodeFTSTokenizer final : public FTSTokenizer {
-    UnicodeFTSTokenizer(const UnicodeFTSTokenizer&) = delete;
-    UnicodeFTSTokenizer& operator=(const UnicodeFTSTokenizer&) = delete;
-
 public:
     UnicodeFTSTokenizer(const FTSLanguage* language);
+    UnicodeFTSTokenizer(const UnicodeFTSTokenizer&) = delete;
+    UnicodeFTSTokenizer& operator=(const UnicodeFTSTokenizer&) = delete;
 
     void reset(std::string_view document, Options options) override;
 

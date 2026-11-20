@@ -48,13 +48,12 @@ const Status kTaskExecutorShutdownInProgress = {ErrorCodes::ShutdownInProgress,
 }  // namespace
 
 class ThreadPoolTaskExecutor::CallbackState : public TaskExecutor::CallbackState {
-    CallbackState(const CallbackState&) = delete;
-    CallbackState& operator=(const CallbackState&) = delete;
-
 public:
     CallbackState() = default;
 
     ~CallbackState() override = default;
+    CallbackState(const CallbackState&) = delete;
+    CallbackState& operator=(const CallbackState&) = delete;
 
     bool isCanceled() const override {
         return cancelSource.token().isCanceled();
@@ -109,15 +108,14 @@ struct ThreadPoolTaskExecutor::RemoteCallbackState : public ThreadPoolTaskExecut
 };
 
 class ThreadPoolTaskExecutor::EventState : public TaskExecutor::EventState {
-    EventState(const EventState&) = delete;
-    EventState& operator=(const EventState&) = delete;
-
 public:
     static std::shared_ptr<EventState> make() {
         return std::make_shared<EventState>();
     }
 
     EventState() = default;
+    EventState(const EventState&) = delete;
+    EventState& operator=(const EventState&) = delete;
 
     void signal() override {
         MONGO_UNREACHABLE;

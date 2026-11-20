@@ -24,14 +24,13 @@ namespace {
 typedef unsigned char HashDigest[16];
 
 class Hasher {
-    Hasher(const Hasher&) = delete;
-    Hasher& operator=(const Hasher&) = delete;
-
 public:
     using HashSeed = BSONElementHasher::HashSeed;
 
     explicit Hasher(HashSeed seed);
     ~Hasher() {};
+    Hasher(const Hasher&) = delete;
+    Hasher& operator=(const Hasher&) = delete;
 
     // pointer to next part of input key, length in bytes to read
     void addData(const void* keyData, size_t numBytes);

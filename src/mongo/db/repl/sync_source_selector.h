@@ -49,12 +49,11 @@ inline std::ostream& operator<<(std::ostream& os, const ChangeSyncSourceAction a
  * Manage list of viable and blocked sync sources that we can replicate from.
  */
 class [[MONGO_MOD_OPEN]] SyncSourceSelector {
-    SyncSourceSelector(const SyncSourceSelector&) = delete;
-    SyncSourceSelector& operator=(const SyncSourceSelector&) = delete;
-
 public:
     SyncSourceSelector() = default;
     virtual ~SyncSourceSelector() = default;
+    SyncSourceSelector(const SyncSourceSelector&) = delete;
+    SyncSourceSelector& operator=(const SyncSourceSelector&) = delete;
 
     /**
      * Clears the list of sync sources we have denylisted.

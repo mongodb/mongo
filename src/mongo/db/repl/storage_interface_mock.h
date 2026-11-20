@@ -44,13 +44,12 @@ struct CollectionMockStats {
 };
 
 class CollectionBulkLoaderMock : public CollectionBulkLoader {
-    CollectionBulkLoaderMock(const CollectionBulkLoaderMock&) = delete;
-    CollectionBulkLoaderMock& operator=(const CollectionBulkLoaderMock&) = delete;
-
 public:
     explicit CollectionBulkLoaderMock(std::shared_ptr<CollectionMockStats> collStats)
         : stats(std::move(collStats)) {}
     ~CollectionBulkLoaderMock() override = default;
+    CollectionBulkLoaderMock(const CollectionBulkLoaderMock&) = delete;
+    CollectionBulkLoaderMock& operator=(const CollectionBulkLoaderMock&) = delete;
     Status init(const std::vector<BSONObj>& secondaryIndexSpecs);
 
     Status insertDocuments(std::span<BSONObj> docs, ParseRecordIdAndDocFunc fn) override;
@@ -72,9 +71,6 @@ public:
 };
 
 class [[MONGO_MOD_PUBLIC]] StorageInterfaceMock : public StorageInterface {
-    StorageInterfaceMock(const StorageInterfaceMock&) = delete;
-    StorageInterfaceMock& operator=(const StorageInterfaceMock&) = delete;
-
 public:
     // Used for testing.
 
@@ -120,6 +116,8 @@ public:
         std::function<StatusWith<UUID>(OperationContext*, const NamespaceString&)>;
 
     StorageInterfaceMock();
+    StorageInterfaceMock(const StorageInterfaceMock&) = delete;
+    StorageInterfaceMock& operator=(const StorageInterfaceMock&) = delete;
 
     StatusWith<int> getRollbackID(OperationContext* opCtx) override;
     StatusWith<int> initializeRollbackID(OperationContext* opCtx) override;

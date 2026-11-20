@@ -1034,9 +1034,6 @@ private:
  * Base class implementing ordered iteration through BSONElements.
  */
 class BSONIteratorSorted {
-    BSONIteratorSorted(const BSONIteratorSorted&) = delete;
-    BSONIteratorSorted& operator=(const BSONIteratorSorted&) = delete;
-
 public:
     bool more() {
         return _cur < static_cast<int>(_fields.size());
@@ -1056,6 +1053,8 @@ public:
 protected:
     class FieldNameCmp;
     BSONIteratorSorted(const BSONObj& o, const FieldNameCmp& cmp);
+    BSONIteratorSorted(const BSONIteratorSorted&) = delete;
+    BSONIteratorSorted& operator=(const BSONIteratorSorted&) = delete;
 
 private:
     std::vector<std::string_view> _fields;

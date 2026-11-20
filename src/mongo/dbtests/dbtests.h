@@ -25,11 +25,10 @@ namespace mongo::dbtests {
  * not created.
  */
 class WriteContextForTests {
-    WriteContextForTests(const WriteContextForTests&) = delete;
-    WriteContextForTests& operator=(const WriteContextForTests&) = delete;
-
 public:
     WriteContextForTests(OperationContext* opCtx, std::string_view ns);
+    WriteContextForTests(const WriteContextForTests&) = delete;
+    WriteContextForTests& operator=(const WriteContextForTests&) = delete;
 
     Database* db() const {
         return _autoDb->getDb();

@@ -79,9 +79,6 @@ enum class ExhaustMode { kOn, kOff };
  * Abstract class that implements the core db operations.
  */
 class [[MONGO_MOD_OPEN]] DBClientBase {
-    DBClientBase(const DBClientBase&) = delete;
-    DBClientBase& operator=(const DBClientBase&) = delete;
-
 public:
     static const uint64_t INVALID_SOCK_CREATION_TIME;
 
@@ -93,6 +90,9 @@ public:
     }
 
     virtual ~DBClientBase() {}
+
+    DBClientBase(const DBClientBase&) = delete;
+    DBClientBase& operator=(const DBClientBase&) = delete;
 
     virtual std::string toString() const = 0;
 

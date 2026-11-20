@@ -35,9 +35,6 @@ namespace [[MONGO_MOD_PUBLIC]] mongo {
  * the response side.
  */
 class BatchedCommandResponse {
-    BatchedCommandResponse(const BatchedCommandResponse&) = delete;
-    BatchedCommandResponse& operator=(const BatchedCommandResponse&) = delete;
-
 public:
     static const BSONField<long long> n;
     static const BSONField<long long> nModified;
@@ -50,6 +47,8 @@ public:
     BatchedCommandResponse();
     ~BatchedCommandResponse();
 
+    BatchedCommandResponse(const BatchedCommandResponse&) = delete;
+    BatchedCommandResponse& operator=(const BatchedCommandResponse&) = delete;
     BatchedCommandResponse(BatchedCommandResponse&&) = default;
     BatchedCommandResponse& operator=(BatchedCommandResponse&&) = default;
 

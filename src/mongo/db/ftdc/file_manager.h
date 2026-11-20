@@ -32,11 +32,10 @@ class Client;
  * Manages file rotation, and directory size management.
  */
 class FTDCFileManager {
-    FTDCFileManager(const FTDCFileManager&) = delete;
-    FTDCFileManager& operator=(const FTDCFileManager&) = delete;
-
 public:
     ~FTDCFileManager();
+    FTDCFileManager(const FTDCFileManager&) = delete;
+    FTDCFileManager& operator=(const FTDCFileManager&) = delete;
 
     /**
      * Creates the directory if it does not exist.

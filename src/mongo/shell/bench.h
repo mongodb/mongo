@@ -148,9 +148,6 @@ struct BenchRunOp {
  * Configuration object describing a bench run activity.
  */
 class BenchRunConfig {
-    BenchRunConfig(const BenchRunConfig&) = delete;
-    BenchRunConfig& operator=(const BenchRunConfig&) = delete;
-
 public:
     /**
      * Create a new BenchRunConfig object, and initialize it from the BSON
@@ -163,6 +160,8 @@ public:
     static std::unique_ptr<DBClientBase> createConnectionImpl(const BenchRunConfig&);
 
     BenchRunConfig();
+    BenchRunConfig(const BenchRunConfig&) = delete;
+    BenchRunConfig& operator=(const BenchRunConfig&) = delete;
 
     void initializeFromBson(const BSONObj& args);
 
@@ -316,9 +315,6 @@ private:
  * In all cases, the counter objects must outlive the trace object.
  */
 class BenchRunEventTrace {
-    BenchRunEventTrace(const BenchRunEventTrace&) = delete;
-    BenchRunEventTrace& operator=(const BenchRunEventTrace&) = delete;
-
 public:
     explicit BenchRunEventTrace(BenchRunEventCounter* eventCounter) {
         initialize(eventCounter, eventCounter, false);
@@ -333,6 +329,9 @@ public:
     ~BenchRunEventTrace() {
         (_succeeded ? _successCounter : _failCounter)->countOne(_timer.micros());
     }
+
+    BenchRunEventTrace(const BenchRunEventTrace&) = delete;
+    BenchRunEventTrace& operator=(const BenchRunEventTrace&) = delete;
 
     void succeed() {
         _succeeded = true;
@@ -384,14 +383,13 @@ struct BenchRunStats {
  * Logically, the states are "starting up", "running" and "finished."
  */
 class BenchRunState {
-    BenchRunState(const BenchRunState&) = delete;
-    BenchRunState& operator=(const BenchRunState&) = delete;
-
 public:
     enum State { BRS_STARTING_UP, BRS_RUNNING, BRS_FINISHED };
 
     explicit BenchRunState(unsigned numWorkers);
     ~BenchRunState();
+    BenchRunState(const BenchRunState&) = delete;
+    BenchRunState& operator=(const BenchRunState&) = delete;
 
     //
     // Functions called by the job-controlling thread, through an instance of BenchRunner.
@@ -466,9 +464,6 @@ private:
  * Represents the behavior of one thread working in a bench run activity.
  */
 class BenchRunWorker {
-    BenchRunWorker(const BenchRunWorker&) = delete;
-    BenchRunWorker& operator=(const BenchRunWorker&) = delete;
-
 public:
     /**
      * Create a new worker, performing one thread's worth of the activity described in
@@ -482,6 +477,8 @@ public:
                    BenchRunState& brState,
                    int64_t randomSeed);
     ~BenchRunWorker();
+    BenchRunWorker(const BenchRunWorker&) = delete;
+    BenchRunWorker& operator=(const BenchRunWorker&) = delete;
 
     /**
      * Start performing the "work" behavior in a new thread.
@@ -531,9 +528,6 @@ private:
  * Object representing a "bench run" activity.
  */
 class BenchRunner {
-    BenchRunner(const BenchRunner&) = delete;
-    BenchRunner& operator=(const BenchRunner&) = delete;
-
 public:
     /**
      * Utility method to create a new bench runner from a BSONObj representation
@@ -566,6 +560,8 @@ public:
      */
     explicit BenchRunner(BenchRunConfig* config);
     ~BenchRunner();
+    BenchRunner(const BenchRunner&) = delete;
+    BenchRunner& operator=(const BenchRunner&) = delete;
 
     /**
      * Start the activity. Only call once per instance of BenchRunner.

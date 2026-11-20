@@ -29,9 +29,6 @@ namespace [[MONGO_MOD_PUBLIC]] mongo {
  */
 
 class [[MONGO_MOD_OPEN]] BackgroundJob {
-    BackgroundJob(const BackgroundJob&) = delete;
-    BackgroundJob& operator=(const BackgroundJob&) = delete;
-
 protected:
     /**
      * sub-class must instantiate the BackgroundJob
@@ -40,6 +37,8 @@ protected:
      * @note selfDelete instances cannot be wait()-ed upon
      */
     explicit BackgroundJob(bool selfDelete = false);
+    BackgroundJob(const BackgroundJob&) = delete;
+    BackgroundJob& operator=(const BackgroundJob&) = delete;
 
     virtual std::string name() const = 0;
 

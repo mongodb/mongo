@@ -92,9 +92,6 @@ class SessionManager;
  * References to the TransportLayer should be stored on service context objects.
  */
 class TransportLayer {
-    TransportLayer(const TransportLayer&) = delete;
-    TransportLayer& operator=(const TransportLayer&) = delete;
-
 public:
     static const Status SessionUnknownStatus;
     static const Status ShutdownStatus;
@@ -105,6 +102,8 @@ public:
 
     TransportLayer() = default;
     virtual ~TransportLayer() = default;
+    TransportLayer(const TransportLayer&) = delete;
+    TransportLayer& operator=(const TransportLayer&) = delete;
 
     virtual StatusWith<std::shared_ptr<Session>> connect(
         HostAndPort peer,

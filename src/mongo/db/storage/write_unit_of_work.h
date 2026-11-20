@@ -45,9 +45,6 @@ public:
  * functionality of the RecoveryUnit.
  */
 class WriteUnitOfWork {
-    WriteUnitOfWork(const WriteUnitOfWork&) = delete;
-    WriteUnitOfWork& operator=(const WriteUnitOfWork&) = delete;
-
 public:
     /**
      * The RecoveryUnitState is used to ensure valid state transitions.
@@ -70,6 +67,8 @@ public:
     WriteUnitOfWork(OperationContext* opCtx, OplogEntryGroupType groupType = noGroup);
 
     ~WriteUnitOfWork();
+    WriteUnitOfWork(const WriteUnitOfWork&) = delete;
+    WriteUnitOfWork& operator=(const WriteUnitOfWork&) = delete;
 
     /**
      * Creates a top-level WriteUnitOfWork without changing RecoveryUnit or Locker state. For use

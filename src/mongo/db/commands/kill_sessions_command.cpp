@@ -59,11 +59,11 @@ KillAllSessionsByPatternSet patternsForLoggedInUser(OperationContext* opCtx) {
 }  // namespace
 
 class KillSessionsCommand final : public BasicCommand {
-    KillSessionsCommand(const KillSessionsCommand&) = delete;
-    KillSessionsCommand& operator=(const KillSessionsCommand&) = delete;
-
 public:
     KillSessionsCommand() : BasicCommand("killSessions") {}
+
+    KillSessionsCommand(const KillSessionsCommand&) = delete;
+    KillSessionsCommand& operator=(const KillSessionsCommand&) = delete;
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;

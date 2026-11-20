@@ -31,9 +31,6 @@ class StorageInterface;
  * This class DOES NOT hold any information related to the consensus protocol.
  */
 class ReplicationProcess {
-    ReplicationProcess(const ReplicationProcess&) = delete;
-    ReplicationProcess& operator=(const ReplicationProcess&) = delete;
-
 public:
     constexpr static int kUninitializedRollbackId = -1;
 
@@ -47,6 +44,8 @@ public:
                        std::unique_ptr<ReplicationConsistencyMarkers> consistencyMarkers,
                        std::unique_ptr<ReplicationRecovery> recovery);
     virtual ~ReplicationProcess() = default;
+    ReplicationProcess(const ReplicationProcess&) = delete;
+    ReplicationProcess& operator=(const ReplicationProcess&) = delete;
 
     /**
      * Rollback ID is an increasing counter of how many rollbacks have occurred on this server.

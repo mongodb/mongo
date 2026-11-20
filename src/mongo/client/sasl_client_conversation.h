@@ -22,9 +22,6 @@ class StatusWith;
  * of a SASL mechanism conversation.
  */
 class [[MONGO_MOD_OPEN]] SaslClientConversation {
-    SaslClientConversation(const SaslClientConversation&) = delete;
-    SaslClientConversation& operator=(const SaslClientConversation&) = delete;
-
 public:
     /**
      * Implements the client side of a SASL authentication mechanism.
@@ -38,6 +35,8 @@ public:
         : _saslClientSession(saslClientSession) {}
 
     virtual ~SaslClientConversation();
+    SaslClientConversation(const SaslClientConversation&) = delete;
+    SaslClientConversation& operator=(const SaslClientConversation&) = delete;
 
     /**
      * Performs one step of the client side of the authentication session,

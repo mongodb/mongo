@@ -22,9 +22,6 @@ class OperationContext;
 namespace repl {
 
 class TaskRunner {
-    TaskRunner(const TaskRunner&) = delete;
-    TaskRunner& operator=(const TaskRunner&) = delete;
-
 public:
     /**
      * Represents next steps of task runner.
@@ -40,6 +37,8 @@ public:
     explicit TaskRunner(ThreadPool* threadPool);
 
     virtual ~TaskRunner();
+    TaskRunner(const TaskRunner&) = delete;
+    TaskRunner& operator=(const TaskRunner&) = delete;
 
     /**
      * Returns diagnostic information.

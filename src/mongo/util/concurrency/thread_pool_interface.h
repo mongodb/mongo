@@ -15,9 +15,6 @@ class Status;
  * Interface for a thread pool.
  */
 class [[MONGO_MOD_OPEN]] ThreadPoolInterface : public OutOfLineExecutor {
-    ThreadPoolInterface(const ThreadPoolInterface&) = delete;
-    ThreadPoolInterface& operator=(const ThreadPoolInterface&) = delete;
-
 public:
     /**
      * Destroys a thread pool.
@@ -26,6 +23,8 @@ public:
      * It is fatal to destroy the pool while another thread is blocked on join().
      */
     ~ThreadPoolInterface() override = default;
+    ThreadPoolInterface(const ThreadPoolInterface&) = delete;
+    ThreadPoolInterface& operator=(const ThreadPoolInterface&) = delete;
 
     /**
      * Starts the thread pool. May be called at most once.

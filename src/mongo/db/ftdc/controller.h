@@ -33,9 +33,6 @@ namespace mongo {
  * Exposes an methods to response to configuration changes in a thread-safe manner.
  */
 class FTDCController {
-    FTDCController(const FTDCController&) = delete;
-    FTDCController& operator=(const FTDCController&) = delete;
-
 public:
     class Env {
     public:
@@ -57,6 +54,8 @@ public:
     }
 
     ~FTDCController() = default;
+    FTDCController(const FTDCController&) = delete;
+    FTDCController& operator=(const FTDCController&) = delete;
 
     /**
      * Get the number of async periodic collectors that are registered on this controller.

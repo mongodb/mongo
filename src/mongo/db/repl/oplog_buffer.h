@@ -88,9 +88,6 @@ inline auto& writeBufferMaxSizeMetric = otel::metrics::MetricsService::instance(
  * Implementations are only required to support one pusher and one popper.
  */
 class [[MONGO_MOD_OPEN]] OplogBuffer {
-    OplogBuffer(const OplogBuffer&) = delete;
-    OplogBuffer& operator=(const OplogBuffer&) = delete;
-
 public:
     /**
      * Type of item held in the oplog buffer;
@@ -114,6 +111,8 @@ public:
 
     OplogBuffer() = default;
     virtual ~OplogBuffer() = default;
+    OplogBuffer(const OplogBuffer&) = delete;
+    OplogBuffer& operator=(const OplogBuffer&) = delete;
 
     /**
      * Causes the oplog buffer to initialize its internal state (start threads if appropriate,

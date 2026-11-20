@@ -26,15 +26,14 @@ namespace repl {
  * Simulates oplog for testing rollback functionality.
  */
 class OplogInterfaceMock : public OplogInterface {
-    OplogInterfaceMock(const OplogInterfaceMock&) = delete;
-    OplogInterfaceMock& operator=(const OplogInterfaceMock&) = delete;
-
 public:
     using Operation = std::pair<BSONObj, RecordId>;
     using Operations = std::list<Operation>;
     OplogInterfaceMock() = default;
     explicit OplogInterfaceMock(std::initializer_list<Operation> operations);
     explicit OplogInterfaceMock(const Operations& operations);
+    OplogInterfaceMock(const OplogInterfaceMock&) = delete;
+    OplogInterfaceMock& operator=(const OplogInterfaceMock&) = delete;
     void setOperations(const Operations& operations);
     std::string toString() const override;
     std::unique_ptr<OplogInterface::Iterator> makeIterator() const override;

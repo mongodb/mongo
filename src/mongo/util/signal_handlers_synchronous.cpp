@@ -76,13 +76,13 @@ int sehExceptionFilter(unsigned int code, struct _EXCEPTION_POINTERS* excPointer
 
 // This should only be used with MallocFreeOSteam
 class MallocFreeStreambuf : public std::streambuf {
-    MallocFreeStreambuf(const MallocFreeStreambuf&) = delete;
-    MallocFreeStreambuf& operator=(const MallocFreeStreambuf&) = delete;
-
 public:
     MallocFreeStreambuf() {
         setp(_buffer, _buffer + maxLogLineSize);
     }
+
+    MallocFreeStreambuf(const MallocFreeStreambuf&) = delete;
+    MallocFreeStreambuf& operator=(const MallocFreeStreambuf&) = delete;
 
     std::string_view str() const {
         return std::string_view(pbase(), pptr() - pbase());

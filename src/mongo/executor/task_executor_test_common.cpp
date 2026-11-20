@@ -77,9 +77,6 @@ static ExecutorTestCaseMap& executorTestCaseRegistry() {
 }
 
 class CetRegistrationAgent {
-    CetRegistrationAgent(const CetRegistrationAgent&) = delete;
-    CetRegistrationAgent& operator=(const CetRegistrationAgent&) = delete;
-
 public:
     CetRegistrationAgent(const std::string& name, ExecutorTestCaseFactory makeTest) {
         auto& entry = executorTestCaseRegistry()[name];
@@ -89,6 +86,9 @@ public:
         }
         entry = std::move(makeTest);
     }
+
+    CetRegistrationAgent(const CetRegistrationAgent&) = delete;
+    CetRegistrationAgent& operator=(const CetRegistrationAgent&) = delete;
 };
 
 #define COMMON_EXECUTOR_TEST(TEST_NAME)                                        \
@@ -233,12 +233,11 @@ COMMON_EXECUTOR_TEST(OneSchedulesAnother) {
 }
 
 class EventChainAndWaitingTest {
-    EventChainAndWaitingTest(const EventChainAndWaitingTest&) = delete;
-    EventChainAndWaitingTest& operator=(const EventChainAndWaitingTest&) = delete;
-
 public:
     EventChainAndWaitingTest(TaskExecutor* exec, NetworkInterfaceMock* network);
     ~EventChainAndWaitingTest();
+    EventChainAndWaitingTest(const EventChainAndWaitingTest&) = delete;
+    EventChainAndWaitingTest& operator=(const EventChainAndWaitingTest&) = delete;
 
     void run();
     void assertSuccess();

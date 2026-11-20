@@ -18,12 +18,11 @@ namespace mongo {
  * using the Cyrus SASL library.
  */
 class CyrusSaslClientSession : public SaslClientSession {
-    CyrusSaslClientSession(const CyrusSaslClientSession&) = delete;
-    CyrusSaslClientSession& operator=(const CyrusSaslClientSession&) = delete;
-
 public:
     CyrusSaslClientSession();
     ~CyrusSaslClientSession() override;
+    CyrusSaslClientSession(const CyrusSaslClientSession&) = delete;
+    CyrusSaslClientSession& operator=(const CyrusSaslClientSession&) = delete;
 
     /**
      * Overriding to store the password data in sasl_secret_t format

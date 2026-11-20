@@ -44,9 +44,6 @@ namespace repl {
  * keep alive timeout, resetting the keep alive schedule.
  */
 class Reporter {
-    Reporter(const Reporter&) = delete;
-    Reporter& operator=(const Reporter&) = delete;
-
 public:
     /**
      * Prepares a BSONObj describing an invocation of the replSetUpdatePosition command that can
@@ -63,6 +60,8 @@ public:
              Milliseconds updatePositionTimeout);
 
     virtual ~Reporter();
+    Reporter(const Reporter&) = delete;
+    Reporter& operator=(const Reporter&) = delete;
 
     /**
      * Returns sync target.

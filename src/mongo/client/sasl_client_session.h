@@ -29,9 +29,6 @@ namespace mongo {
  * parameterPassword parameter is not constrained.
  */
 class [[MONGO_MOD_UNFORTUNATELY_OPEN]] SaslClientSession {
-    SaslClientSession(const SaslClientSession&) = delete;
-    SaslClientSession& operator=(const SaslClientSession&) = delete;
-
 public:
     typedef std::function<SaslClientSession*(const std::string&)> SaslClientSessionFactoryFn;
     static SaslClientSessionFactoryFn create;
@@ -53,6 +50,8 @@ public:
 
     SaslClientSession();
     virtual ~SaslClientSession();
+    SaslClientSession(const SaslClientSession&) = delete;
+    SaslClientSession& operator=(const SaslClientSession&) = delete;
 
     /**
      * Sets the parameter identified by "id" to "value".

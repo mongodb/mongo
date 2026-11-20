@@ -31,12 +31,11 @@ enum class TransportProtocol;
  * construction (preferably through factory functions) to obviate the need for synchronization.
  */
 class [[MONGO_MOD_PUBLIC]] TransportLayerManager {
-    TransportLayerManager(const TransportLayerManager&) = delete;
-    TransportLayerManager& operator=(const TransportLayerManager&) = delete;
-
 public:
     TransportLayerManager() = default;
     virtual ~TransportLayerManager() = default;
+    TransportLayerManager(const TransportLayerManager&) = delete;
+    TransportLayerManager& operator=(const TransportLayerManager&) = delete;
 
     virtual Status start() = 0;
     virtual void shutdown() = 0;

@@ -26,11 +26,10 @@ class StorageInterface;
  * oplog buffer.
  */
 class [[MONGO_MOD_PARENT_PRIVATE]] OplogBufferProxy : public OplogBuffer {
-    OplogBufferProxy(const OplogBufferProxy&) = delete;
-    OplogBufferProxy& operator=(const OplogBufferProxy&) = delete;
-
 public:
     explicit OplogBufferProxy(std::unique_ptr<OplogBuffer> target);
+    OplogBufferProxy(const OplogBufferProxy&) = delete;
+    OplogBufferProxy& operator=(const OplogBufferProxy&) = delete;
 
     /**
      * Returns target oplog buffer.

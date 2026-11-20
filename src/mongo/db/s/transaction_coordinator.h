@@ -46,9 +46,6 @@ class TransactionCoordinatorMetricsObserver;
  * signaled.
  */
 class TransactionCoordinator : public std::enable_shared_from_this<TransactionCoordinator> {
-    TransactionCoordinator(const TransactionCoordinator&) = delete;
-    TransactionCoordinator& operator=(const TransactionCoordinator&) = delete;
-
 public:
     /**
      * The two-phase commit steps.
@@ -80,6 +77,8 @@ public:
                            Date_t deadline);
 
     ~TransactionCoordinator();
+    TransactionCoordinator(const TransactionCoordinator&) = delete;
+    TransactionCoordinator& operator=(const TransactionCoordinator&) = delete;
 
     /*
      * After constructing a TransactionCoordinator, calling start() begins its asynchronous

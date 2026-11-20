@@ -88,14 +88,13 @@ private:
  * Manages the lifetime of a set of replica set monitors.
  */
 class ReplicaSetMonitorManager {
-    ReplicaSetMonitorManager(const ReplicaSetMonitorManager&) = delete;
-    ReplicaSetMonitorManager& operator=(const ReplicaSetMonitorManager&) = delete;
-
 public:
     ReplicaSetMonitorManager() {
         ObservableMutexRegistry::get().add("replicaSetMonitorManagerMutex", _mutex);
     }
     ~ReplicaSetMonitorManager();
+    ReplicaSetMonitorManager(const ReplicaSetMonitorManager&) = delete;
+    ReplicaSetMonitorManager& operator=(const ReplicaSetMonitorManager&) = delete;
 
     static ReplicaSetMonitorManager* get();
 

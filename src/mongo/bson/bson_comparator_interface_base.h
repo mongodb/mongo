@@ -30,13 +30,7 @@ class BSONObj;
  */
 template <typename T>
 class BSONComparatorInterfaceBase {
-    BSONComparatorInterfaceBase(const BSONComparatorInterfaceBase&) = delete;
-    BSONComparatorInterfaceBase& operator=(const BSONComparatorInterfaceBase&) = delete;
-
 public:
-    BSONComparatorInterfaceBase(BSONComparatorInterfaceBase&& other) = default;
-    BSONComparatorInterfaceBase& operator=(BSONComparatorInterfaceBase&& other) = default;
-
     /**
      * Set of rules used in the comparison of BSON Objects and Elements.
      */
@@ -150,6 +144,10 @@ public:
     using UnorderedMap = stdx::unordered_map<T, ValueType, Hasher, EqualTo>;
 
     virtual ~BSONComparatorInterfaceBase() = default;
+    BSONComparatorInterfaceBase(const BSONComparatorInterfaceBase&) = delete;
+    BSONComparatorInterfaceBase& operator=(const BSONComparatorInterfaceBase&) = delete;
+    BSONComparatorInterfaceBase(BSONComparatorInterfaceBase&& other) = default;
+    BSONComparatorInterfaceBase& operator=(BSONComparatorInterfaceBase&& other) = default;
 
     /**
      * Compares two BSONObj/BSONElement objects. Returns <0, 0, >0 if 'lhs' < 'rhs', 'lhs' == 'rhs',

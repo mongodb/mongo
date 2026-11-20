@@ -29,12 +29,11 @@ namespace mongo {
  * sleeps for the background thread.
  */
 class BackgroundThreadClockSource final : public ClockSource {
-    BackgroundThreadClockSource(const BackgroundThreadClockSource&) = delete;
-    BackgroundThreadClockSource& operator=(const BackgroundThreadClockSource&) = delete;
-
 public:
     BackgroundThreadClockSource(std::unique_ptr<ClockSource> clockSource, Milliseconds granularity);
     ~BackgroundThreadClockSource() override;
+    BackgroundThreadClockSource(const BackgroundThreadClockSource&) = delete;
+    BackgroundThreadClockSource& operator=(const BackgroundThreadClockSource&) = delete;
     Milliseconds getPrecision() override;
     Date_t now() override;
 

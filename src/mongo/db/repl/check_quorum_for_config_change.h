@@ -30,9 +30,6 @@ class ReplSetConfig;
  * result of the quorum check.
  */
 class QuorumChecker : public ScatterGatherAlgorithm {
-    QuorumChecker(const QuorumChecker&) = delete;
-    QuorumChecker& operator=(const QuorumChecker&) = delete;
-
 public:
     /**
      * Constructs a QuorumChecker that is used to confirm that sufficient nodes are up to accept
@@ -42,6 +39,8 @@ public:
      */
     QuorumChecker(const ReplSetConfig* rsConfig, int myIndex, long long term);
     ~QuorumChecker() override;
+    QuorumChecker(const QuorumChecker&) = delete;
+    QuorumChecker& operator=(const QuorumChecker&) = delete;
 
     std::vector<executor::RemoteCommandRequest> getRequests() const override;
     void processResponse(const executor::RemoteCommandRequest& request,

@@ -16,9 +16,6 @@ namespace [[MONGO_MOD_PUBLIC]] mongo {
  * command's response (see BatchedCommandResponse).
  */
 class BatchedUpsertDetail {
-    BatchedUpsertDetail(const BatchedUpsertDetail&) = delete;
-    BatchedUpsertDetail& operator=(const BatchedUpsertDetail&) = delete;
-
 public:
     //
     // schema declarations
@@ -32,6 +29,8 @@ public:
     //
 
     BatchedUpsertDetail();
+    BatchedUpsertDetail(const BatchedUpsertDetail&) = delete;
+    BatchedUpsertDetail& operator=(const BatchedUpsertDetail&) = delete;
 
     /** Copies all the fields present in 'this' to 'other'. */
     void cloneTo(BatchedUpsertDetail* other) const;

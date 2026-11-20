@@ -99,13 +99,12 @@ struct RecordIdsGroupMembership {
  * }
  */
 class [[MONGO_MOD_OPEN]] ReplicationConsistencyMarkers {
-    ReplicationConsistencyMarkers(const ReplicationConsistencyMarkers&) = delete;
-    ReplicationConsistencyMarkers& operator=(const ReplicationConsistencyMarkers&) = delete;
-
 public:
     // Constructor and Destructor.
     ReplicationConsistencyMarkers();
     virtual ~ReplicationConsistencyMarkers();
+    ReplicationConsistencyMarkers(const ReplicationConsistencyMarkers&) = delete;
+    ReplicationConsistencyMarkers& operator=(const ReplicationConsistencyMarkers&) = delete;
 
     /**
      * Initializes the minValid document with the required fields. This is safe to call on an

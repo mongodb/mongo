@@ -45,9 +45,6 @@ class ReplicationProcess;
 class StorageInterface;
 
 class [[MONGO_MOD_PARENT_PRIVATE]] BackgroundSync {
-    BackgroundSync(const BackgroundSync&) = delete;
-    BackgroundSync& operator=(const BackgroundSync&) = delete;
-
 public:
     /**
      *   Stopped -> Starting -> Running
@@ -79,6 +76,8 @@ public:
                    OplogWriter* oplogWriter,
                    OplogApplier* oplogApplier,
                    SyncSourceChangedCallback syncSourceChangedCallback = {});
+    BackgroundSync(const BackgroundSync&) = delete;
+    BackgroundSync& operator=(const BackgroundSync&) = delete;
 
     // stop syncing (when this node becomes a primary, e.g.)
     // During stepdown, the last fetched optime is not reset in order to keep track of the lastest

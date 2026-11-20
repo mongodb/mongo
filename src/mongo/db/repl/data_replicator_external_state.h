@@ -41,13 +41,12 @@ using OpTimeWithTerm = OpTimeWith<long long>;
  * InitialSyncer should be moved here.
  */
 class [[MONGO_MOD_PARENT_PRIVATE]] DataReplicatorExternalState {
-    DataReplicatorExternalState(const DataReplicatorExternalState&) = delete;
-    DataReplicatorExternalState& operator=(const DataReplicatorExternalState&) = delete;
-
 public:
     DataReplicatorExternalState() = default;
 
     virtual ~DataReplicatorExternalState() = default;
+    DataReplicatorExternalState(const DataReplicatorExternalState&) = delete;
+    DataReplicatorExternalState& operator=(const DataReplicatorExternalState&) = delete;
 
     /**
      * Returns task executor for scheduling tasks to be run asynchronously.

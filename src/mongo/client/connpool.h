@@ -57,14 +57,13 @@ struct ConnectionPoolStats;
  * PoolForHost is not thread-safe; thread safety is handled by DBConnectionPool.
  */
 class PoolForHost {
-    PoolForHost(const PoolForHost&) = delete;
-    PoolForHost& operator=(const PoolForHost&) = delete;
-
 public:
     friend class DBConnectionPool;
 
     PoolForHost() = default;
     ~PoolForHost();
+    PoolForHost(const PoolForHost&) = delete;
+    PoolForHost& operator=(const PoolForHost&) = delete;
 
     /**
      * Returns the number of connections in this pool that went bad.
@@ -447,9 +446,6 @@ private:
 };
 
 class AScopedConnection {
-    AScopedConnection(const AScopedConnection&) = delete;
-    AScopedConnection& operator=(const AScopedConnection&) = delete;
-
 public:
     AScopedConnection() {
         _numConnections.fetchAndAdd(1);
@@ -457,6 +453,9 @@ public:
     virtual ~AScopedConnection() {
         _numConnections.fetchAndAdd(-1);
     }
+
+    AScopedConnection(const AScopedConnection&) = delete;
+    AScopedConnection& operator=(const AScopedConnection&) = delete;
 
     virtual DBClientBase* get() = 0;
     virtual void done() = 0;

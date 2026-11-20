@@ -180,9 +180,6 @@ private:
  * kicks off the cloning as soon as possible by calling startClone.
  */
 class MigrationChunkClonerSource {
-    MigrationChunkClonerSource(const MigrationChunkClonerSource&) = delete;
-    MigrationChunkClonerSource& operator=(const MigrationChunkClonerSource&) = delete;
-
 public:
     struct CloneStats {
         long long xferModsDeletes{0};
@@ -198,6 +195,8 @@ public:
                                ConnectionString donorConnStr,
                                HostAndPort recipientHost);
     ~MigrationChunkClonerSource();
+    MigrationChunkClonerSource(const MigrationChunkClonerSource&) = delete;
+    MigrationChunkClonerSource& operator=(const MigrationChunkClonerSource&) = delete;
 
     /**
      * Blocking method, which prepares the object for serving as a source for migrations and tells

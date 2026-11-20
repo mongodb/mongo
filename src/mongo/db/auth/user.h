@@ -212,9 +212,6 @@ protected:
  * user from the AuthorizationManager.
  */
 class User {
-    User(const User&) = delete;
-    User& operator=(const User&) = delete;
-
 public:
     using UserId = std::vector<std::uint8_t>;
     constexpr static auto kSHA1FieldName = auth::kMechanismScramSha1;
@@ -310,6 +307,8 @@ public:
     using ResourcePrivilegeMap = stdx::unordered_map<ResourcePattern, Privilege>;
 
     explicit User(std::unique_ptr<UserRequest> request);
+    User(const User&) = delete;
+    User& operator=(const User&) = delete;
     User(User&&) = default;
     User& operator=(User&&) = default;
 

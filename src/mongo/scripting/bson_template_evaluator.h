@@ -53,9 +53,6 @@ namespace mongo {
  *
  */
 class [[MONGO_MOD_NEEDS_REPLACEMENT]] BsonTemplateEvaluator {
-    BsonTemplateEvaluator(const BsonTemplateEvaluator&) = delete;
-    BsonTemplateEvaluator& operator=(const BsonTemplateEvaluator&) = delete;
-
 public:
     /* Status of template evaluation. Logically the  the status are "success", "bad operator"
      * and "operation evaluation error." */
@@ -83,6 +80,8 @@ public:
      */
     BsonTemplateEvaluator(int64_t seed);
     ~BsonTemplateEvaluator();
+    BsonTemplateEvaluator(const BsonTemplateEvaluator&) = delete;
+    BsonTemplateEvaluator& operator=(const BsonTemplateEvaluator&) = delete;
 
     /**
      * Set an identifying number for this template evaluator.

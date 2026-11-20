@@ -26,12 +26,11 @@ using namespace mongo;
 using namespace mongo::repl;
 
 class OplogBufferMock : public OplogBuffer {
-    OplogBufferMock(const OplogBufferMock&) = delete;
-    OplogBufferMock& operator=(const OplogBufferMock&) = delete;
-
 public:
     OplogBufferMock() = default;
     ~OplogBufferMock() override = default;
+    OplogBufferMock(const OplogBufferMock&) = delete;
+    OplogBufferMock& operator=(const OplogBufferMock&) = delete;
 
     void startup(OperationContext*) override {
         startupCalled = true;

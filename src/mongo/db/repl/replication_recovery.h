@@ -67,12 +67,11 @@ public:
 };
 
 class [[MONGO_MOD_PUBLIC]] ReplicationRecoveryImpl : public ReplicationRecovery {
-    ReplicationRecoveryImpl(const ReplicationRecoveryImpl&) = delete;
-    ReplicationRecoveryImpl& operator=(const ReplicationRecoveryImpl&) = delete;
-
 public:
     ReplicationRecoveryImpl(StorageInterface* storageInterface,
                             ReplicationConsistencyMarkers* consistencyMarkers);
+    ReplicationRecoveryImpl(const ReplicationRecoveryImpl&) = delete;
+    ReplicationRecoveryImpl& operator=(const ReplicationRecoveryImpl&) = delete;
 
     boost::optional<Timestamp> recoverFromOplog(
         OperationContext* opCtx, boost::optional<Timestamp> stableTimestamp) override;

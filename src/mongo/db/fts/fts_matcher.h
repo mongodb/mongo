@@ -20,11 +20,10 @@ namespace mongo {
 namespace fts {
 
 class FTSMatcher {
-    FTSMatcher(const FTSMatcher&) = delete;
-    FTSMatcher& operator=(const FTSMatcher&) = delete;
-
 public:
     FTSMatcher(const FTSQueryImpl& query, const FTSSpec& spec);
+    FTSMatcher(const FTSMatcher&) = delete;
+    FTSMatcher& operator=(const FTSMatcher&) = delete;
 
     /**
      * Returns whether 'obj' matches the query.  An object is considered to match the query

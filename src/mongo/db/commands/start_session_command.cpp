@@ -21,11 +21,11 @@ namespace mongo {
 namespace {
 
 class StartSessionCommand final : public BasicCommand {
-    StartSessionCommand(const StartSessionCommand&) = delete;
-    StartSessionCommand& operator=(const StartSessionCommand&) = delete;
-
 public:
     StartSessionCommand() : BasicCommand("startSession") {}
+
+    StartSessionCommand(const StartSessionCommand&) = delete;
+    StartSessionCommand& operator=(const StartSessionCommand&) = delete;
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;

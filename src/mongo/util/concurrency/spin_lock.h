@@ -19,9 +19,6 @@ namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 #if defined(_WIN32)
 class SpinLock {
-    SpinLock(const SpinLock&) = delete;
-    SpinLock& operator=(const SpinLock&) = delete;
-
 public:
     SpinLock() {
         InitializeCriticalSectionAndSpinCount(&_cs, 4000);
@@ -30,6 +27,9 @@ public:
     ~SpinLock() {
         DeleteCriticalSection(&_cs);
     }
+
+    SpinLock(const SpinLock&) = delete;
+    SpinLock& operator=(const SpinLock&) = delete;
 
     void lock() {
         EnterCriticalSection(&_cs);

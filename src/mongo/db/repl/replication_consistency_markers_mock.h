@@ -27,11 +27,10 @@ namespace [[MONGO_MOD_PUBLIC]] repl {
  * A mock ReplicationConsistencyMarkers implementation that stores everything in memory.
  */
 class ReplicationConsistencyMarkersMock : public ReplicationConsistencyMarkers {
-    ReplicationConsistencyMarkersMock(const ReplicationConsistencyMarkersMock&) = delete;
-    ReplicationConsistencyMarkersMock& operator=(const ReplicationConsistencyMarkersMock&) = delete;
-
 public:
     ReplicationConsistencyMarkersMock() = default;
+    ReplicationConsistencyMarkersMock(const ReplicationConsistencyMarkersMock&) = delete;
+    ReplicationConsistencyMarkersMock& operator=(const ReplicationConsistencyMarkersMock&) = delete;
 
     void initializeMinValidDocument(OperationContext* opCtx) override;
 

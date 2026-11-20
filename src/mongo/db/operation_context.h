@@ -113,9 +113,6 @@ private:
 class OperationContext final : public OperationContextBase,
                                public Interruptible,
                                public Decorable<OperationContext> {
-    OperationContext(const OperationContext&) = delete;
-    OperationContext& operator=(const OperationContext&) = delete;
-
 public:
     /**
      * Used for tracking information about checkForInterrupt() calls that are overdue. This is only
@@ -149,6 +146,8 @@ public:
      */
     OperationContext(Client* client, OperationId opId);
     ~OperationContext() override;
+    OperationContext(const OperationContext&) = delete;
+    OperationContext& operator=(const OperationContext&) = delete;
 
     // TODO (SERVER-77213): The RecoveryUnit ownership is being moved to the TransactionResources.
     // Do not add any new usages to these methods as they will go away and will be folded as an
@@ -1282,9 +1281,6 @@ namespace repl {
  * object is in scope.
  */
 class UnreplicatedWritesBlock {
-    UnreplicatedWritesBlock(const UnreplicatedWritesBlock&) = delete;
-    UnreplicatedWritesBlock& operator=(const UnreplicatedWritesBlock&) = delete;
-
 public:
     UnreplicatedWritesBlock(OperationContext* opCtx)
         : _opCtx(opCtx), _shouldReplicateWrites(opCtx->writesAreReplicated()) {
@@ -1294,6 +1290,9 @@ public:
     ~UnreplicatedWritesBlock() {
         _opCtx->setReplicatedWrites(_shouldReplicateWrites);
     }
+
+    UnreplicatedWritesBlock(const UnreplicatedWritesBlock&) = delete;
+    UnreplicatedWritesBlock& operator=(const UnreplicatedWritesBlock&) = delete;
 
 private:
     OperationContext* _opCtx;

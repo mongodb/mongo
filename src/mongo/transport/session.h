@@ -54,9 +54,6 @@ struct SessionManagerOpCounters {
  */
 class [[MONGO_MOD_PUBLIC]] Session : public std::enable_shared_from_this<Session>,
                                      public Decorable<Session> {
-    Session(const Session&) = delete;
-    Session& operator=(const Session&) = delete;
-
 public:
     /**
      * Type to indicate the internal id for this session.
@@ -66,6 +63,8 @@ public:
     static const Status ClosedStatus;
 
     ~Session() override;
+    Session(const Session&) = delete;
+    Session& operator=(const Session&) = delete;
 
     Id id() const {
         return _id;

@@ -84,12 +84,11 @@ void resumeMigrationRecipientsOnStepUp(OperationContext* opCtx);
  * same time.
  */
 class [[MONGO_MOD_NEEDS_REPLACEMENT]] ActiveMigrationsRegistry {
-    ActiveMigrationsRegistry(const ActiveMigrationsRegistry&) = delete;
-    ActiveMigrationsRegistry& operator=(const ActiveMigrationsRegistry&) = delete;
-
 public:
     ActiveMigrationsRegistry();
     ~ActiveMigrationsRegistry();
+    ActiveMigrationsRegistry(const ActiveMigrationsRegistry&) = delete;
+    ActiveMigrationsRegistry& operator=(const ActiveMigrationsRegistry&) = delete;
 
     static ActiveMigrationsRegistry& get(ServiceContext* service);
     static ActiveMigrationsRegistry& get(OperationContext* opCtx);
@@ -359,15 +358,14 @@ private:
  * registerDonateChunk method for more details.
  */
 class ScopedDonateChunk {
-    ScopedDonateChunk(const ScopedDonateChunk&) = delete;
-    ScopedDonateChunk& operator=(const ScopedDonateChunk&) = delete;
-
 public:
     ScopedDonateChunk(ActiveMigrationsRegistry* registry,
                       bool shouldExecute,
                       std::shared_ptr<SharedPromise<void>> promise);
     ~ScopedDonateChunk();
 
+    ScopedDonateChunk(const ScopedDonateChunk&) = delete;
+    ScopedDonateChunk& operator=(const ScopedDonateChunk&) = delete;
     ScopedDonateChunk(ScopedDonateChunk&&);
     ScopedDonateChunk& operator=(ScopedDonateChunk&&);
 
@@ -412,13 +410,12 @@ private:
  * registry.
  */
 class ScopedReceiveChunk {
-    ScopedReceiveChunk(const ScopedReceiveChunk&) = delete;
-    ScopedReceiveChunk& operator=(const ScopedReceiveChunk&) = delete;
-
 public:
     ScopedReceiveChunk(ActiveMigrationsRegistry* registry);
     ~ScopedReceiveChunk();
 
+    ScopedReceiveChunk(const ScopedReceiveChunk&) = delete;
+    ScopedReceiveChunk& operator=(const ScopedReceiveChunk&) = delete;
     ScopedReceiveChunk(ScopedReceiveChunk&&);
     ScopedReceiveChunk& operator=(ScopedReceiveChunk&&);
 

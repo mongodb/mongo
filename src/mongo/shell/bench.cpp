@@ -72,9 +72,6 @@ const int kStartTransactionOption = 1 << 0;
 const int kMultiStatementTransactionOption = 1 << 1;
 
 class BenchRunWorkerStateGuard {
-    BenchRunWorkerStateGuard(const BenchRunWorkerStateGuard&) = delete;
-    BenchRunWorkerStateGuard& operator=(const BenchRunWorkerStateGuard&) = delete;
-
 public:
     explicit BenchRunWorkerStateGuard(BenchRunState& brState) : _brState(brState) {
         _brState.onWorkerStarted();
@@ -83,6 +80,9 @@ public:
     ~BenchRunWorkerStateGuard() {
         _brState.onWorkerFinished();
     }
+
+    BenchRunWorkerStateGuard(const BenchRunWorkerStateGuard&) = delete;
+    BenchRunWorkerStateGuard& operator=(const BenchRunWorkerStateGuard&) = delete;
 
 private:
     BenchRunState& _brState;

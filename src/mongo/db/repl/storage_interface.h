@@ -55,9 +55,6 @@ struct [[MONGO_MOD_PUBLIC]] TimestampedBSONObj {
  *      * Insert documents into a collection
  */
 class [[MONGO_MOD_PUBLIC]] StorageInterface {
-    StorageInterface(const StorageInterface&) = delete;
-    StorageInterface& operator=(const StorageInterface&) = delete;
-
 public:
     // Operation Context binding.
     static StorageInterface* get(ServiceContext* service);
@@ -68,6 +65,8 @@ public:
     // Constructor and Destructor.
     StorageInterface() = default;
     virtual ~StorageInterface() = default;
+    StorageInterface(const StorageInterface&) = delete;
+    StorageInterface& operator=(const StorageInterface&) = delete;
 
     /**
      * Rollback ID is an increasing counter of how many rollbacks have occurred on this server. It

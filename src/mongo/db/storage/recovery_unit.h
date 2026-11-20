@@ -102,9 +102,6 @@ enum class DataCorruptionDetectionMode {
  * All on-disk information must be mutated through this interface.
  */
 class RecoveryUnit {
-    RecoveryUnit(const RecoveryUnit&) = delete;
-    RecoveryUnit& operator=(const RecoveryUnit&) = delete;
-
 public:
     enum class Isolation {
         readUncommitted,
@@ -113,6 +110,8 @@ public:
     };
 
     virtual ~RecoveryUnit() = default;
+    RecoveryUnit(const RecoveryUnit&) = delete;
+    RecoveryUnit& operator=(const RecoveryUnit&) = delete;
 
     /**
      * A Snapshot is a decorable type whose lifetime is tied to the the lifetime of a

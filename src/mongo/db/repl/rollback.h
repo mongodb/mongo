@@ -16,9 +16,6 @@ namespace repl {
  * interact with the rollback subsystem.
  */
 class [[MONGO_MOD_PRIVATE]] Rollback {
-    Rollback(const Rollback&) = delete;
-    Rollback& operator=(const Rollback&) = delete;
-
 public:
     /**
      * Callback function to report results of rollback. On success, the last optime applied will be
@@ -30,6 +27,8 @@ public:
     Rollback() = default;
 
     virtual ~Rollback() = default;
+    Rollback(const Rollback&) = delete;
+    Rollback& operator=(const Rollback&) = delete;
 };
 
 }  // namespace repl

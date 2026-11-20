@@ -40,9 +40,6 @@ namespace mongo {
  *     - list of error codes, if present in the response, should stop the scheduler.
  */
 class RemoteCommandRetryScheduler {
-    RemoteCommandRetryScheduler(const RemoteCommandRetryScheduler&) = delete;
-    RemoteCommandRetryScheduler& operator=(const RemoteCommandRetryScheduler&) = delete;
-
 public:
     class RetryStrategy;
 
@@ -55,6 +52,8 @@ public:
                                 std::unique_ptr<mongo::RetryStrategy> retryStrategy);
 
     virtual ~RemoteCommandRetryScheduler();
+    RemoteCommandRetryScheduler(const RemoteCommandRetryScheduler&) = delete;
+    RemoteCommandRetryScheduler& operator=(const RemoteCommandRetryScheduler&) = delete;
 
     /**
      * Returns true if we have scheduled a remote command and are waiting for the response.

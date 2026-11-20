@@ -46,9 +46,6 @@ class AggregateCommandRequest;
  *   longer open on the server side.
  */
 class [[MONGO_MOD_PUBLIC]] DBClientCursor {
-    DBClientCursor(const DBClientCursor&) = delete;
-    DBClientCursor& operator=(const DBClientCursor&) = delete;
-
 public:
     /**
      * Constructs a 'DBClientCursor' that will be opened by issuing the aggregate command described
@@ -84,6 +81,8 @@ public:
                    bool keepCursorOpen = false);
 
     virtual ~DBClientCursor();
+    DBClientCursor(const DBClientCursor&) = delete;
+    DBClientCursor& operator=(const DBClientCursor&) = delete;
 
     /**
      * If true, safe to call next(). Requests more from server if necessary.

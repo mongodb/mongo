@@ -33,9 +33,6 @@ namespace [[MONGO_MOD_PUBLIC]] repl {
  * Reads from an OplogBuffer batches of operations that may be applied in parallel.
  */
 class [[MONGO_MOD_OPEN]] OplogApplier {
-    OplogApplier(const OplogApplier&) = delete;
-    OplogApplier& operator=(const OplogApplier&) = delete;
-
 public:
     /**
      * Used to configure behavior of this OplogApplier.
@@ -97,6 +94,8 @@ public:
                  const Options& options);
 
     virtual ~OplogApplier() = default;
+    OplogApplier(const OplogApplier&) = delete;
+    OplogApplier& operator=(const OplogApplier&) = delete;
 
     /**
      * Returns this applier's input buffer.

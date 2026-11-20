@@ -84,12 +84,11 @@ using TargetedBatchMap = std::map<ShardId, std::unique_ptr<TargetedWriteBatch>>;
  *
  */
 class BatchWriteOp {
-    BatchWriteOp(const BatchWriteOp&) = delete;
-    BatchWriteOp& operator=(const BatchWriteOp&) = delete;
-
 public:
     BatchWriteOp(OperationContext* opCtx, const BatchedCommandRequest& clientRequest);
     ~BatchWriteOp() = default;
+    BatchWriteOp(const BatchWriteOp&) = delete;
+    BatchWriteOp& operator=(const BatchWriteOp&) = delete;
 
     /**
      * Targets one or more of the next write ops in this batch op using a NSTargeter.  The

@@ -39,8 +39,6 @@
 namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class Fetcher {
-    Fetcher(const Fetcher&) = delete;
-    Fetcher& operator=(const Fetcher&) = delete;
     using RemoteCommandRequest = executor::RemoteCommandRequest;
 
 public:
@@ -132,6 +130,8 @@ public:
             OperationContext* opCtx = nullptr);
 
     virtual ~Fetcher();
+    Fetcher(const Fetcher&) = delete;
+    Fetcher& operator=(const Fetcher&) = delete;
 
     /**
      * Returns host where remote commands will be sent to.

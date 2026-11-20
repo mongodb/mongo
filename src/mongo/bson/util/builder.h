@@ -72,9 +72,6 @@ static_assert(BufferMaxSize < (1 << 27));
 namespace allocator_aware {
 template <class Allocator = std::allocator<void>>
 class SharedBufferAllocator {
-    SharedBufferAllocator(const SharedBufferAllocator&) = delete;
-    SharedBufferAllocator& operator=(const SharedBufferAllocator&) = delete;
-
 public:
     SharedBufferAllocator() = default;
     explicit SharedBufferAllocator(const Allocator& allocator) : _buf(allocator) {}
@@ -91,6 +88,8 @@ public:
         invariant(!_buf.isShared());
     }
 
+    SharedBufferAllocator(const SharedBufferAllocator&) = delete;
+    SharedBufferAllocator& operator=(const SharedBufferAllocator&) = delete;
     // Allow moving but not copying. It would be an error for two SharedBufferAllocators to use the
     // same underlying buffer.
     SharedBufferAllocator(SharedBufferAllocator&&) = default;
@@ -239,16 +238,16 @@ private:
 
 template <size_t SZ>
 class StackAllocator {
-    StackAllocator(const StackAllocator&) = delete;
-    StackAllocator& operator=(const StackAllocator&) = delete;
-    StackAllocator(StackAllocator&&) = delete;
-    StackAllocator& operator=(StackAllocator&&) = delete;
-
 public:
     StackAllocator() = default;
     ~StackAllocator() {
         free();
     }
+
+    StackAllocator(const StackAllocator&) = delete;
+    StackAllocator& operator=(const StackAllocator&) = delete;
+    StackAllocator(StackAllocator&&) = delete;
+    StackAllocator& operator=(StackAllocator&&) = delete;
 
     void malloc(size_t sz) {
         if (sz > SZ) {

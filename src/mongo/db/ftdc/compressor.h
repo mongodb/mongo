@@ -39,9 +39,6 @@ namespace mongo {
  * across all documents in the series of documents.
  */
 class FTDCCompressor {
-    FTDCCompressor(const FTDCCompressor&) = delete;
-    FTDCCompressor& operator=(const FTDCCompressor&) = delete;
-
 public:
     /**
      * The FTDCCompressor returns one of these values when a sample is added to indicate whether the
@@ -60,6 +57,9 @@ public:
     };
 
     explicit FTDCCompressor(const FTDCConfig* config) : _config(config) {}
+
+    FTDCCompressor(const FTDCCompressor&) = delete;
+    FTDCCompressor& operator=(const FTDCCompressor&) = delete;
 
     /**
      * Add a bson document containing metrics into the compressor.

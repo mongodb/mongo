@@ -40,9 +40,6 @@ using std::unique_ptr;
 namespace {
 
 class DirectClientScope {
-    DirectClientScope(const DirectClientScope&) = delete;
-    DirectClientScope& operator=(const DirectClientScope&) = delete;
-
 public:
     explicit DirectClientScope(OperationContext* opCtx)
         : _opCtx(opCtx), _prev(_opCtx->getClient()->isInDirectClient()) {
@@ -52,6 +49,9 @@ public:
     ~DirectClientScope() {
         _opCtx->getClient()->setInDirectClient(_prev);
     }
+
+    DirectClientScope(const DirectClientScope&) = delete;
+    DirectClientScope& operator=(const DirectClientScope&) = delete;
 
 private:
     OperationContext* const _opCtx;

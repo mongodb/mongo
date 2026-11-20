@@ -29,11 +29,10 @@ struct Token {
 };
 
 class Tokenizer {
-    Tokenizer(const Tokenizer&) = delete;
-    Tokenizer& operator=(const Tokenizer&) = delete;
-
 public:
     Tokenizer(const FTSLanguage* language, std::string_view str);
+    Tokenizer(const Tokenizer&) = delete;
+    Tokenizer& operator=(const Tokenizer&) = delete;
 
     bool more() const;
     Token next();

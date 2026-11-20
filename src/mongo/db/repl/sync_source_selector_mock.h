@@ -20,14 +20,13 @@ namespace repl {
  * Mock implementation of SyncSourceSelector interface for testing.
  */
 class [[MONGO_MOD_PARENT_PRIVATE]] SyncSourceSelectorMock : public SyncSourceSelector {
-    SyncSourceSelectorMock(const SyncSourceSelectorMock&) = delete;
-    SyncSourceSelectorMock& operator=(const SyncSourceSelectorMock&) = delete;
-
 public:
     using ChooseNewSyncSourceHook = std::function<void()>;
 
     SyncSourceSelectorMock();
     ~SyncSourceSelectorMock() override;
+    SyncSourceSelectorMock(const SyncSourceSelectorMock&) = delete;
+    SyncSourceSelectorMock& operator=(const SyncSourceSelectorMock&) = delete;
 
     void clearSyncSourceDenylist() override;
     HostAndPort chooseNewSyncSource(const OpTime& ot) override;

@@ -21,12 +21,11 @@ class SaslClientConversation;
  * native SASL implementation.
  */
 class [[MONGO_MOD_PUBLIC]] NativeSaslClientSession : public SaslClientSession {
-    NativeSaslClientSession(const NativeSaslClientSession&) = delete;
-    NativeSaslClientSession& operator=(const NativeSaslClientSession&) = delete;
-
 public:
     NativeSaslClientSession();
     ~NativeSaslClientSession() override;
+    NativeSaslClientSession(const NativeSaslClientSession&) = delete;
+    NativeSaslClientSession& operator=(const NativeSaslClientSession&) = delete;
 
     Status initialize() override;
 

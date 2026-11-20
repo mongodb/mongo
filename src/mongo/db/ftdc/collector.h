@@ -33,11 +33,10 @@ namespace mongo {
  * Provides an interface to collect BSONObjs from system providers
  */
 class [[MONGO_MOD_OPEN]] FTDCCollectorInterface {
-    FTDCCollectorInterface(const FTDCCollectorInterface&) = delete;
-    FTDCCollectorInterface& operator=(const FTDCCollectorInterface&) = delete;
-
 public:
     virtual ~FTDCCollectorInterface() = default;
+    FTDCCollectorInterface(const FTDCCollectorInterface&) = delete;
+    FTDCCollectorInterface& operator=(const FTDCCollectorInterface&) = delete;
 
     /**
      * Name of the collector
@@ -102,11 +101,10 @@ private:
  * Not Thread-Safe. Locking is owner's responsibility.
  */
 class FTDCCollectorCollection {
-    FTDCCollectorCollection(const FTDCCollectorCollection&) = delete;
-    FTDCCollectorCollection& operator=(const FTDCCollectorCollection&) = delete;
-
 public:
     virtual ~FTDCCollectorCollection() = default;
+    FTDCCollectorCollection(const FTDCCollectorCollection&) = delete;
+    FTDCCollectorCollection& operator=(const FTDCCollectorCollection&) = delete;
 
     /**
      * Add a metric collector to the collection.

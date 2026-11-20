@@ -20,9 +20,6 @@ using namespace std::literals::string_view_literals;
 [[MONGO_MOD_FILE_PRIVATE]] constexpr std::string_view kLockFileBasename = "mongod.lock"sv;
 
 class [[MONGO_MOD_PUBLIC]] StorageEngineLockFile {
-    StorageEngineLockFile(const StorageEngineLockFile&) = delete;
-    StorageEngineLockFile& operator=(const StorageEngineLockFile&) = delete;
-
 public:
     static boost::optional<StorageEngineLockFile>& get(ServiceContext* service);
 
@@ -47,6 +44,8 @@ public:
     StorageEngineLockFile(std::string_view dbpath, std::string_view fileName = kLockFileBasename);
 
     virtual ~StorageEngineLockFile();
+    StorageEngineLockFile(const StorageEngineLockFile&) = delete;
+    StorageEngineLockFile& operator=(const StorageEngineLockFile&) = delete;
 
     /**
      * Returns the path to the lock file.

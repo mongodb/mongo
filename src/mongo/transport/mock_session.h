@@ -100,9 +100,6 @@ private:
 };
 
 class [[MONGO_MOD_OPEN]] MockSession : public MockSessionBase {
-    MockSession(const MockSession&) = delete;
-    MockSession& operator=(const MockSession&) = delete;
-
 public:
     static std::shared_ptr<MockSession> create(TransportLayer* tl) {
         auto handle = std::make_shared<MockSession>(tl);
@@ -188,6 +185,9 @@ public:
                          TransportLayer* tl)
         : MockSessionBase(std::move(remote), std::move(remoteAddr), std::move(localAddr)),
           _tl(checked_cast<TransportLayerMock*>(tl)) {}
+
+    MockSession(const MockSession&) = delete;
+    MockSession& operator=(const MockSession&) = delete;
 
 protected:
     TransportLayerMock* const _tl;

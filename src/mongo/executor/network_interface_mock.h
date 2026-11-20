@@ -669,9 +669,6 @@ private:
  * Not thread-safe.
  */
 class NetworkInterfaceMock::InNetworkGuard {
-    InNetworkGuard(const InNetworkGuard&) = delete;
-    InNetworkGuard& operator=(const InNetworkGuard&) = delete;
-
 public:
     /**
      * Calls enterNetwork.
@@ -685,6 +682,8 @@ public:
      * Calls exitNetwork, unless dismiss has been called.
      */
     ~InNetworkGuard();
+    InNetworkGuard(const InNetworkGuard&) = delete;
+    InNetworkGuard& operator=(const InNetworkGuard&) = delete;
 
     /**
      * Returns network interface mock pointer.

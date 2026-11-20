@@ -13,11 +13,10 @@ class OperationContext;
 namespace repl {
 
 class [[MONGO_MOD_PUBLIC]] ReplicationRecoveryMock : public ReplicationRecovery {
-    ReplicationRecoveryMock(const ReplicationRecoveryMock&) = delete;
-    ReplicationRecoveryMock& operator=(const ReplicationRecoveryMock&) = delete;
-
 public:
     ReplicationRecoveryMock() = default;
+    ReplicationRecoveryMock(const ReplicationRecoveryMock&) = delete;
+    ReplicationRecoveryMock& operator=(const ReplicationRecoveryMock&) = delete;
 
     boost::optional<Timestamp> recoverFromOplog(
         OperationContext* opCtx, boost::optional<Timestamp> stableTimestamp) override {

@@ -30,12 +30,11 @@ namespace mongo {
  * relevant entries for authentication.
  */
 class [[MONGO_MOD_PUBLIC]] AuthOpObserver final : public OpObserverNoop {
-    AuthOpObserver(const AuthOpObserver&) = delete;
-    AuthOpObserver& operator=(const AuthOpObserver&) = delete;
-
 public:
     AuthOpObserver();
     ~AuthOpObserver() override;
+    AuthOpObserver(const AuthOpObserver&) = delete;
+    AuthOpObserver& operator=(const AuthOpObserver&) = delete;
 
     // The filtering for this OpObserver is derived from the namespace filters in
     // AuthorizationManagerImpl and the various AuditInterface implementations, see SERVER-83383.

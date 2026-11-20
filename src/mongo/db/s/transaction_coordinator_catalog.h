@@ -32,12 +32,11 @@ namespace mongo {
  * txnNumber and txnRetryCounter. It supports holding several coordinator objects per session.
  */
 class TransactionCoordinatorCatalog {
-    TransactionCoordinatorCatalog(const TransactionCoordinatorCatalog&) = delete;
-    TransactionCoordinatorCatalog& operator=(const TransactionCoordinatorCatalog&) = delete;
-
 public:
     TransactionCoordinatorCatalog();
     ~TransactionCoordinatorCatalog();
+    TransactionCoordinatorCatalog(const TransactionCoordinatorCatalog&) = delete;
+    TransactionCoordinatorCatalog& operator=(const TransactionCoordinatorCatalog&) = delete;
 
     /**
      * Marks that recovery of the catalog has completed and that operations can be run on it.

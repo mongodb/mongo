@@ -69,9 +69,6 @@ namespace [[MONGO_MOD_PARENT_PRIVATE]] repl {
  * An oplog fetcher is an abstract async component, which takes care of startup and shutdown logic.
  */
 class OplogFetcher : public AbstractAsyncComponent<ObservableMutex<std::mutex>> {
-    OplogFetcher(const OplogFetcher&) = delete;
-    OplogFetcher& operator=(const OplogFetcher&) = delete;
-
 public:
     /**
      * Type of function called by the oplog fetcher on shutdown with the final oplog fetcher status.
@@ -221,6 +218,8 @@ public:
                  Config config);
 
     ~OplogFetcher() override;
+    OplogFetcher(const OplogFetcher&) = delete;
+    OplogFetcher& operator=(const OplogFetcher&) = delete;
 
     /**
      * Validates documents in current batch of results returned from tailing the remote oplog.

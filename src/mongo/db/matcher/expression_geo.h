@@ -39,12 +39,11 @@ class GeometryContainer;
 // This represents either a $within or a $geoIntersects. The parsed geometry is owned via shared_ptr
 // and may be evaluated concurrently; see GeometryContainer for the thread-safety contract.
 class GeoExpression {
-    GeoExpression(const GeoExpression&) = delete;
-    GeoExpression& operator=(const GeoExpression&) = delete;
-
 public:
     GeoExpression();
     GeoExpression(const std::string& f);
+    GeoExpression(const GeoExpression&) = delete;
+    GeoExpression& operator=(const GeoExpression&) = delete;
 
     enum Predicate { WITHIN, INTERSECT, INVALID };
 
@@ -145,12 +144,11 @@ private:
 // TODO SERVER-122401: Make a struct, turn parse stuff into something like
 // static Status parseNearQuery(const BSONObj& obj, NearQuery** out);
 class GeoNearExpression {
-    GeoNearExpression(const GeoNearExpression&) = delete;
-    GeoNearExpression& operator=(const GeoNearExpression&) = delete;
-
 public:
     GeoNearExpression();
     GeoNearExpression(const std::string& f);
+    GeoNearExpression(const GeoNearExpression&) = delete;
+    GeoNearExpression& operator=(const GeoNearExpression&) = delete;
 
     // The name of the field that contains the geometry.
     std::string field;

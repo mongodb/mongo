@@ -287,11 +287,10 @@ class ChunkManager;
  * query utilization statististics and to decide what to balance.
  */
 class DistributionStatus final {
-    DistributionStatus(const DistributionStatus&) = delete;
-    DistributionStatus& operator=(const DistributionStatus&) = delete;
-
 public:
     DistributionStatus(NamespaceString nss, ZoneInfo zoneInfo, const ChunkManager& chunkMngr);
+    DistributionStatus(const DistributionStatus&) = delete;
+    DistributionStatus& operator=(const DistributionStatus&) = delete;
     DistributionStatus(DistributionStatus&&) = default;
     ~DistributionStatus() {}
 

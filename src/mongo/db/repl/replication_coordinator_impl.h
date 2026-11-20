@@ -124,9 +124,6 @@ class TopologyCoordinator;
 
 class [[MONGO_MOD_PUBLIC]] ReplicationCoordinatorImpl : public ReplicationCoordinator,
                                                         public StepUpStepDownCoordinator {
-    ReplicationCoordinatorImpl(const ReplicationCoordinatorImpl&) = delete;
-    ReplicationCoordinatorImpl& operator=(const ReplicationCoordinatorImpl&) = delete;
-
 public:
     ReplicationCoordinatorImpl(ServiceContext* serviceContext,
                                const ReplSettings& settings,
@@ -138,6 +135,8 @@ public:
                                int64_t prngSeed);
 
     ~ReplicationCoordinatorImpl() override;
+    ReplicationCoordinatorImpl(const ReplicationCoordinatorImpl&) = delete;
+    ReplicationCoordinatorImpl& operator=(const ReplicationCoordinatorImpl&) = delete;
 
     // ================== Members of public ReplicationCoordinator API ===================
 

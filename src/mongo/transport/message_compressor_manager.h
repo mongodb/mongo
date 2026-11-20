@@ -26,9 +26,6 @@ class Message;
 class MessageCompressorRegistry;
 
 class [[MONGO_MOD_PUBLIC]] MessageCompressorManager {
-    MessageCompressorManager(const MessageCompressorManager&) = delete;
-    MessageCompressorManager& operator=(const MessageCompressorManager&) = delete;
-
 public:
     /*
      * Constructs a manager that resolves compressor implementations against the global
@@ -42,6 +39,8 @@ public:
     MessageCompressorManager(MessageCompressionDirection direction,
                              MessageCompressorRegistry* factory);
 
+    MessageCompressorManager(const MessageCompressorManager&) = delete;
+    MessageCompressorManager& operator=(const MessageCompressorManager&) = delete;
     MessageCompressorManager(MessageCompressorManager&&) = default;
     MessageCompressorManager& operator=(MessageCompressorManager&&) = default;
 

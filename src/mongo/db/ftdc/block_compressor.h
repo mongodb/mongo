@@ -17,11 +17,10 @@ namespace mongo {
  * Compesses and uncompresses a block of buffer using zlib.
  */
 class BlockCompressor {
-    BlockCompressor(const BlockCompressor&) = delete;
-    BlockCompressor& operator=(const BlockCompressor&) = delete;
-
 public:
     BlockCompressor() = default;
+    BlockCompressor(const BlockCompressor&) = delete;
+    BlockCompressor& operator=(const BlockCompressor&) = delete;
 
     /**
      * Compress a buffer of data.

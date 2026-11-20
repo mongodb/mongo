@@ -51,9 +51,6 @@ const auto kMsgObj = BSON("msg" << "periodic noop");
  *  Runs the noopWrite argument with waitTime period until its destroyed.
  */
 class NoopWriter::PeriodicNoopRunner {
-    PeriodicNoopRunner(const PeriodicNoopRunner&) = delete;
-    PeriodicNoopRunner& operator=(const PeriodicNoopRunner&) = delete;
-
     using NoopWriteFn = std::function<void(OperationContext*)>;
 
 public:
@@ -69,6 +66,9 @@ public:
         lk.unlock();
         _thread.join();
     }
+
+    PeriodicNoopRunner(const PeriodicNoopRunner&) = delete;
+    PeriodicNoopRunner& operator=(const PeriodicNoopRunner&) = delete;
 
 private:
     void run(Seconds waitTime, NoopWriteFn&& noopWrite) {

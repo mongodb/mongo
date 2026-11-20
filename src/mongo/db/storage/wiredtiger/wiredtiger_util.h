@@ -72,11 +72,10 @@ private:
 };
 
 class WiredTigerUtil {
-    WiredTigerUtil(const WiredTigerUtil&) = delete;
-    WiredTigerUtil& operator=(const WiredTigerUtil&) = delete;
-
 private:
     WiredTigerUtil();
+    WiredTigerUtil(const WiredTigerUtil&) = delete;
+    WiredTigerUtil& operator=(const WiredTigerUtil&) = delete;
 
 public:
     static constexpr std::string_view kConfigStringField = "configString"sv;
@@ -459,9 +458,6 @@ private:
 };
 
 class WiredTigerConfigParser {
-    WiredTigerConfigParser(const WiredTigerConfigParser&) = delete;
-    WiredTigerConfigParser& operator=(const WiredTigerConfigParser&) = delete;
-
 public:
     WiredTigerConfigParser(std::string_view config) {
         invariantWTOK(
@@ -478,6 +474,9 @@ public:
     ~WiredTigerConfigParser() {
         invariantWTOK(_parser->close(_parser), nullptr);
     }
+
+    WiredTigerConfigParser(const WiredTigerConfigParser&) = delete;
+    WiredTigerConfigParser& operator=(const WiredTigerConfigParser&) = delete;
 
     int next(WT_CONFIG_ITEM* key, WT_CONFIG_ITEM* value) {
         return _parser->next(_parser, key, value);

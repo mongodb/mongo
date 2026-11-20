@@ -61,9 +61,6 @@ struct ShardingStatistics;
  * is the commitDonateChunk and its comments explain the reasoning.
  */
 class [[MONGO_MOD_NEEDS_REPLACEMENT]] MigrationSourceManager {
-    MigrationSourceManager(const MigrationSourceManager&) = delete;
-    MigrationSourceManager& operator=(const MigrationSourceManager&) = delete;
-
 public:
     /**
      * Retrieves the MigrationSourceManager pointer that corresponds to the given collection under
@@ -96,6 +93,8 @@ public:
         ManagementModeEnum managementMode = ManagementModeEnum::kStandalone,
         UUID migrationId = UUID::gen());
     ~MigrationSourceManager();
+    MigrationSourceManager(const MigrationSourceManager&) = delete;
+    MigrationSourceManager& operator=(const MigrationSourceManager&) = delete;
 
     /**
      * Contacts the donor shard and tells it to start cloning the specified chunk. This method will

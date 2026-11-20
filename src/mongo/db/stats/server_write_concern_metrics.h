@@ -22,11 +22,10 @@ namespace mongo {
  * Container for server-wide statistics on writeConcern levels used by operations.
  */
 class [[MONGO_MOD_PUBLIC]] ServerWriteConcernMetrics {
-    ServerWriteConcernMetrics(const ServerWriteConcernMetrics&) = delete;
-    ServerWriteConcernMetrics& operator=(const ServerWriteConcernMetrics&) = delete;
-
 public:
     ServerWriteConcernMetrics() = default;
+    ServerWriteConcernMetrics(const ServerWriteConcernMetrics&) = delete;
+    ServerWriteConcernMetrics& operator=(const ServerWriteConcernMetrics&) = delete;
 
     static ServerWriteConcernMetrics* get(ServiceContext* service);
     static ServerWriteConcernMetrics* get(OperationContext* opCtx);

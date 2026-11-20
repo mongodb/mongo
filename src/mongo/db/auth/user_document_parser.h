@@ -17,11 +17,11 @@
 namespace mongo {
 
 class V2UserDocumentParser {
-    V2UserDocumentParser(const V2UserDocumentParser&) = delete;
-    V2UserDocumentParser& operator=(const V2UserDocumentParser&) = delete;
-
 public:
     V2UserDocumentParser() {}
+
+    V2UserDocumentParser(const V2UserDocumentParser&) = delete;
+    V2UserDocumentParser& operator=(const V2UserDocumentParser&) = delete;
 
     /**
      * Apply a tenant identifier to every tenant aware object during parsing.

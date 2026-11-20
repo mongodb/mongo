@@ -75,9 +75,6 @@ struct CollectionOptionsAndIndexes {
  */
 class [[MONGO_MOD_NEEDS_REPLACEMENT]] MigrationDestinationManager
     : public ReplicaSetAwareServiceShardSvr<MigrationDestinationManager> {
-    MigrationDestinationManager(const MigrationDestinationManager&) = delete;
-    MigrationDestinationManager& operator=(const MigrationDestinationManager&) = delete;
-
 public:
     enum State {
         kReady,
@@ -94,6 +91,8 @@ public:
 
     MigrationDestinationManager();
     ~MigrationDestinationManager() override;
+    MigrationDestinationManager(const MigrationDestinationManager&) = delete;
+    MigrationDestinationManager& operator=(const MigrationDestinationManager&) = delete;
 
     /**
      * Returns the singleton instance of the migration destination manager.

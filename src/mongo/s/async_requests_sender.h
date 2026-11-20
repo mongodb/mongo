@@ -70,9 +70,6 @@ namespace mongo {
  * Does not throw exceptions.
  */
 class [[MONGO_MOD_PUBLIC]] AsyncRequestsSender {
-    AsyncRequestsSender(const AsyncRequestsSender&) = delete;
-    AsyncRequestsSender& operator=(const AsyncRequestsSender&) = delete;
-
 public:
     /**
      * Defines a request to a remote shard that can be run by the ARS.
@@ -142,6 +139,8 @@ public:
                         const ShardHostMap& designatedHostsMap);
 
     ~AsyncRequestsSender();
+    AsyncRequestsSender(const AsyncRequestsSender&) = delete;
+    AsyncRequestsSender& operator=(const AsyncRequestsSender&) = delete;
 
     /**
      * Returns true if responses for all requests have been returned via next().

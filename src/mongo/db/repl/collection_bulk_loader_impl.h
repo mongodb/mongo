@@ -26,9 +26,6 @@ namespace repl {
  * Note: Call commit when done inserting documents.
  */
 class CollectionBulkLoaderImpl : public CollectionBulkLoader {
-    CollectionBulkLoaderImpl(const CollectionBulkLoaderImpl&) = delete;
-    CollectionBulkLoaderImpl& operator=(const CollectionBulkLoaderImpl&) = delete;
-
 public:
     struct Stats {
         Date_t startBuildingIndexes;
@@ -42,6 +39,8 @@ public:
                              ServiceContext::UniqueOperationContext opCtx,
                              const NamespaceString& nss);
     ~CollectionBulkLoaderImpl() override;
+    CollectionBulkLoaderImpl(const CollectionBulkLoaderImpl&) = delete;
+    CollectionBulkLoaderImpl& operator=(const CollectionBulkLoaderImpl&) = delete;
 
     Status init(const BSONObj& idIndexSpec, const std::vector<BSONObj>& secondaryIndexSpecs);
 

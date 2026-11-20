@@ -31,12 +31,11 @@ public:
  * at destruction. This can only be used for multi-statement transactions.
  */
 class RouterOperationContextSession {
-    RouterOperationContextSession(const RouterOperationContextSession&) = delete;
-    RouterOperationContextSession& operator=(const RouterOperationContextSession&) = delete;
-
 public:
     RouterOperationContextSession(OperationContext* opCtx);
     ~RouterOperationContextSession();
+    RouterOperationContextSession(const RouterOperationContextSession&) = delete;
+    RouterOperationContextSession& operator=(const RouterOperationContextSession&) = delete;
 
     /**
      * These methods take an operation context with a checked-out session and allow it to be

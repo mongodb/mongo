@@ -23,9 +23,6 @@ namespace [[MONGO_MOD_PUBLIC]] mongo {
  * deletion, otherwise the document will be lost if the process gets terminated in between.
  */
 class RemoveSaver {
-    RemoveSaver(const RemoveSaver&) = delete;
-    RemoveSaver& operator=(const RemoveSaver&) = delete;
-
 public:
     class Storage;
     RemoveSaver(const std::string& type,
@@ -33,6 +30,8 @@ public:
                 const std::string& why,
                 std::unique_ptr<Storage> storage = std::make_unique<Storage>());
     ~RemoveSaver();
+    RemoveSaver(const RemoveSaver&) = delete;
+    RemoveSaver& operator=(const RemoveSaver&) = delete;
 
     /**
      * Writes document to file. File is created lazily before writing the first document.

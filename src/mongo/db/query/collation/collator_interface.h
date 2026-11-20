@@ -31,9 +31,6 @@ class CollatorInterface;
 constexpr CollatorInterface* kSimpleCollator = nullptr;
 
 class CollatorInterface : public StringDataComparator {
-    CollatorInterface(const CollatorInterface&) = delete;
-    CollatorInterface& operator=(const CollatorInterface&) = delete;
-
 public:
     /**
      * Every string has a corresponding ComparisonKey with respect to this collator. Two
@@ -75,6 +72,9 @@ public:
     CollatorInterface(Collation spec) : _spec(std::move(spec)) {}
 
     ~CollatorInterface() override {}
+
+    CollatorInterface(const CollatorInterface&) = delete;
+    CollatorInterface& operator=(const CollatorInterface&) = delete;
 
     virtual std::unique_ptr<CollatorInterface> clone() const = 0;
     virtual std::shared_ptr<CollatorInterface> cloneShared() const = 0;

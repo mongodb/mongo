@@ -350,15 +350,14 @@ private:
  * Minimal interface sets a timer with a callback and cancels the timer.
  */
 class [[MONGO_MOD_UNFORTUNATELY_OPEN]] ConnectionPool::TimerInterface {
-    TimerInterface(const TimerInterface&) = delete;
-    TimerInterface& operator=(const TimerInterface&) = delete;
-
 public:
     TimerInterface() = default;
 
     using TimeoutCallback = std::function<void()>;
 
     virtual ~TimerInterface() = default;
+    TimerInterface(const TimerInterface&) = delete;
+    TimerInterface& operator=(const TimerInterface&) = delete;
 
     /**
      * Sets the timeout for the timer. Setting an already set timer should
@@ -397,9 +396,6 @@ enum class ConnectionCloseReason {
  * refresh them (issue some kind of ping) and manage a timer.
  */
 class [[MONGO_MOD_UNFORTUNATELY_OPEN]] ConnectionPool::ConnectionInterface : public TimerInterface {
-    ConnectionInterface(const ConnectionInterface&) = delete;
-    ConnectionInterface& operator=(const ConnectionInterface&) = delete;
-
     friend class ConnectionPool;
 
 public:
@@ -413,6 +409,8 @@ public:
         : _id{id}, _generation(generation) {}
 
     ~ConnectionInterface() override = default;
+    ConnectionInterface(const ConnectionInterface&) = delete;
+    ConnectionInterface& operator=(const ConnectionInterface&) = delete;
 
     /**
      * Indicates that the user is now done with this connection. Users MUST call either
@@ -606,15 +604,14 @@ protected:
  * connection pool.
  */
 class [[MONGO_MOD_UNFORTUNATELY_OPEN]] ConnectionPool::DependentTypeFactoryInterface {
-    DependentTypeFactoryInterface(const DependentTypeFactoryInterface&) = delete;
-    DependentTypeFactoryInterface& operator=(const DependentTypeFactoryInterface&) = delete;
-
 public:
     using PoolConnectionId = ConnectionInterface::PoolConnectionId;
 
     DependentTypeFactoryInterface() = default;
 
     virtual ~DependentTypeFactoryInterface() = default;
+    DependentTypeFactoryInterface(const DependentTypeFactoryInterface&) = delete;
+    DependentTypeFactoryInterface& operator=(const DependentTypeFactoryInterface&) = delete;
 
     /**
      * Makes a new connection given a host and port

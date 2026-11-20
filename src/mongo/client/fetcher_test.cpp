@@ -1282,14 +1282,14 @@ TEST_F(FetcherTest, FetcherAppliesRetryStrategyToFirstCommandButNotToGetMoreRequ
 
 bool sharedCallbackStateDestroyed = false;
 class SharedCallbackState {
-    SharedCallbackState(const SharedCallbackState&) = delete;
-    SharedCallbackState& operator=(const SharedCallbackState&) = delete;
-
 public:
     SharedCallbackState() {}
     ~SharedCallbackState() {
         sharedCallbackStateDestroyed = true;
     }
+
+    SharedCallbackState(const SharedCallbackState&) = delete;
+    SharedCallbackState& operator=(const SharedCallbackState&) = delete;
 };
 
 TEST_F(FetcherTest, FetcherResetsInternalFinishCallbackFunctionPointerAfterLastCallback) {

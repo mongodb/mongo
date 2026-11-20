@@ -25,9 +25,6 @@ class OperationContext;
  * the statistics collection. There should be one instance of this object per service context.
  */
 class ClusterStatistics {
-    ClusterStatistics(const ClusterStatistics&) = delete;
-    ClusterStatistics& operator=(const ClusterStatistics&) = delete;
-
 public:
     /**
      * Structure, which describes the statistics of a single shard host.
@@ -46,6 +43,8 @@ public:
         std::set<std::string> shardZones;
     };
     virtual ~ClusterStatistics();
+    ClusterStatistics(const ClusterStatistics&) = delete;
+    ClusterStatistics& operator=(const ClusterStatistics&) = delete;
 
     /**
      * Retrieves a snapshot of the current state of the shards. The implementation of this

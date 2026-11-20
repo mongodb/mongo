@@ -34,9 +34,6 @@ class StorageInterface;
 struct TimestampedBSONObj;
 
 class ReplicationConsistencyMarkersImpl : public ReplicationConsistencyMarkers {
-    ReplicationConsistencyMarkersImpl(const ReplicationConsistencyMarkersImpl&) = delete;
-    ReplicationConsistencyMarkersImpl& operator=(const ReplicationConsistencyMarkersImpl&) = delete;
-
 public:
     explicit ReplicationConsistencyMarkersImpl(StorageInterface* storageInterface);
     ReplicationConsistencyMarkersImpl(StorageInterface* storageInterface,
@@ -44,6 +41,8 @@ public:
                                       NamespaceString oplogTruncateAfterNss,
                                       NamespaceString initialSyncIdNss,
                                       NamespaceString recordIdsGroupIdNss);
+    ReplicationConsistencyMarkersImpl(const ReplicationConsistencyMarkersImpl&) = delete;
+    ReplicationConsistencyMarkersImpl& operator=(const ReplicationConsistencyMarkersImpl&) = delete;
 
     void initializeMinValidDocument(OperationContext* opCtx) override;
 

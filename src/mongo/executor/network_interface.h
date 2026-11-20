@@ -45,9 +45,6 @@ extern FailPoint networkInterfaceShouldNotKillPendingRequests;
  * Interface to networking for use by TaskExecutor implementations.
  */
 class [[MONGO_MOD_PUBLIC]] NetworkInterface {
-    NetworkInterface(const NetworkInterface&) = delete;
-    NetworkInterface& operator=(const NetworkInterface&) = delete;
-
 public:
     // Indicates that there is no expiration time by when a request needs to complete
     static constexpr Date_t kNoExpirationDate{Date_t::max()};
@@ -98,6 +95,8 @@ public:
     };
 
     virtual ~NetworkInterface();
+    NetworkInterface(const NetworkInterface&) = delete;
+    NetworkInterface& operator=(const NetworkInterface&) = delete;
 
     /**
      * Returns diagnostic info.

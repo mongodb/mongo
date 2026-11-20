@@ -27,9 +27,6 @@ class Status;
 namespace repl {
 
 class VoteRequester {
-    VoteRequester(const VoteRequester&) = delete;
-    VoteRequester& operator=(const VoteRequester&) = delete;
-
 public:
     enum class Result {
         kSuccessfullyElected,
@@ -86,6 +83,8 @@ public:
 
     VoteRequester();
     virtual ~VoteRequester();
+    VoteRequester(const VoteRequester&) = delete;
+    VoteRequester& operator=(const VoteRequester&) = delete;
 
     /**
      * Begins the process of sending replSetRequestVotes commands to all non-DOWN nodes

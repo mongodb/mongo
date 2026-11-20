@@ -51,9 +51,6 @@ class MozJSImplScope;
  *
  */
 class MozJSProxyScope final : public Scope {
-    MozJSProxyScope(const MozJSProxyScope&) = delete;
-    MozJSProxyScope& operator=(const MozJSProxyScope&) = delete;
-
     /**
      * The FSM is fairly tight:
      *
@@ -96,6 +93,8 @@ class MozJSProxyScope final : public Scope {
 public:
     MozJSProxyScope(MozJSScriptEngine* engine);
     ~MozJSProxyScope() override;
+    MozJSProxyScope(const MozJSProxyScope&) = delete;
+    MozJSProxyScope& operator=(const MozJSProxyScope&) = delete;
 
     void init(const BSONObj* data) override;
 

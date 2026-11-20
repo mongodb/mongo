@@ -32,11 +32,11 @@
 namespace mongo {
 
 class KillAllSessionsByPatternCommand final : public BasicCommand {
-    KillAllSessionsByPatternCommand(const KillAllSessionsByPatternCommand&) = delete;
-    KillAllSessionsByPatternCommand& operator=(const KillAllSessionsByPatternCommand&) = delete;
-
 public:
     KillAllSessionsByPatternCommand() : BasicCommand("killAllSessionsByPattern") {}
+
+    KillAllSessionsByPatternCommand(const KillAllSessionsByPatternCommand&) = delete;
+    KillAllSessionsByPatternCommand& operator=(const KillAllSessionsByPatternCommand&) = delete;
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;

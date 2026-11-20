@@ -16,9 +16,6 @@
 namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class ProgressMeter {
-    ProgressMeter(const ProgressMeter&) = delete;
-    ProgressMeter& operator=(const ProgressMeter&) = delete;
-
 public:
     ProgressMeter(unsigned long long total,
                   int secondsBetween = 3,
@@ -32,6 +29,9 @@ public:
     ProgressMeter() {
         _name = "Progress";
     }
+
+    ProgressMeter(const ProgressMeter&) = delete;
+    ProgressMeter& operator=(const ProgressMeter&) = delete;
 
     // typically you do ProgressMeterHolder
     void reset(unsigned long long total, int secondsBetween = 3, int checkInterval = 100);
@@ -119,9 +119,6 @@ private:
  * lock, then the thread must be executing the associated OperationContext.
  */
 class ProgressMeterHolder {
-    ProgressMeterHolder(const ProgressMeterHolder&) = delete;
-    ProgressMeterHolder& operator=(const ProgressMeterHolder&) = delete;
-
 public:
     ProgressMeterHolder() : _pm(nullptr) {}
 
@@ -133,6 +130,9 @@ public:
             }
         }
     }
+
+    ProgressMeterHolder(const ProgressMeterHolder&) = delete;
+    ProgressMeterHolder& operator=(const ProgressMeterHolder&) = delete;
 
     void set(WithLock, ProgressMeter& pm, OperationContext* opCtx) {
         _opCtx = opCtx;

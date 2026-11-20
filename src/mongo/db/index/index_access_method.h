@@ -59,9 +59,6 @@ enum class ContainerWriteBehavior { kDoNotReplicate, kReplicate };
  *
  */
 class [[MONGO_MOD_OPEN]] IndexAccessMethod {
-    IndexAccessMethod(const IndexAccessMethod&) = delete;
-    IndexAccessMethod& operator=(const IndexAccessMethod&) = delete;
-
 public:
     using ShouldRelaxConstraintsFn =
         std::function<bool(OperationContext* opCtx, const CollectionPtr& collection)>;
@@ -78,6 +75,8 @@ public:
 
     IndexAccessMethod() = default;
     virtual ~IndexAccessMethod() = default;
+    IndexAccessMethod(const IndexAccessMethod&) = delete;
+    IndexAccessMethod& operator=(const IndexAccessMethod&) = delete;
 
     static std::unique_ptr<IndexAccessMethod> make(OperationContext* opCtx,
                                                    RecoveryUnit& ru,

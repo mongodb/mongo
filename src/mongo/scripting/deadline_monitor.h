@@ -48,9 +48,6 @@ int getScriptingEngineInterruptInterval();
  */
 template <typename _Task>
 class DeadlineMonitor {
-    DeadlineMonitor(const DeadlineMonitor&) = delete;
-    DeadlineMonitor& operator=(const DeadlineMonitor&) = delete;
-
 public:
     DeadlineMonitor() {
         // NOTE(schwerin): Because _monitorThread takes a pointer to "this", all of the fields
@@ -69,6 +66,9 @@ public:
         }
         _monitorThread.join();
     }
+
+    DeadlineMonitor(const DeadlineMonitor&) = delete;
+    DeadlineMonitor& operator=(const DeadlineMonitor&) = delete;
 
     /**
      * Start monitoring a task for deadline lapse.  User must call stopDeadline() before

@@ -615,9 +615,6 @@ class SorterBatchGuard;
  */
 template <typename Key, typename Value>
 class Sorter : public SorterBase {
-    Sorter(const Sorter&) = delete;
-    Sorter& operator=(const Sorter&) = delete;
-
 public:
     typedef std::pair<Key, Value> Data;
     typedef std::function<Value()> ValueProducer;
@@ -687,6 +684,9 @@ public:
     virtual void resume() = 0;
 
     virtual ~Sorter() {}
+
+    Sorter(const Sorter&) = delete;
+    Sorter& operator=(const Sorter&) = delete;
 
     /**
      * Returns the current persisted sorter state which can then be used to later reconstruct a

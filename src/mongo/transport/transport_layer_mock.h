@@ -36,14 +36,13 @@ using namespace std::literals::string_view_literals;
  * This TransportLayerMock is a noop TransportLayer implementation.
  */
 class TransportLayerMock : public TransportLayer {
-    TransportLayerMock(const TransportLayerMock&) = delete;
-    TransportLayerMock& operator=(const TransportLayerMock&) = delete;
-
 public:
     TransportLayerMock();
     explicit TransportLayerMock(std::unique_ptr<SessionManager> sm)
         : _sessionManager(std::move(sm)) {}
     ~TransportLayerMock() override;
+    TransportLayerMock(const TransportLayerMock&) = delete;
+    TransportLayerMock& operator=(const TransportLayerMock&) = delete;
 
     std::shared_ptr<Session> createSession();
     std::shared_ptr<Session> get(Session::Id id);

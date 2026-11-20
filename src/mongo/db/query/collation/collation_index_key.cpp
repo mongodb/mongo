@@ -25,12 +25,12 @@ namespace {
 // holds necessary information for in-progress translations.  TranslateContexts are held by a
 // TranslateStack, which acts like a heap-allocated call stack.
 class TranslateContext {
-    TranslateContext(const TranslateContext&) = delete;
-    TranslateContext& operator=(const TranslateContext&) = delete;
-
 public:
     TranslateContext(BSONObjIterator&& iter, BufBuilder* buf)
         : bob(*buf), _objIterator(std::move(iter)) {}
+
+    TranslateContext(const TranslateContext&) = delete;
+    TranslateContext& operator=(const TranslateContext&) = delete;
 
     /**
      * Returns true if the underlying iterator has additional elements.

@@ -288,9 +288,6 @@ void systemDeallocate(void* ptr, std::size_t bytes) {
  * page size and allocate returns aligned pointers.
  */
 class Allocation {
-    Allocation(const Allocation&) = delete;
-    Allocation& operator=(const Allocation&) = delete;
-
 public:
     explicit Allocation(std::size_t initialAllocation) {
         auto pageSize = ProcessInfo::getPageSize();
@@ -306,6 +303,9 @@ public:
         systemDeallocate(_start, _size);
         gSecureAllocCountInfo().updateSecureAllocBytesInPages(-static_cast<int32_t>(_size));
     }
+
+    Allocation(const Allocation&) = delete;
+    Allocation& operator=(const Allocation&) = delete;
 
     /**
      * Allocates an aligned pointer of given size from the locked page we have a pointer to.

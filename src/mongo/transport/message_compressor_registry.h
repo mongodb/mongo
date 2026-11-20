@@ -31,12 +31,11 @@ namespace moe = mongo::optionenvironment;
  * The MessageCompressorRegistry holds the global registrations of compressors for a process.
  */
 class MessageCompressorRegistry {
-    MessageCompressorRegistry(const MessageCompressorRegistry&) = delete;
-    MessageCompressorRegistry& operator=(const MessageCompressorRegistry&) = delete;
-
 public:
     MessageCompressorRegistry() = default;
 
+    MessageCompressorRegistry(const MessageCompressorRegistry&) = delete;
+    MessageCompressorRegistry& operator=(const MessageCompressorRegistry&) = delete;
     MessageCompressorRegistry(MessageCompressorRegistry&&) = default;
     MessageCompressorRegistry& operator=(MessageCompressorRegistry&&) = default;
 

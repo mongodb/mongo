@@ -19,11 +19,10 @@
 namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class MessageCompressorBase {
-    MessageCompressorBase(const MessageCompressorBase&) = delete;
-    MessageCompressorBase& operator=(const MessageCompressorBase&) = delete;
-
 public:
     virtual ~MessageCompressorBase() = default;
+    MessageCompressorBase(const MessageCompressorBase&) = delete;
+    MessageCompressorBase& operator=(const MessageCompressorBase&) = delete;
 
     /*
      * Returns the name for subclass compressors (e.g. "snappy", "zlib", "zstd" or "noop")

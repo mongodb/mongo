@@ -35,11 +35,10 @@ bool canBalanceCollection(const CollectionType& coll);
  * the sharded cluster to be balanced.
  */
 class BalancerChunkSelectionPolicy {
-    BalancerChunkSelectionPolicy(const BalancerChunkSelectionPolicy&) = delete;
-    BalancerChunkSelectionPolicy& operator=(const BalancerChunkSelectionPolicy&) = delete;
-
 public:
     explicit BalancerChunkSelectionPolicy(ClusterStatistics* clusterStats);
+    BalancerChunkSelectionPolicy(const BalancerChunkSelectionPolicy&) = delete;
+    BalancerChunkSelectionPolicy& operator=(const BalancerChunkSelectionPolicy&) = delete;
 
     /**
      * Potentially blocking method, which gives out a set of chunks, which need to be split because

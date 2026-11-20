@@ -49,9 +49,6 @@ class Status;
  * loaded shards. It would issue a request for a chunk migration per round, if it found so.
  */
 class [[MONGO_MOD_PUBLIC]] Balancer : public ReplicaSetAwareServiceConfigSvr<Balancer> {
-    Balancer(const Balancer&) = delete;
-    Balancer& operator=(const Balancer&) = delete;
-
 public:
     /**
      * Provide access to the Balancer decoration on ServiceContext.
@@ -61,6 +58,8 @@ public:
 
     Balancer();
     ~Balancer() override;
+    Balancer(const Balancer&) = delete;
+    Balancer& operator=(const Balancer&) = delete;
 
     /**
      * Returns true if 'upperBound', interpreted alongside the compound 'shardKeyPattern',

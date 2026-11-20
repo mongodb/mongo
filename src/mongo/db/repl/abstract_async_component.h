@@ -33,9 +33,6 @@ namespace repl {
  */
 template <typename Mutex = std::mutex>
 class [[MONGO_MOD_OPEN]] AbstractAsyncComponent {
-    AbstractAsyncComponent(const AbstractAsyncComponent&) = delete;
-    AbstractAsyncComponent& operator=(const AbstractAsyncComponent&) = delete;
-
 public:
     AbstractAsyncComponent(executor::TaskExecutor* executor, const std::string& componentName)
         : _executor(executor), _componentName(componentName) {
@@ -43,6 +40,8 @@ public:
     }
 
     virtual ~AbstractAsyncComponent() = default;
+    AbstractAsyncComponent(const AbstractAsyncComponent&) = delete;
+    AbstractAsyncComponent& operator=(const AbstractAsyncComponent&) = delete;
 
     /**
      * Returns true if this component is currently running or in the process of shutting down.

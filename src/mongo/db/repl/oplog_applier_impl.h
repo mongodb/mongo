@@ -41,9 +41,6 @@ namespace repl {
  * collection, and applies the batch of operations.
  */
 class OplogApplierImpl : public OplogApplier {
-    OplogApplierImpl(const OplogApplierImpl&) = delete;
-    OplogApplierImpl& operator=(const OplogApplierImpl&) = delete;
-
 public:
     /**
      * Constructs this OplogApplier with specific options.
@@ -60,6 +57,8 @@ public:
                      StorageInterface* storageInterface,
                      const Options& options,
                      ThreadPool* workerPool);
+    OplogApplierImpl(const OplogApplierImpl&) = delete;
+    OplogApplierImpl& operator=(const OplogApplierImpl&) = delete;
 
     void fillWriterVectors_forTest(OperationContext* opCtx,
                                    std::vector<OplogEntry>* ops,

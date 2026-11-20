@@ -13,11 +13,10 @@ namespace mongo {
  * replica set, etc).
  */
 class [[MONGO_MOD_PUBLIC]] RemoteCommandTargeterFactory {
-    RemoteCommandTargeterFactory(const RemoteCommandTargeterFactory&) = delete;
-    RemoteCommandTargeterFactory& operator=(const RemoteCommandTargeterFactory&) = delete;
-
 public:
     virtual ~RemoteCommandTargeterFactory() = default;
+    RemoteCommandTargeterFactory(const RemoteCommandTargeterFactory&) = delete;
+    RemoteCommandTargeterFactory& operator=(const RemoteCommandTargeterFactory&) = delete;
 
     /**
      * Instantiates a RemoteCommandTargeter for the specified connection string.

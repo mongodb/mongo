@@ -25,9 +25,6 @@ class ScatterGatherAlgorithm;
  * Interface of a scatter-gather behavior.
  */
 class ScatterGatherRunner {
-    ScatterGatherRunner(const ScatterGatherRunner&) = delete;
-    ScatterGatherRunner& operator=(const ScatterGatherRunner&) = delete;
-
 public:
     /**
      * Constructs a new runner whose underlying algorithm is "algorithm".
@@ -40,6 +37,8 @@ public:
     explicit ScatterGatherRunner(std::shared_ptr<ScatterGatherAlgorithm> algorithm,
                                  executor::TaskExecutor* executor,
                                  std::string logMessage);
+    ScatterGatherRunner(const ScatterGatherRunner&) = delete;
+    ScatterGatherRunner& operator=(const ScatterGatherRunner&) = delete;
 
     /**
      * Runs the scatter-gather process and blocks until it completes.

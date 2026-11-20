@@ -20,12 +20,11 @@ namespace mongo {
 namespace fts {
 
 class StopWords {
-    StopWords(const StopWords&) = delete;
-    StopWords& operator=(const StopWords&) = delete;
-
 public:
     StopWords();
     StopWords(const std::set<std::string>& words);
+    StopWords(const StopWords&) = delete;
+    StopWords& operator=(const StopWords&) = delete;
 
     bool isStopWord(std::string_view word) const {
         return _words.find(word) != _words.end();

@@ -217,13 +217,13 @@ Counter64& CurOp::opsWithOverdueInterruptCheck_forTest() {
  * The stack itself is represented in the _parent pointers of the CurOp class.
  */
 class CurOp::CurOpStack {
-    CurOpStack(const CurOpStack&) = delete;
-    CurOpStack& operator=(const CurOpStack&) = delete;
-
 public:
     CurOpStack() {
         _pushNoLock(&_base);
     }
+
+    CurOpStack(const CurOpStack&) = delete;
+    CurOpStack& operator=(const CurOpStack&) = delete;
 
     /**
      * Returns the top of the CurOp stack.

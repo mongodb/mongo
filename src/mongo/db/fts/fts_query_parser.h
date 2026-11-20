@@ -44,11 +44,10 @@ struct QueryToken {
  * SPECIAL_CHARS = '-' | ' ' | '"'
  */
 class FTSQueryParser {
-    FTSQueryParser(const FTSQueryParser&) = delete;
-    FTSQueryParser& operator=(const FTSQueryParser&) = delete;
-
 public:
     FTSQueryParser(std::string_view str);
+    FTSQueryParser(const FTSQueryParser&) = delete;
+    FTSQueryParser& operator=(const FTSQueryParser&) = delete;
     bool more() const;
     QueryToken next();
 

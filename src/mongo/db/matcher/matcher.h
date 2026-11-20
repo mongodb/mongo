@@ -29,9 +29,6 @@ class CollatorInterface;
  * TODO SERVER-113198: Remove external dependencies on this class.
  */
 class [[MONGO_MOD_NEEDS_REPLACEMENT]] Matcher {
-    Matcher(const Matcher&) = delete;
-    Matcher& operator=(const Matcher&) = delete;
-
 public:
     /**
      * 'collator' must outlive the returned Matcher and any MatchExpression cloned from it.
@@ -41,6 +38,8 @@ public:
             const ExtensionsCallback& extensionsCallback = ExtensionsCallbackNoop(),
             MatchExpressionParser::AllowedFeatureSet allowedFeatures =
                 MatchExpressionParser::kDefaultSpecialFeatures);
+    Matcher(const Matcher&) = delete;
+    Matcher& operator=(const Matcher&) = delete;
 
     const BSONObj* getQuery() const {
         return &_pattern;

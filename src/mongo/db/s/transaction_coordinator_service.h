@@ -30,12 +30,11 @@
 namespace mongo {
 
 class [[MONGO_MOD_PUBLIC]] TransactionCoordinatorService {
-    TransactionCoordinatorService(const TransactionCoordinatorService&) = delete;
-    TransactionCoordinatorService& operator=(const TransactionCoordinatorService&) = delete;
-
 public:
     TransactionCoordinatorService();
     virtual ~TransactionCoordinatorService();
+    TransactionCoordinatorService(const TransactionCoordinatorService&) = delete;
+    TransactionCoordinatorService& operator=(const TransactionCoordinatorService&) = delete;
 
     /**
      * Retrieves the TransactionCoordinatorService associated with the service or operation context.

@@ -18,11 +18,10 @@ namespace mongo {
  * Interface encapsulating the targeting logic for a given replica set or a standalone host.
  */
 class [[MONGO_MOD_PUBLIC]] RemoteCommandTargeter {
-    RemoteCommandTargeter(const RemoteCommandTargeter&) = delete;
-    RemoteCommandTargeter& operator=(const RemoteCommandTargeter&) = delete;
-
 public:
     virtual ~RemoteCommandTargeter() = default;
+    RemoteCommandTargeter(const RemoteCommandTargeter&) = delete;
+    RemoteCommandTargeter& operator=(const RemoteCommandTargeter&) = delete;
 
     /**
      * Retrieves the full connection string for the replica set or standalone host which are

@@ -18,11 +18,10 @@ namespace mongo {
  * Inflates a compressed chunk of metrics into a list of BSON documents
  */
 class FTDCDecompressor {
-    FTDCDecompressor(const FTDCDecompressor&) = delete;
-    FTDCDecompressor& operator=(const FTDCDecompressor&) = delete;
-
 public:
     FTDCDecompressor() = default;
+    FTDCDecompressor(const FTDCDecompressor&) = delete;
+    FTDCDecompressor& operator=(const FTDCDecompressor&) = delete;
 
     static constexpr std::uint64_t kMaxTotalSamples = 1ull << 25;    // 256MiB of 8-byte samples
     static constexpr std::uint64_t kMaxDeltaFileSize = 10ull << 20;  // 10MiB

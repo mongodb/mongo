@@ -25,11 +25,10 @@ class BackgroundSync;
 class Reporter;
 
 class [[MONGO_MOD_PARENT_PRIVATE]] SyncSourceFeedback {
-    SyncSourceFeedback(const SyncSourceFeedback&) = delete;
-    SyncSourceFeedback& operator=(const SyncSourceFeedback&) = delete;
-
 public:
     SyncSourceFeedback() = default;
+    SyncSourceFeedback(const SyncSourceFeedback&) = delete;
+    SyncSourceFeedback& operator=(const SyncSourceFeedback&) = delete;
 
     /// Notifies the SyncSourceFeedbackThread to wake up and send an update upstream of secondary
     /// replication progress.

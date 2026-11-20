@@ -27,13 +27,12 @@ class BSONObjBuilder;
  * instance name.
  */
 class PerfCounterCollection {
-    PerfCounterCollection(const PerfCounterCollection&) = delete;
-    PerfCounterCollection& operator=(const PerfCounterCollection&) = delete;
-
     friend class PerfCounterCollector;
 
 public:
     PerfCounterCollection() = default;
+    PerfCounterCollection(const PerfCounterCollection&) = delete;
+    PerfCounterCollection& operator=(const PerfCounterCollection&) = delete;
     PerfCounterCollection(PerfCounterCollection&&) = default;
     PerfCounterCollection& operator=(PerfCounterCollection&&) = default;
 
@@ -111,11 +110,10 @@ private:
  * output the raw counter values to BSONObjBuilder.
  */
 class PerfCounterCollector {
-    PerfCounterCollector(const PerfCounterCollector&) = delete;
-    PerfCounterCollector& operator=(const PerfCounterCollector&) = delete;
-
 public:
     ~PerfCounterCollector();
+    PerfCounterCollector(const PerfCounterCollector&) = delete;
+    PerfCounterCollector& operator=(const PerfCounterCollector&) = delete;
     PerfCounterCollector(PerfCounterCollector&&) = default;
 
     /**

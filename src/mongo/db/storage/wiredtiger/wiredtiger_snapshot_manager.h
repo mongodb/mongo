@@ -23,11 +23,10 @@ class WiredTigerSession;
 using RoundUpPreparedTimestamps = WiredTigerBeginTxnBlock::RoundUpPreparedTimestamps;
 
 class WiredTigerSnapshotManager final : public SnapshotManager {
-    WiredTigerSnapshotManager(const WiredTigerSnapshotManager&) = delete;
-    WiredTigerSnapshotManager& operator=(const WiredTigerSnapshotManager&) = delete;
-
 public:
     WiredTigerSnapshotManager() = default;
+    WiredTigerSnapshotManager(const WiredTigerSnapshotManager&) = delete;
+    WiredTigerSnapshotManager& operator=(const WiredTigerSnapshotManager&) = delete;
 
     void setCommittedSnapshot(const Timestamp& timestamp) final;
     void setLastApplied(const Timestamp& timestamp) final;

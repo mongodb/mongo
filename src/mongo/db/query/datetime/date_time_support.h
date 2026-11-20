@@ -427,9 +427,6 @@ private:
  * accessed via the global service context.
  */
 class TimeZoneDatabase {
-    TimeZoneDatabase(const TimeZoneDatabase&) = delete;
-    TimeZoneDatabase& operator=(const TimeZoneDatabase&) = delete;
-
 public:
     /**
      * A custom-deleter which deletes 'timeZoneDatabase' if it is not the builtin time zone
@@ -510,6 +507,8 @@ public:
      * Creates a TimeZoneDatabase object using time zone rules given by 'timeZoneDatabase'.
      */
     TimeZoneDatabase(std::unique_ptr<_timelib_tzdb, TimeZoneDBDeleter> timeZoneDatabase);
+    TimeZoneDatabase(const TimeZoneDatabase&) = delete;
+    TimeZoneDatabase& operator=(const TimeZoneDatabase&) = delete;
 
     std::vector<std::string> getTimeZoneStrings() const;
 

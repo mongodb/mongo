@@ -45,9 +45,6 @@ namespace mongo {
 extern FailPoint disableMatchExpressionOptimization;
 
 class [[MONGO_MOD_PUBLIC]] MatchExpression {
-    MatchExpression(const MatchExpression&) = delete;
-    MatchExpression& operator=(const MatchExpression&) = delete;
-
 public:
     /** In-name-only dependency. Defined in expression_hasher.h. */
     struct HashParam;
@@ -280,6 +277,9 @@ public:
 
     MatchExpression(MatchType type, clonable_ptr<ErrorAnnotation> annotation = nullptr);
     virtual ~MatchExpression() {}
+
+    MatchExpression(const MatchExpression&) = delete;
+    MatchExpression& operator=(const MatchExpression&) = delete;
 
     //
     // Structural/AST information

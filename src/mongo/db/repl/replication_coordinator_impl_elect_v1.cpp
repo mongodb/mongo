@@ -49,9 +49,6 @@ MONGO_FAIL_POINT_DEFINE(electionHangsBeforeUpdateMemberState);
 MONGO_FAIL_POINT_DEFINE(hangBeforeOnVoteRequestCompleteCallback);
 
 class ReplicationCoordinatorImpl::ElectionState::LoseElectionGuardV1 {
-    LoseElectionGuardV1(const LoseElectionGuardV1&) = delete;
-    LoseElectionGuardV1& operator=(const LoseElectionGuardV1&) = delete;
-
 public:
     LoseElectionGuardV1(ReplicationCoordinatorImpl* replCoord) : _replCoord(replCoord) {}
 
@@ -74,6 +71,9 @@ public:
         ReplicationMetrics::get(getGlobalServiceContext()).clearElectionCandidateMetrics();
     }
 
+    LoseElectionGuardV1(const LoseElectionGuardV1&) = delete;
+    LoseElectionGuardV1& operator=(const LoseElectionGuardV1&) = delete;
+
     void dismiss() {
         _dismissed = true;
     }
@@ -86,14 +86,14 @@ protected:
 
 class ReplicationCoordinatorImpl::ElectionState::LoseElectionDryRunGuardV1
     : public LoseElectionGuardV1 {
-    LoseElectionDryRunGuardV1(const LoseElectionDryRunGuardV1&) = delete;
-    LoseElectionDryRunGuardV1& operator=(const LoseElectionDryRunGuardV1&) = delete;
-
 public:
     LoseElectionDryRunGuardV1(ReplicationCoordinatorImpl* replCoord)
         : LoseElectionGuardV1(replCoord) {
         _isDryRun = true;
     }
+
+    LoseElectionDryRunGuardV1(const LoseElectionDryRunGuardV1&) = delete;
+    LoseElectionDryRunGuardV1& operator=(const LoseElectionDryRunGuardV1&) = delete;
 };
 
 void ReplicationCoordinatorImpl::cancelElection_forTest() {

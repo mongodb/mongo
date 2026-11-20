@@ -270,15 +270,15 @@ TEST_F(
 }
 
 class SharedCallbackState {
-    SharedCallbackState(const SharedCallbackState&) = delete;
-    SharedCallbackState& operator=(const SharedCallbackState&) = delete;
-
 public:
     explicit SharedCallbackState(bool* sharedCallbackStateDestroyed)
         : _sharedCallbackStateDestroyed(sharedCallbackStateDestroyed) {}
     ~SharedCallbackState() {
         *_sharedCallbackStateDestroyed = true;
     }
+
+    SharedCallbackState(const SharedCallbackState&) = delete;
+    SharedCallbackState& operator=(const SharedCallbackState&) = delete;
 
 private:
     bool* _sharedCallbackStateDestroyed;

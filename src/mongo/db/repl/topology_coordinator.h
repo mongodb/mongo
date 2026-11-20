@@ -70,9 +70,6 @@ extern mongo::Counter64& numSyncSourceChangesDueToSignificantlyCloserNode;
  * Methods of this class should be non-blocking.
  */
 class [[MONGO_MOD_PUBLIC]] TopologyCoordinator {
-    TopologyCoordinator(const TopologyCoordinator&) = delete;
-    TopologyCoordinator& operator=(const TopologyCoordinator&) = delete;
-
 public:
     /**
      * RecentSyncSourceChanges stores the times that recent sync source changes happened. It will
@@ -137,6 +134,8 @@ public:
 
 
     ~TopologyCoordinator();
+    TopologyCoordinator(const TopologyCoordinator&) = delete;
+    TopologyCoordinator& operator=(const TopologyCoordinator&) = delete;
 
     ////////////////////////////////////////////////////////////
     //

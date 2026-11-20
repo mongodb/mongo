@@ -166,9 +166,6 @@ private:
  * Contains settings, which control the behaviour of the balancer.
  */
 class [[MONGO_MOD_PUBLIC]] BalancerConfiguration {
-    BalancerConfiguration(const BalancerConfiguration&) = delete;
-    BalancerConfiguration& operator=(const BalancerConfiguration&) = delete;
-
 public:
     static constexpr const char* kBalancerSettingKey = "balancer";
 
@@ -178,6 +175,8 @@ public:
      */
     BalancerConfiguration();
     ~BalancerConfiguration();
+    BalancerConfiguration(const BalancerConfiguration&) = delete;
+    BalancerConfiguration& operator=(const BalancerConfiguration&) = delete;
 
     /**
      * Non-blocking method, which checks whether the balancer is enabled (without checking for the

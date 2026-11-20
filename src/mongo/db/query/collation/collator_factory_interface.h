@@ -22,13 +22,13 @@ class StatusWith;
  * An interface which can be used to retrieve a collator.
  */
 class CollatorFactoryInterface {
-    CollatorFactoryInterface(const CollatorFactoryInterface&) = delete;
-    CollatorFactoryInterface& operator=(const CollatorFactoryInterface&) = delete;
-
 public:
     CollatorFactoryInterface() = default;
 
     virtual ~CollatorFactoryInterface() {}
+
+    CollatorFactoryInterface(const CollatorFactoryInterface&) = delete;
+    CollatorFactoryInterface& operator=(const CollatorFactoryInterface&) = delete;
 
     /**
      * Returns the CollatorFactoryInterface object associated with the specified service context.

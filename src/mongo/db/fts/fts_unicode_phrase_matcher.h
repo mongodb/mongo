@@ -25,11 +25,10 @@ class FTSLanguage;
  * case fold mapping), the phrase matcher will take that into account.
  */
 class UnicodeFTSPhraseMatcher final : public FTSPhraseMatcher {
-    UnicodeFTSPhraseMatcher(const UnicodeFTSPhraseMatcher&) = delete;
-    UnicodeFTSPhraseMatcher& operator=(const UnicodeFTSPhraseMatcher&) = delete;
-
 public:
     UnicodeFTSPhraseMatcher(const std::string& language);
+    UnicodeFTSPhraseMatcher(const UnicodeFTSPhraseMatcher&) = delete;
+    UnicodeFTSPhraseMatcher& operator=(const UnicodeFTSPhraseMatcher&) = delete;
 
     bool phraseMatches(std::string_view phrase,
                        std::string_view haystack,
