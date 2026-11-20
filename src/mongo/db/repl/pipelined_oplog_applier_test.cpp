@@ -3070,6 +3070,48 @@ TEST_F(PipelinedOplogApplierRunTest, WaitsForInflightPipelinedBatchToDrainBefore
     assertPublished(createOther);
 }
 
+// Drop/recreate must wait for prior publication even when the old write has released all locks.
+TEST_F(PipelinedOplogApplierRunTest, CollectionRecreationWaitsForPriorPublication) {
+    const auto oldUuid = [&] {
+        // Catalog setup must not be timestamped ahead of the synthetic oplog entries.
+        UnreplicatedWritesBlock noRep(_opCtx.get());
+        return createCollectionWithUuid(_opCtx.get(), kNss);
+    }();
+    const auto newUuid = UUID::gen();
+    setServerParameter("replBatchLimitOperations", 1);
+    auto* replCoord = ReplicationCoordinator::get(serviceContext);
+    const auto before = replCoord->getMyLastAppliedOpTimeAndWallTime();
+    const auto oldWrite = makeInsertOplogEntry(nextOpTime(), kNss, oldUuid, BSON("_id" << 0));
+    const auto drop = makeCommandOplogEntry(
+        nextOpTime(), kNss.getCommandNS(), BSON("drop" << kNss.coll()), boost::none, oldUuid);
+    const auto recreate = makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), kNss, newUuid);
+    const auto newWrite = makeInsertOplogEntry(nextOpTime(), kNss, newUuid, BSON("_id" << 1));
+
+    {
+        FailPointEnableBlock publishing("hangBeforePipelinedApplierPublish");
+        pushToBuffer({oldWrite});
+        startApplier();
+        publishing.wait();
+        assertCollectionContainsExactly(kNss, {BSON("_id" << 0)});
+
+        {
+            FailPointEnableBlock beforeWait("hangBeforePipelinedApplierIdleWait");
+            pushToBuffer({drop, recreate, newWrite});
+            beforeWait.wait();
+
+            // A missing leading drain would reach this wait only after dropping the collection.
+            ASSERT_TRUE(collectionExists(_opCtx.get(), kNss));
+            ASSERT_EQ(getCollectionUUID(_opCtx.get(), kNss), oldUuid);
+            ASSERT_EQ(replCoord->getMyLastAppliedOpTimeAndWallTime(), before);
+        }
+    }
+    finishApplier();
+
+    ASSERT_EQ(getCollectionUUID(_opCtx.get(), kNss), newUuid);
+    assertCollectionContainsExactly(kNss, {BSON("_id" << 1)});
+    assertPublished(newWrite);
+}
+
 // The drain after a serialized batch: the next pipelined batch must not be dispatched until the
 // serialized batch has been applied and published. Hold the worker applying a serialized
 // createCollection, then push a pipelined batch targeting the collection it creates: its ops
