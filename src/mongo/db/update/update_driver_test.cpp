@@ -18,6 +18,9 @@
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/update/document_diff_calculator.h"
+#include "mongo/db/update_index_data.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
 
@@ -752,6 +755,394 @@ TEST_F(ModifiedPathsTestFixture, NeedsMatchDetailsIsFalseForNonPositionalUpdate)
     mutablebson::Document doc(fromjson("{a: 0}"));
     runUpdate(&doc, makeUpdateMod(spec));
     ASSERT_EQ(false, _driver->needMatchDetails());
+}
+
+//
+// ChildLookupCache must not change what an update does. Each test runs an update through
+// UpdateDriver with the cache off and with the lowest threshold. Documents and oplog entries are
+// compared byte for byte; the other results and error codes are compared by value.
+//
+
+constexpr auto kCacheThresholdParam = "internalUpdateObjectNodeChildLookupCacheThreshold"sv;
+
+// A threshold of 1 makes every eligible object node with a static child use the cache.
+constexpr int kCacheOff = 0;
+constexpr int kCacheMostAggressive = 1;
+
+struct DiffUpdateCase {
+    BSONObj update;
+    std::vector<BSONObj> arrayFilters = {};
+    std::vector<std::string> indexedPaths = {};
+};
+
+struct DiffUpdateOutcome {
+    bool threw = false;
+    int errorCode = 0;
+    std::vector<BSONObj> docs;
+    std::vector<BSONObj> oplogEntries;
+    std::vector<bool> modified;
+    std::vector<std::string> modifiedPaths;
+    std::vector<bool> indexesAffected;
+};
+
+bool indexesAffectedByDiff(const DocumentUpdateRecord& record,
+                           const std::vector<std::string>& indexedPaths) {
+    if (indexedPaths.empty() || !record.diff) {
+        return false;
+    }
+    UpdateIndexData indexData;
+    for (const auto& path : indexedPaths) {
+        indexData.addPath(FieldRef(path));
+    }
+    doc_diff::IndexUpdateIdentifier identifier{1 /*numIndexes*/};
+    identifier.addIndex(/*indexCounter=*/0, indexData);
+    return identifier.determineAffectedIndexes(*record.diff).any();
+}
+
+// Parses 'testCase' once and applies it to each input in turn, as a multi-update does. Stops at the
+// first update that throws. Fatal gtest assertions need a void function, hence the out parameter.
+void runDiffUpdateCase(int threshold,
+                       const DiffUpdateCase& testCase,
+                       const std::vector<std::pair<BSONObj, std::string>>& inputs,
+                       DiffUpdateOutcome* out) {
+    unittest::ServerParameterGuard cacheThreshold(kCacheThresholdParam, threshold);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    for (const auto& filter : testCase.arrayFilters) {
+        auto parsedFilter = assertGet(MatchExpressionParser::parse(filter, expCtx));
+        auto expr = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
+        ASSERT(expr->getPlaceholder());
+        arrayFilters[expr->getPlaceholder().value()] = std::move(expr);
+    }
+
+    UpdateDriver driver(expCtx);
+    driver.parse(makeUpdateMod(testCase.update), arrayFilters, boost::none, /*multi=*/true);
+
+    DiffUpdateOutcome outcome;
+    const FieldRefSet immutablePaths;
+    for (const auto& [input, matchedField] : inputs) {
+        mutablebson::Document doc(input);
+        DocumentUpdateRecord record;
+        bool docWasModified = false;
+        FieldRefSetWithStorage modifiedPaths;
+        try {
+            uassertStatusOK(driver.update(expCtx->getOperationContext(),
+                                          matchedField,
+                                          &doc,
+                                          /*validateForStorage=*/true,
+                                          immutablePaths,
+                                          /*isInsert=*/false,
+                                          &record,
+                                          &docWasModified,
+                                          &modifiedPaths));
+        } catch (const DBException& ex) {
+            outcome.threw = true;
+            outcome.errorCode = ex.code();
+            break;
+        }
+        outcome.docs.push_back(doc.getObject());
+        outcome.oplogEntries.push_back(record.oplogEntry.getOwned());
+        outcome.modified.push_back(docWasModified);
+        outcome.modifiedPaths.push_back(modifiedPaths.toString());
+        outcome.indexesAffected.push_back(indexesAffectedByDiff(record, testCase.indexedPaths));
+    }
+    *out = std::move(outcome);
+}
+
+// Runs 'testCase' with the cache off and on and checks that the results are identical. The
+// cache-off result is stored in 'baseline' if given.
+void assertSameWithAndWithoutCache(const DiffUpdateCase& testCase,
+                                   const std::vector<std::pair<BSONObj, std::string>>& inputs,
+                                   DiffUpdateOutcome* baseline = nullptr) {
+    DiffUpdateOutcome off, on;
+    ASSERT_NO_FATAL_FAILURE(runDiffUpdateCase(kCacheOff, testCase, inputs, &off));
+    ASSERT_NO_FATAL_FAILURE(runDiffUpdateCase(kCacheMostAggressive, testCase, inputs, &on));
+
+    ASSERT_EQ(off.threw, on.threw) << testCase.update;
+    ASSERT_EQ(off.errorCode, on.errorCode) << testCase.update;
+    ASSERT_EQ(off.docs.size(), on.docs.size()) << testCase.update;
+    for (size_t i = 0; i < off.docs.size(); ++i) {
+        // Binary comparison also catches reordered and duplicated fields.
+        ASSERT_BSONOBJ_BINARY_EQ(off.docs[i], on.docs[i]);
+        ASSERT_BSONOBJ_BINARY_EQ(off.oplogEntries[i], on.oplogEntries[i]);
+        ASSERT_EQ(off.modified[i], on.modified[i]) << testCase.update;
+        ASSERT_EQ(off.modifiedPaths[i], on.modifiedPaths[i]) << testCase.update;
+        ASSERT_EQ(off.indexesAffected[i], on.indexesAffected[i]) << testCase.update;
+    }
+    if (baseline) {
+        *baseline = std::move(off);
+    }
+}
+
+// Returns {<prefix>0: base, <prefix>1: base + 1, ...}.
+BSONObj makeWideObject(const std::string& prefix, int numFields, int base = 0) {
+    BSONObjBuilder bob;
+    for (int i = 0; i < numFields; ++i) {
+        bob.append(prefix + std::to_string(i), base + i);
+    }
+    return bob.obj();
+}
+
+TEST(UpdateDriverChildLookupCacheTest, MixedOperatorsOnWideObject) {
+    static constexpr int kNumFields = 40;
+    BSONObjBuilder setBob, incBob, unsetBob, maxBob;
+    for (int i = 0; i < kNumFields; i += 4) {
+        setBob.append("w.f" + std::to_string(i), "set");
+        incBob.append("w.f" + std::to_string(i + 1), 10);
+        unsetBob.append("w.f" + std::to_string(i + 2), "");
+        maxBob.append("w.f" + std::to_string(i + 3), 1000);
+    }
+    setBob.append("w.created", 1);
+    BSONObj update =
+        BSON("$set" << setBob.obj() << "$inc" << incBob.obj() << "$unset" << unsetBob.obj()
+                    << "$max" << maxBob.obj() << "$rename" << BSON("w.renameSrc" << "w.renameDst"));
+
+    BSONObjBuilder docBob;
+    {
+        BSONObjBuilder w(docBob.subobjStart("w"));
+        w.appendElements(makeWideObject("f", kNumFields));
+        w.append("renameSrc", 7);
+    }
+
+    DiffUpdateOutcome outcome;
+    ASSERT_NO_FATAL_FAILURE(
+        assertSameWithAndWithoutCache({update}, {{docBob.obj(), ""}}, &outcome));
+    ASSERT_FALSE(outcome.threw);
+    ASSERT_EQ(outcome.docs.size(), 1U);
+    ASSERT_TRUE(outcome.modified[0]);
+}
+
+TEST(UpdateDriverChildLookupCacheTest, RenameWithinAndAcrossWideObjects) {
+    // Renames within one wide object and from one wide object into another.
+    BSONObjBuilder renameBob;
+    for (int i = 0; i < 10; ++i) {
+        renameBob.append("a.src" + std::to_string(i), "a.dst" + std::to_string(i));
+        renameBob.append("b.x" + std::to_string(i), "c.y" + std::to_string(i));
+    }
+    BSONObj update = BSON("$rename" << renameBob.obj() << "$set" << BSON("a.keep" << 1));
+
+    BSONObjBuilder docBob;
+    docBob.append("a", makeWideObject("src", 10));
+    docBob.append("b", makeWideObject("x", 10, 100));
+    docBob.append("c", makeWideObject("other", 5));
+
+    DiffUpdateOutcome outcome;
+    ASSERT_NO_FATAL_FAILURE(
+        assertSameWithAndWithoutCache({update}, {{docBob.obj(), ""}}, &outcome));
+    ASSERT_FALSE(outcome.threw);
+}
+
+TEST(UpdateDriverChildLookupCacheTest, RenameSourceRemovedBeforeLookupWithDuplicateName) {
+    // Each destination sorts before its source, so the source is removed before its placeholder is
+    // looked up, and the cache still holds the removed element. Every source name appears twice;
+    // only the first copy is renamed.
+    BSONObjBuilder renameBob;
+    BSONObjBuilder docBob;
+    {
+        BSONObjBuilder a(docBob.subobjStart("a"));
+        for (int i = 0; i < 5; ++i) {
+            const auto suffix = std::to_string(i);
+            renameBob.append("a.z" + suffix, "a.b" + suffix);
+            a.append("z" + suffix, "first");
+            a.append("z" + suffix, "second");
+        }
+    }
+    BSONObj update = BSON("$rename" << renameBob.obj());
+
+    DiffUpdateOutcome outcome;
+    ASSERT_NO_FATAL_FAILURE(
+        assertSameWithAndWithoutCache({update}, {{docBob.obj(), ""}}, &outcome));
+    ASSERT_FALSE(outcome.threw);
+    ASSERT_EQ(outcome.docs.size(), 1U);
+    ASSERT_TRUE(outcome.modified[0]);
+
+    const auto a = outcome.docs[0]["a"].Obj();
+    for (int i = 0; i < 5; ++i) {
+        const auto suffix = std::to_string(i);
+        ASSERT_EQ(a["b" + suffix].String(), "first") << a;
+        ASSERT_EQ(a["z" + suffix].String(), "second") << a;
+    }
+}
+
+TEST(UpdateDriverChildLookupCacheTest, NestedWideObjectsAndMissingParents) {
+    // An existing nested object, a missing top-level parent and a missing intermediate level.
+    BSONObjBuilder setBob;
+    for (int i = 0; i < 20; ++i) {
+        setBob.append("p.q.f" + std::to_string(i), i * 2);
+        setBob.append("missing.f" + std::to_string(i), i);
+        setBob.append("p.newLevel.f" + std::to_string(i), i);
+    }
+    BSONObj update = BSON("$set" << setBob.obj());
+
+    BSONObjBuilder docBob;
+    {
+        BSONObjBuilder p(docBob.subobjStart("p"));
+        p.append("q", makeWideObject("f", 30));
+    }
+    // Same names as the targets under "missing".
+    docBob.appendElements(makeWideObject("f", 20));
+
+    DiffUpdateOutcome outcome;
+    ASSERT_NO_FATAL_FAILURE(
+        assertSameWithAndWithoutCache({update}, {{docBob.obj(), ""}}, &outcome));
+    ASSERT_FALSE(outcome.threw);
+}
+
+TEST(UpdateDriverChildLookupCacheTest, WideObjectsInsideArrayWithArrayFilters) {
+    // The array node never uses the cache, but the object node applied to each element does.
+    BSONObjBuilder setBob;
+    for (int i = 0; i < 15; ++i) {
+        setBob.append("arr.$[e].f" + std::to_string(i), "filtered");
+    }
+    BSONObjBuilder incBob;
+    for (int i = 0; i < 15; ++i) {
+        incBob.append("arr.$[].g" + std::to_string(i), 1);
+    }
+    BSONObj update = BSON("$set" << setBob.obj() << "$inc" << incBob.obj());
+
+    BSONArrayBuilder arr;
+    for (int k = 0; k < 4; ++k) {
+        BSONObjBuilder elem;
+        elem.append("kind", k % 2);
+        elem.appendElements(makeWideObject("f", 15));
+        elem.appendElements(makeWideObject("g", 15, k * 100));
+        arr.append(elem.obj());
+    }
+
+    DiffUpdateOutcome outcome;
+    ASSERT_NO_FATAL_FAILURE(assertSameWithAndWithoutCache(
+        {update, {fromjson("{'e.kind': 1}")}}, {{BSON("arr" << arr.arr()), ""}}, &outcome));
+    ASSERT_FALSE(outcome.threw);
+    ASSERT_TRUE(outcome.modified[0]);
+}
+
+TEST(UpdateDriverChildLookupCacheTest, PositionalOnRealArray) {
+    BSONObjBuilder setBob;
+    for (int i = 0; i < 12; ++i) {
+        setBob.append("arr.$.f" + std::to_string(i), "pos");
+    }
+    setBob.append("arr.0.f0", "static0");
+    BSONObj update = BSON("$set" << setBob.obj());
+
+    BSONArrayBuilder arr;
+    for (int k = 0; k < 12; ++k) {
+        arr.append(makeWideObject("f", 12, k * 10));
+    }
+    BSONObj doc = BSON("arr" << arr.arr());
+    // Digit-only names are ordered numerically, so try one and two digit indexes.
+    for (const char* matched : {"3", "10", "11"}) {
+        DiffUpdateOutcome outcome;
+        ASSERT_NO_FATAL_FAILURE(
+            assertSameWithAndWithoutCache({update}, {{doc, matched}}, &outcome));
+        ASSERT_FALSE(outcome.threw) << matched;
+    }
+}
+
+TEST(UpdateDriverChildLookupCacheTest, AffectedIndexesMatch) {
+    BSONObjBuilder setBob;
+    for (int i = 0; i < 30; ++i) {
+        setBob.append("w.f" + std::to_string(i), "v");
+    }
+    BSONObj update = BSON("$set" << setBob.obj());
+    BSONObj doc = BSON("w" << makeWideObject("f", 30));
+
+    DiffUpdateOutcome touched;
+    ASSERT_NO_FATAL_FAILURE(
+        assertSameWithAndWithoutCache({update, {}, {"w.f7"}}, {{doc, ""}}, &touched));
+    ASSERT_EQ(touched.indexesAffected.size(), 1U);
+    ASSERT_TRUE(touched.indexesAffected[0]);
+
+    DiffUpdateOutcome untouched;
+    ASSERT_NO_FATAL_FAILURE(
+        assertSameWithAndWithoutCache({update, {}, {"w.notUpdated"}}, {{doc, ""}}, &untouched));
+    ASSERT_EQ(untouched.indexesAffected.size(), 1U);
+    ASSERT_FALSE(untouched.indexesAffected[0]);
+}
+
+TEST(UpdateDriverChildLookupCacheTest, FailingUpdatesReportSameErrorCode) {
+    // Each update fails after the "f*" fields under 'w', which sort first, have been updated.
+    BSONObjBuilder docBob;
+    {
+        BSONObjBuilder w(docBob.subobjStart("w"));
+        w.appendElements(makeWideObject("f", 30));
+        w.append("txt", "not a number");
+    }
+    docBob.append("arr", BSON_ARRAY(1 << 2));
+    BSONObj doc = docBob.obj();
+
+    BSONObjBuilder siblingsBob;
+    for (int i = 0; i < 20; ++i) {
+        siblingsBob.append("w.f" + std::to_string(i), 1000 + i);
+    }
+    BSONObj siblings = siblingsBob.obj();
+
+    BSONObjBuilder throughScalarBob;
+    throughScalarBob.appendElements(siblings);
+    throughScalarBob.append("w.f25.x", 1);
+
+    struct FailCase {
+        BSONObj update;
+        ErrorCodes::Error expected;
+    };
+    const std::vector<FailCase> cases = {
+        {BSON("$set" << siblings << "$inc" << BSON("w.txt" << 1)), ErrorCodes::TypeMismatch},
+        // "w.f25" is an int.
+        {BSON("$set" << throughScalarBob.obj()), ErrorCodes::PathNotViable},
+        {BSON("$set" << siblings << "$rename" << BSON("arr.0" << "w.zzz")), ErrorCodes::BadValue},
+    };
+
+    for (const auto& c : cases) {
+        DiffUpdateOutcome outcome;
+        ASSERT_NO_FATAL_FAILURE(assertSameWithAndWithoutCache({c.update}, {{doc, ""}}, &outcome));
+        ASSERT_TRUE(outcome.threw) << c.update;
+        ASSERT_EQ(outcome.errorCode, static_cast<int>(c.expected)) << c.update;
+    }
+}
+
+TEST(UpdateDriverChildLookupCacheTest, NoopUpdateProducesNoOplogEntry) {
+    BSONObj doc = BSON("w" << makeWideObject("f", 30));
+    BSONObjBuilder setBob;
+    for (int i = 0; i < 30; ++i) {
+        setBob.append("w.f" + std::to_string(i), i);
+    }
+
+    DiffUpdateOutcome outcome;
+    ASSERT_NO_FATAL_FAILURE(
+        assertSameWithAndWithoutCache({BSON("$set" << setBob.obj())}, {{doc, ""}}, &outcome));
+    ASSERT_EQ(outcome.docs.size(), 1U);
+    ASSERT_FALSE(outcome.modified[0]);
+    // UpdateDriver leaves the oplog entry empty for a no-op.
+    ASSERT_TRUE(outcome.oplogEntries[0].isEmpty());
+}
+
+TEST(UpdateDriverChildLookupCacheTest, OneExecutorAppliedToManyDocuments) {
+    // One parsed update applied to documents of different shapes, as in a multi-update.
+    BSONObjBuilder setBob;
+    for (int i = 0; i < 25; ++i) {
+        setBob.append("w.f" + std::to_string(i), "new");
+    }
+    BSONObj update = BSON("$set" << setBob.obj() << "$inc" << BSON("w.counter" << 1));
+
+    BSONObjBuilder dupBob;
+    dupBob.append("f0", "first");
+    dupBob.append("f0", "second");
+    dupBob.appendElements(makeWideObject("f", 10, 500));
+
+    const std::vector<std::pair<BSONObj, std::string>> inputs = {
+        {BSON("w" << makeWideObject("f", 25)), ""},
+        {BSON("w" << makeWideObject("f", 10)), ""},
+        {BSON("w" << BSONObj()), ""},
+        {BSON("other" << 1), ""},
+        {BSON("w" << makeWideObject("f", 200)), ""},
+        {BSON("w" << dupBob.obj()), ""},
+        {BSON("w" << makeWideObject("f", 25)), ""},
+    };
+
+    DiffUpdateOutcome outcome;
+    ASSERT_NO_FATAL_FAILURE(assertSameWithAndWithoutCache({update}, inputs, &outcome));
+    ASSERT_FALSE(outcome.threw);
+    ASSERT_EQ(outcome.docs.size(), inputs.size());
 }
 
 }  // namespace
