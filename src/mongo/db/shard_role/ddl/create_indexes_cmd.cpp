@@ -929,6 +929,22 @@ public:
                     opCtx, request(), resolvedRequest, scopedReplicaSetDDL);
             }
 
+            try {
+                return _runCreateIndexesWithRetries(opCtx, scopedReplicaSetDDL);
+            } catch (const DBException&) {
+                // Set last op on error, including errors raised from the retry handlers, so the
+                // client can read the server's state when createIndexes failed. Ignore failures
+                // caused by interruption so they do not mask the original error.
+                repl::ReplClientInfo::forClient(opCtx->getClient())
+                    .setLastOpToSystemLastOpTimeIgnoringCtxInterrupted(opCtx);
+                throw;
+            }
+        }
+
+    private:
+        CreateIndexesReply _runCreateIndexesWithRetries(
+            OperationContext* opCtx,
+            boost::optional<ReplicaSetDDLTracker::ScopedReplicaSetDDL>& scopedReplicaSetDDL) {
             // If we encounter an IndexBuildAlreadyInProgress error for any of the requested index
             // specs, then we will wait for the build(s) to finish before trying again unless we are
             // in a multi-document transaction.
@@ -1040,12 +1056,6 @@ public:
                     // NamespaceNotFound.
                     namespaceNotFoundBackoff.incrementAttemptCount();
                     opCtx->sleepFor(namespaceNotFoundBackoff.getBackoffDelay());
-                } catch (const DBException&) {
-                    // Set last op on error to provide the client with a specific optime to read the
-                    // state of the server when the createIndexes command failed.
-                    repl::ReplClientInfo::forClient(opCtx->getClient())
-                        .setLastOpToSystemLastOpTime(opCtx);
-                    throw;
                 }
             }
         }

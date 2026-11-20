@@ -3,10 +3,13 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/rss/attached_storage/attached_persistence_provider.h"
 #include "mongo/db/rss/replicated_storage_service.h"
@@ -15,8 +18,10 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 namespace {
@@ -75,6 +80,48 @@ TEST_F(CreateIndexesTest, CreateIndexOnPreimagesCollectionFails) {
     ASSERT_FALSE(client.runCommand(nss.dbName(), cmd, result)) << result;
     ASSERT(result.hasField("code"));
     ASSERT_EQ(result.getIntField("code"), 8293400);
+}
+
+TEST_F(CreateIndexesTest, NamespaceNotFoundRetryExhaustionUpdatesClientLastOp) {
+    auto opCtx = operationContext();
+    const auto nss =
+        NamespaceString::createNamespaceString_forTest("unittests.namespaceNotFoundRetries");
+    ASSERT_OK(storageInterface()->createCollection(opCtx, nss, {}));
+
+    {
+        AutoGetCollection collection(opCtx, nss, MODE_X);
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_OK(Helpers::insert(opCtx, *collection, BSON("_id" << 0 << "a" << 1)));
+        wuow.commit();
+    }
+
+    // Simulate another client's write. Check lastOp directly: operationTime can fall back to the
+    // node's last-applied time, hiding a stale client lastOp.
+    auto& clientInfo = repl::ReplClientInfo::forClient(opCtx->getClient());
+    const auto initialLastOp = clientInfo.getLastOp();
+    const repl::OpTime systemLastOp(Timestamp(initialLastOp.getTimestamp().getSecs() + 1, 1),
+                                    initialLastOp.getTerm());
+    repl::ReplicationCoordinator::get(opCtx)->setMyLastWrittenOpTimeAndWallTimeForward(
+        {systemLastOp, Date_t::now()});
+
+    FailPointEnableBlock failWithNamespaceNotFound(
+        "createIndexesFailWithNamespaceNotFoundBeforeStartingIndexBuild");
+    auto command = CommandHelpers::findCommand(opCtx, "createIndexes");
+    ASSERT(command);
+    const auto request = OpMsgRequestBuilder::create(
+        boost::none,
+        nss.dbName(),
+        BSON("createIndexes" << nss.coll() << "indexes"
+                             << BSON_ARRAY(BSON("key" << BSON("a" << 1) << "name"
+                                                      << "a_1"))
+                             << "commitQuorum" << 1));
+    auto invocation = command->parse(opCtx, request);
+    rpc::OpMsgReplyBuilder replyBuilder;
+    // Invoke directly to prevent write-concern handling from masking a missing lastOp update.
+    ASSERT_THROWS_CODE(invocation->run(opCtx, &replyBuilder),
+                       DBException,
+                       ErrorCodes::ConflictingOperationInProgress);
+    ASSERT_EQ(clientInfo.getLastOp(), systemLastOp);
 }
 
 TEST_F(CreateIndexesTest, CreateIndexOnLocalCollectionFailsWhenUnsupported) {

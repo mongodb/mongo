@@ -146,8 +146,8 @@ describe("createIndexes racing a moveCollection commit or concurrent drop", func
                 assert.eq(
                     1,
                     indexes.filter((index) => index.name === indexName).length,
-                    () =>
-                        `${indexName} is missing even though createIndexes succeeded: ${tojson(indexes)}`,
+                    `${indexName} is missing even though createIndexes succeeded`,
+                    {indexes},
                 );
 
                 assert.commandWorked(
