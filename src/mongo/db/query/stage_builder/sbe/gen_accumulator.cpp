@@ -1578,6 +1578,10 @@ static const StringDataMap<AccumOpInfo> accumOpInfoMap = {
                      makeBuildFn(&buildSinglePurposeAccum<sbe::CountHashAggAccumulatorTerminal>),
                  .buildSinglePurposeAccumForMerge =
                      makeBuildFn(&buildSinglePurposeAccum<sbe::CountHashAggAccumulatorPartial>),
+                 .buildCompactAccum = makeBuildFn(
+                     &buildSinglePurposeAccum<sbe::CompactCountHashAggAccumulatorTerminal>),
+                 .buildCompactAccumForMerge = makeBuildFn(
+                     &buildSinglePurposeAccum<sbe::CompactCountHashAggAccumulatorPartial>),
                  .buildAddBlockExprs = makeBuildFn(&buildAccumBlockExprsNoInputs),
                  .buildAddAggs = makeBuildFn(&buildAccumAggsCount),
                  .buildAddBlockAggs = makeBuildFn(&buildAccumBlockAggsCount),

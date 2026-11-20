@@ -39,14 +39,16 @@ describe("Compact hash aggregation stage selection and execution", function () {
         }
     });
 
-    function usesCompactGroup(accumulators, allowDiskUse) {
-        const explain = coll
-            .explain()
-            .aggregate([{$group: {_id: "$k", ...accumulators}}], {allowDiskUse});
+    function usesCompactAggregation(pipeline, allowDiskUse) {
+        const explain = coll.explain().aggregate(pipeline, {allowDiskUse});
         assert.eq("sbe", getEngine(explain), explain);
         return getQueryPlanners(explain)
             .flatMap((queryPlanner) => getNestedProperties(queryPlanner, "slotBasedPlan"))
             .some((plan) => plan.stages.includes("compact_group"));
+    }
+
+    function usesCompactGroup(accumulators, allowDiskUse) {
+        return usesCompactAggregation([{$group: {_id: "$k", ...accumulators}}], allowDiskUse);
     }
 
     it("uses compact aggregation for $sum", function () {
@@ -55,6 +57,12 @@ describe("Compact hash aggregation stage selection and execution", function () {
 
     it("uses compact aggregation for $push", function () {
         assert(usesCompactGroup({xs: {$push: "$x"}}, false));
+    });
+
+    it("uses compact aggregation for $count after $match", function () {
+        const pipeline = [{$match: {k: 1}}, {$count: "n"}];
+        assert(usesCompactAggregation(pipeline, false));
+        assert.eq([{n: 2}], coll.aggregate(pipeline, {allowDiskUse: false}).toArray());
     });
 
     it("uses compact aggregation without accumulators", function () {

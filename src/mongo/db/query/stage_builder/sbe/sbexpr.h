@@ -767,6 +767,8 @@ struct SbHashAggAccumulator {
         SbHashAggSinglePurposeScalarAccumulator<sbe::CountHashAggAccumulatorPartial>,
         SbHashAggSinglePurposeScalarAccumulator<sbe::FirstHashAggAccumulator>,
         SbHashAggSinglePurposeScalarAccumulator<sbe::PushHashAggAccumulator>,
+        SbHashAggSinglePurposeScalarAccumulator<sbe::CompactCountHashAggAccumulatorTerminal>,
+        SbHashAggSinglePurposeScalarAccumulator<sbe::CompactCountHashAggAccumulatorPartial>,
         SbHashAggSinglePurposeScalarAccumulator<sbe::CompactSumHashAggAccumulatorTerminal>,
         SbHashAggSinglePurposeScalarAccumulator<sbe::CompactSumHashAggAccumulatorPartial>,
         SbHashAggSinglePurposeScalarAccumulator<sbe::CompactPushHashAggAccumulator>,

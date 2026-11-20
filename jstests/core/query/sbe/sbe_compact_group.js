@@ -114,6 +114,14 @@ describe("$group with CompactHashAggStage", function () {
         runGroup([{$match: {k: {$lt: 3}}}, {$group: {_id: "$y", total: {$sum: "$x"}}}]);
     });
 
+    it("counts matching documents", function () {
+        runGroup([{$match: {k: 1}}, {$count: "n"}]);
+    });
+
+    it("counts documents alongside a sum", function () {
+        runGroup([{$group: {_id: "$k", n: {$count: {}}, total: {$sum: "$x"}}}]);
+    });
+
     it("pushes values alongside a sum", function () {
         runGroup([
             {$group: {_id: "$k", ys: {$push: "$y"}, total: {$sum: "$y"}}},

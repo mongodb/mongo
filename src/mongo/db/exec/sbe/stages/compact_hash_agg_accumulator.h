@@ -84,7 +84,7 @@ public:
     }
 
     void accumulate(vm::ByteCode& bytecode, std::byte* buffer) const final {
-        accumulateValue(runInput(bytecode), _position(buffer));
+        accumulateState(bytecode, _position(buffer));
     }
 
     void finalize(std::byte* buffer, value::OwnedValueAccessor& result) const final {
@@ -96,7 +96,7 @@ public:
     }
 
 protected:
-    virtual void accumulateValue(value::TagValueMaybeOwned input, State& state) const = 0;
+    virtual void accumulateState(vm::ByteCode& bytecode, State& state) const = 0;
     virtual value::TagValueMaybeOwned finalizeState(State& state) const = 0;
     virtual size_t stateHeapMemUsage(const State& state) const = 0;
 
@@ -114,8 +114,7 @@ public:
     }
 
 protected:
-    void accumulateValue(value::TagValueMaybeOwned input,
-                         value::DoubleDoubleSumState& state) const final;
+    void accumulateState(vm::ByteCode& bytecode, value::DoubleDoubleSumState& state) const final;
 
     size_t stateHeapMemUsage(const value::DoubleDoubleSumState& state) const final {
         return 0;
@@ -155,6 +154,57 @@ protected:
     }
 };
 
+class CompactCountHashAggAccumulatorBase : public TypedCompactHashAggAccumulator<uint64_t> {
+public:
+    explicit CompactCountHashAggAccumulatorBase(value::SlotId outSlot)
+        : TypedCompactHashAggAccumulator(outSlot, nullptr) {}
+
+    size_t estimateSize() const final {
+        return sizeof(*this);
+    }
+
+protected:
+    void accumulateState(vm::ByteCode&, uint64_t& count) const final {
+        ++count;
+    }
+
+    size_t stateHeapMemUsage(const uint64_t&) const final {
+        return 0;
+    }
+};
+
+class CompactCountHashAggAccumulatorTerminal final : public CompactCountHashAggAccumulatorBase {
+public:
+    using CompactCountHashAggAccumulatorBase::CompactCountHashAggAccumulatorBase;
+
+    std::unique_ptr<CompactHashAggAccumulator> clone() const final {
+        return std::make_unique<CompactCountHashAggAccumulatorTerminal>(_outSlot);
+    }
+
+protected:
+    value::TagValueMaybeOwned finalizeState(uint64_t& count) const final;
+
+    std::string getDebugName() const final {
+        return "_compactCount";
+    }
+};
+
+class CompactCountHashAggAccumulatorPartial final : public CompactCountHashAggAccumulatorBase {
+public:
+    using CompactCountHashAggAccumulatorBase::CompactCountHashAggAccumulatorBase;
+
+    std::unique_ptr<CompactHashAggAccumulator> clone() const final {
+        return std::make_unique<CompactCountHashAggAccumulatorPartial>(_outSlot);
+    }
+
+protected:
+    value::TagValueMaybeOwned finalizeState(uint64_t& count) const final;
+
+    std::string getDebugName() const final {
+        return "_compactPartialCount";
+    }
+};
+
 struct CompactPushState {
     value::Array values;
     int64_t valuesSize = 0;
@@ -178,7 +228,7 @@ public:
     }
 
 protected:
-    void accumulateValue(value::TagValueMaybeOwned input, CompactPushState& state) const final;
+    void accumulateState(vm::ByteCode& bytecode, CompactPushState& state) const final;
 
     value::TagValueMaybeOwned finalizeState(CompactPushState& state) const final;
 

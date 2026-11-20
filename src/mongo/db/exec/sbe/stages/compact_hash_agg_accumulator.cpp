@@ -5,13 +5,30 @@
 
 #include "mongo/db/exec/sbe/size_estimator.h"
 
+#include <cstdint>
 #include <memory>
 #include <type_traits>
+#include <utility>
 
 namespace mongo::sbe {
+namespace {
+
+value::TagValueView countResult(uint64_t count) {
+    if (std::in_range<int32_t>(count)) {
+        return value::TagValueView::numberInt32(static_cast<int32_t>(count));
+    }
+    if (std::in_range<int64_t>(count)) {
+        return value::TagValueView::numberInt64(static_cast<int64_t>(count));
+    }
+    return value::TagValueView::numberDouble(static_cast<double>(count));
+}
+
+}  // namespace
 
 void CompactHashAggAccumulator::prepare(CompileCtx& ctx) {
-    _inputCode = _inputExpr->compile(ctx);
+    if (_inputExpr) {
+        _inputCode = _inputExpr->compile(ctx);
+    }
 }
 
 value::TagValueMaybeOwned CompactHashAggAccumulator::runInput(vm::ByteCode& bytecode) const {
@@ -26,13 +43,16 @@ std::vector<DebugPrinter::Block> CompactHashAggAccumulator::debugPrint() const {
     std::vector<DebugPrinter::Block> blocks;
     DebugPrinter::addKeyword(blocks, getDebugName());
     blocks.emplace_back("`(`");
-    DebugPrinter::addBlocks(blocks, _inputExpr->debugPrint());
+    if (_inputExpr) {
+        DebugPrinter::addBlocks(blocks, _inputExpr->debugPrint());
+    }
     blocks.emplace_back("`)");
     return blocks;
 }
 
-void CompactSumHashAggAccumulatorBase::accumulateValue(value::TagValueMaybeOwned input,
+void CompactSumHashAggAccumulatorBase::accumulateState(vm::ByteCode& bytecode,
                                                        value::DoubleDoubleSumState& state) const {
+    auto input = runInput(bytecode);
     state.add(input.tag(), input.value());
 }
 
@@ -50,8 +70,20 @@ value::TagValueMaybeOwned CompactSumHashAggAccumulatorPartial::finalizeState(
                                                                    sumArray.value());
 }
 
-void CompactPushHashAggAccumulator::accumulateValue(value::TagValueMaybeOwned input,
+value::TagValueMaybeOwned CompactCountHashAggAccumulatorTerminal::finalizeState(
+    uint64_t& count) const {
+    return value::TagValueMaybeOwned{countResult(count)};
+}
+
+value::TagValueMaybeOwned CompactCountHashAggAccumulatorPartial::finalizeState(
+    uint64_t& count) const {
+    auto [tag, val] = countResult(count);
+    return vm::ByteCode::builtinDoubleDoublePartialSumFinalizeImpl(tag, val);
+}
+
+void CompactPushHashAggAccumulator::accumulateState(vm::ByteCode& bytecode,
                                                     CompactPushState& state) const {
+    auto input = runInput(bytecode);
     if (input.tag() == value::TypeTags::Nothing) {
         return;
     }

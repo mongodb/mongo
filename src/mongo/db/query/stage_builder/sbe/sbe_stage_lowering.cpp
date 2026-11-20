@@ -382,7 +382,11 @@ struct Lowerer {
                         [&]<std::derived_from<sbe::CompactHashAggAccumulator> Impl>(
                             SbHashAggSinglePurposeScalarAccumulator<Impl>& impl)
                             -> std::unique_ptr<sbe::CompactHashAggAccumulator> {
-                            return std::make_unique<Impl>(acc.outSlot, le(impl.transform));
+                            if constexpr (std::constructible_from<Impl, sbe::value::SlotId>) {
+                                return std::make_unique<Impl>(acc.outSlot);
+                            } else {
+                                return std::make_unique<Impl>(acc.outSlot, le(impl.transform));
+                            }
                         },
                         [](auto&) -> std::unique_ptr<sbe::CompactHashAggAccumulator> {
                             MONGO_UNREACHABLE_TASSERT(13901600);

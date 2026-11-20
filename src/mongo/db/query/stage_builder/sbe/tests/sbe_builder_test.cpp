@@ -684,7 +684,8 @@ protected:
     PlanRun runGroup(std::string_view accumulators,
                      bool compactFlag,
                      bool allowDiskUse,
-                     bool merge = false) {
+                     bool merge = false,
+                     const BSONObj& groupKey = BSON("" << "$a")) {
         unittest::ServerParameterGuard flag("featureFlagSbeCompactHashAgg", compactFlag);
         VariablesParseState vps = _expCtx->variablesParseState;
         std::vector<AccumulationStatement> statements;
@@ -692,13 +693,13 @@ protected:
             statements.push_back(
                 AccumulationStatement::parseAccumulationStatement(_expCtx.get(), elem, vps));
         }
-        auto groupNode =
-            std::make_unique<GroupNode>(getScanNode(),
-                                        ExpressionFieldPath::parse(_expCtx.get(), "$a", vps),
-                                        std::move(statements),
-                                        /*doingMerge=*/false,
-                                        /*willBeMerged=*/merge,
-                                        /*shouldProduceBson=*/true);
+        auto keyExpr = Expression::parseOperand(_expCtx.get(), groupKey.firstElement(), vps);
+        auto groupNode = std::make_unique<GroupNode>(getScanNode(),
+                                                     std::move(keyExpr),
+                                                     std::move(statements),
+                                                     /*doingMerge=*/false,
+                                                     /*willBeMerged=*/merge,
+                                                     /*shouldProduceBson=*/true);
         boost::intrusive_ptr<ExpressionContext> expCtx =
             new ExpressionContextForTest(operationContext(), _nss);
         expCtx->setAllowDiskUse(allowDiskUse);
@@ -745,6 +746,21 @@ TEST_F(CompactGroupStageBuilderTest, PartialAccumulatorsUseCompactStage) {
                       runGroup(kAccs, false, false, /*merge=*/true));
 }
 
+TEST_F(CompactGroupStageBuilderTest, CountUsesCompactStage) {
+    constexpr auto kAccs = "{c: {$count: {}}, n: {$sum: 1}, s: {$sum: '$b'}}";
+    for (bool merge : {false, true}) {
+        assertSameResults(runGroup(kAccs, true, false, merge),
+                          runGroup(kAccs, false, false, merge));
+    }
+}
+
+TEST_F(CompactGroupStageBuilderTest, ConstantKeyCountUsesCompactStage) {
+    constexpr auto kAccs = "{c: {$sum: 1}}";
+    const auto key = BSON("" << BSONNULL);
+    assertSameResults(runGroup(kAccs, true, false, /*merge=*/false, key),
+                      runGroup(kAccs, false, false, /*merge=*/false, key));
+}
+
 TEST_F(CompactGroupStageBuilderTest, NoAccumulatorsUsesCompactStage) {
     assertSameResults(runGroup("{}", true, false), runGroup("{}", false, false));
 }
@@ -753,8 +769,7 @@ TEST_F(CompactGroupStageBuilderTest, IneligibleGroupsUseHashAgg) {
     ASSERT_FALSE(isCompact(runGroup("{s: {$sum: '$b'}}", false, false)));
     ASSERT_FALSE(isCompact(runGroup("{s: {$sum: '$b'}}", true, true)));
     ASSERT_FALSE(isCompact(runGroup("{s: {$sum: '$b'}, m: {$avg: '$b'}}", true, false)));
-    ASSERT_FALSE(isCompact(runGroup("{c: {$sum: 1}}", true, false)));
-    ASSERT_FALSE(isCompact(runGroup("{c: {$count: {}}}", true, false)));
+    ASSERT_FALSE(isCompact(runGroup("{c: {$count: {}}}", true, true)));
 }
 
 TEST_F(GoldenSbeStageBuilderTest, TestLimitSkip) {

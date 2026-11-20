@@ -106,7 +106,7 @@ public:
     }
 
 protected:
-    void accumulateValue(value::TagValueMaybeOwned input, CountedState& state) const final {}
+    void accumulateState(vm::ByteCode&, CountedState&) const final {}
 
     value::TagValueMaybeOwned finalizeState(CountedState& state) const final {
         return value::TagValueMaybeOwned::nothing();

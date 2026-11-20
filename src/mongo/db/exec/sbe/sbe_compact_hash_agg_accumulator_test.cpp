@@ -155,6 +155,11 @@ protected:
         return {_outSlot, makeVariable(_inSlot)};
     }
 
+    template <class Accumulator>
+    Accumulator countAccumulator() {
+        return Accumulator{_outSlot};
+    }
+
     TagValueOwned compactSum(const Sequence& inputs, bool partial) {
         if (partial) {
             auto accumulator = sumAccumulator<CompactSumHashAggAccumulatorPartial>();
@@ -239,7 +244,6 @@ protected:
 
     static constexpr int32_t kNoCap = std::numeric_limits<int32_t>::max();
 
-private:
     TagValueOwned run(CompactHashAggAccumulator& accumulator, const Sequence& inputs) {
         return withState(accumulator, [&](std::byte* buffer) {
             accumulate(accumulator, buffer, inputs);
@@ -249,6 +253,7 @@ private:
         });
     }
 
+private:
     value::SlotIdGenerator _ids;
     std::unique_ptr<RuntimeEnvironment> _env = std::make_unique<RuntimeEnvironment>();
     value::SlotId _inSlot = _env->registerSlot(value::TypeTags::Nothing, 0, false, &_ids);
@@ -316,6 +321,43 @@ TEST_F(CompactHashAggAccumulatorTest, SumMatchesVm) {
                 << expected.view() << " != " << actual.view();
         }
     }
+}
+
+TEST_F(CompactHashAggAccumulatorTest, Count) {
+    auto terminal = countAccumulator<CompactCountHashAggAccumulatorTerminal>();
+    auto partial = countAccumulator<CompactCountHashAggAccumulatorPartial>();
+    ASSERT_EQ(layoutOf(terminal).size(), sizeof(uint64_t));
+    ASSERT_TRUE(identical(run(terminal, {}).view(), TagValueView::numberInt32(0)));
+
+    auto inputs =
+        sequence({TagValueView::numberInt32(9), TagValueView::null(), TagValueView::nothing()});
+    ASSERT_TRUE(identical(run(terminal, inputs).view(), TagValueView::numberInt32(3)));
+    ASSERT_BSONOBJ_EQ(BSON("" << BSON_ARRAY(16 << 3.0 << 0.0)),
+                      toBson(run(partial, inputs).view()));
+}
+
+TEST_F(CompactHashAggAccumulatorTest, CountPromotesResult) {
+    auto terminal = countAccumulator<CompactCountHashAggAccumulatorTerminal>();
+    auto partial = countAccumulator<CompactCountHashAggAccumulatorPartial>();
+    const auto position = CompactStateLayout{}.add<uint64_t>();
+    auto afterIncrement = [&](CompactHashAggAccumulator& accumulator, uint64_t initialCount) {
+        return withState(accumulator, [&](std::byte* buffer) {
+            position(buffer) = initialCount;
+            vm::ByteCode bytecode;
+            accumulator.accumulate(bytecode, buffer);
+            value::OwnedValueAccessor result;
+            accumulator.finalize(buffer, result);
+            return result.copyOrMoveValue();
+        });
+    };
+
+    constexpr int64_t maxInt = std::numeric_limits<int32_t>::max();
+    ASSERT_TRUE(
+        identical(afterIncrement(terminal, maxInt).view(), TagValueView::numberInt64(maxInt + 1)));
+    ASSERT_BSONOBJ_EQ(BSON("" << BSON_ARRAY(18 << static_cast<double>(maxInt + 1) << 0.0)),
+                      toBson(afterIncrement(partial, maxInt).view()));
+    ASSERT_TRUE(identical(afterIncrement(terminal, std::numeric_limits<int64_t>::max()).view(),
+                          TagValueView::numberDouble(std::ldexp(1.0, 63))));
 }
 
 TEST_F(CompactHashAggAccumulatorTest, Push) {
