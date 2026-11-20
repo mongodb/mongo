@@ -4,6 +4,7 @@
 #include "mongo/db/query/query_knobs/query_knob_configuration.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/query/query_join_optimization_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/query_settings/query_knob_overrides.h"
 #include "mongo/db/query/query_settings/query_settings.h"
@@ -114,6 +115,21 @@ TEST_F(QueryKnobConfigurationTest, QueryKnobOverrideByQuerySettings) {
     qs.setQueryKnobs(
         query_settings::QuerySettingsKnobOverrides::fromBSON(BSON("planRanker" << "mixed")));
     ASSERT_EQ(QueryKnobConfiguration{qs}.getPlanRanker(), QueryPlanRankerEnum::kMixed);
+}
+
+TEST_F(QueryKnobConfigurationTest, QuerySettingsJoinPlanTreeShape) {
+    query_settings::QuerySettings qs;
+    qs.setQueryKnobs(query_settings::QuerySettingsKnobOverrides::fromBSON(
+        BSON("joinPlanTreeShape" << "leftDeep")));
+    ASSERT_EQ(QueryKnobConfiguration{qs}.getJoinPlanTreeShape(), JoinPlanTreeShapeEnum::kLeftDeep);
+}
+
+TEST_F(QueryKnobConfigurationTest, QuerySettingsJoinPlanTreeShapeWinsOverSetParameter) {
+    unittest::ServerParameterGuard paramGuard{"internalJoinPlanTreeShape", "rightDeep"};
+    query_settings::QuerySettings qs;
+    qs.setQueryKnobs(query_settings::QuerySettingsKnobOverrides::fromBSON(
+        BSON("joinPlanTreeShape" << "zigZag")));
+    ASSERT_EQ(QueryKnobConfiguration{qs}.getJoinPlanTreeShape(), JoinPlanTreeShapeEnum::kZigZag);
 }
 
 // ---------------------------------------------------------------------------

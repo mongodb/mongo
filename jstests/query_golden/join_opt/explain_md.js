@@ -2,7 +2,7 @@
  * Test explain output (especially 'rejectedPlans') for join optimization.
  *
  * @tags: [
- *   requires_fcv_90,
+ *   requires_fcv_91,
  *   requires_sbe,
  * ]
  */
@@ -39,14 +39,19 @@ const pipeline = [
 
 let expectedWinningOrder = undefined;
 function testAllPlans(desc, baseRes, minLevel, maxLevel) {
-    const [actual, explain] = getJoinTestResultsAndExplain(desc, coll, pipeline, {
-        setParameter: 1,
-        internalEnableJoinOptimization: true,
-        internalJoinReorderMode: "bottomUp",
-        internalJoinPlanTreeShape: "zigZag",
-        internalMinAllPlansEnumerationSubsetLevel: minLevel,
-        internalMaxAllPlansEnumerationSubsetLevel: maxLevel,
-    });
+    const [actual, explain] = getJoinTestResultsAndExplain(
+        desc,
+        coll,
+        pipeline,
+        {
+            setParameter: 1,
+            internalEnableJoinOptimization: true,
+            internalJoinReorderMode: "bottomUp",
+            internalMinAllPlansEnumerationSubsetLevel: minLevel,
+            internalMaxAllPlansEnumerationSubsetLevel: maxLevel,
+        },
+        {queryKnobs: {joinPlanTreeShape: "zigZag"}},
+    );
 
     assertArrayEq({expected: baseRes, actual});
     verifyExplainOutput(explain, true /* joinOptExpectedInExplainOutput */);
