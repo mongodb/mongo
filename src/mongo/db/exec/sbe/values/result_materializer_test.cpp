@@ -591,5 +591,19 @@ TEST_F(ResultMaterializerTest, UnownedBaseIsCopied) {
     ASSERT_EQ(materializer.toBson(false).objdata(), obj.objdata());
 }
 
+TEST_F(ResultMaterializerTest, ConvertMinKeyAndMaxKey) {
+    Value minKey = convertToValue({value::TypeTags::MinKey, value::Value{0u}});
+    Value maxKey = convertToValue({value::TypeTags::MaxKey, value::Value{0u}});
+
+    ASSERT_VALUE_EQ(minKey, Value(MINKEY));
+    ASSERT_VALUE_EQ(maxKey, Value(MAXKEY));
+
+    // MinKey and MaxKey must not be materialized as the object {"": MinKey} / {"": MaxKey}.
+    ASSERT_FALSE(minKey.isObject());
+    ASSERT_FALSE(maxKey.isObject());
+    ASSERT_EQ(minKey.getType(), BSONType::minKey);
+    ASSERT_EQ(maxKey.getType(), BSONType::maxKey);
+}
+
 }  // namespace
 }  // namespace mongo::sbe

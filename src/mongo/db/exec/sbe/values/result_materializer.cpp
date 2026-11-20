@@ -80,10 +80,10 @@ Value convertToValue(value::TagValueView view) {
             return Value(OID::from(value::getObjectIdView(val)->data()));
 
         case value::TypeTags::MinKey:
-            return Value(kMinBSONKey);
+            return Value(MINKEY);
 
         case value::TypeTags::MaxKey:
-            return Value(kMaxBSONKey);
+            return Value(MAXKEY);
 
         case value::TypeTags::bsonObject:
             return Value(BSONObj{value::bitcastTo<const char*>(val)});
