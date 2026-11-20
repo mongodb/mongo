@@ -327,9 +327,9 @@ void WiredTigerIndex::unindex(OperationContext* opCtx,
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
 
     auto& pp = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
-    // On a standby the primary already validated uniqueness, so all indexes including _id can use
-    // blind writes to skip the stable-table lookup. Primaries always do non-blind writes for all
-    // indexes.
+    // TODO(SERVER-137754): Open this cursor with blind_remove when wiredTigerBlindRemoveEnabled
+    // allows it. Overwrite does not change WT_CURSOR::remove, so this sampling no longer skips the
+    // stable-table lookup; the remove still checks whether the key exists.
     const bool allowOverwrite = chooseBlindWriteOverwrite(/*defaultOverwrite=*/false,
                                                           pp.shouldUseBlindWriteWhenSafe(opCtx),
                                                           opCtx->getClient()->getPrng());

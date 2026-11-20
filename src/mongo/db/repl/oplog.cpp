@@ -3806,7 +3806,7 @@ Status applyContainerOperations(OperationContext* opCtx,
         // nonBlind unconditionally, so primary writes always perform the storage-engine
         // existence check. On a standby applying an op the primary already validated, the
         // engine samples blind with probability gWiredTigerBlindWriteRatio (default 0.999),
-        // skipping the read-before-write on layered tables.
+        // skipping the read-before-write on layered tables for inserts and updates.
         const auto policy = engine->getEngine()->chooseBlindWritePolicy(opCtx);
         if (!cursor || policy != prevPolicy || ident != prevIdent) {
             cursor = engine->getEngine()->getDirectCursor(*ru, ident, policy);

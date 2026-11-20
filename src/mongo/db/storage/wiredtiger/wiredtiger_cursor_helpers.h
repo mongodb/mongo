@@ -27,7 +27,7 @@ int wiredTigerCursorRemove(WiredTigerRecoveryUnit&, WT_CURSOR* cursor);
  * non-blind and `providerAllowsBlindWrite` is true (e.g. non-primary oplog application where
  * the primary has already validated the write), samples true with probability
  * gWiredTigerBlindWriteRatio. Otherwise returns `defaultOverwrite` so existing behavior is
- * preserved.
+ * preserved. Overwrite only makes inserts and updates blind; it does not change removes.
  */
 bool chooseBlindWriteOverwrite(bool defaultOverwrite,
                                bool providerAllowsBlindWrite,

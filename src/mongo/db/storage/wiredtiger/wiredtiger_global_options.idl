@@ -471,12 +471,12 @@ server_parameters:
 
     wiredTigerBlindWriteRatio:
         description: >-
-            Fraction (0.0-1.0) of writes that use WiredTiger cursor overwrite=true (blind writes).
-            Only applied during standby oplog application, where the primary has already validated
-            the write. The remaining (1 - ratio) fraction performs a non-blind write as a
-            durability sanity check. 0.0 disables blind writes entirely; 1.0 always uses blind
-            writes. Blind writes avoid a redundant read-before-write, eliminating standby cache
-            misses during oplog application.
+            Fraction (0.0-1.0) of inserts and updates that use WiredTiger cursor overwrite=true
+            (blind writes). Only applied during standby oplog application, where the primary has
+            already validated the write. The remaining (1 - ratio) fraction performs a non-blind
+            write as a durability sanity check. 0.0 disables blind writes entirely; 1.0 always uses
+            blind writes. Blind writes avoid a redundant read-before-write, eliminating standby
+            cache misses during oplog application.
         set_at: [startup, runtime]
         cpp_vartype: "Atomic<double>"
         cpp_varname: gWiredTigerBlindWriteRatio
@@ -486,6 +486,18 @@ server_parameters:
         validator:
             gte: 0.0
             lte: 1.0
+        redact: false
+
+    wiredTigerBlindRemoveEnabled:
+        description: >-
+            Kill switch for WiredTiger blind removes. When true, removes during standby oplog
+            application may open their cursor with the WiredTiger blind_remove option, so
+            WT_CURSOR::remove succeeds without reading the stable table to check whether the key
+            exists. When false, every remove checks whether the key exists.
+        set_at: [startup, runtime]
+        cpp_vartype: "Atomic<bool>"
+        cpp_varname: gWiredTigerBlindRemoveEnabled
+        default: false
         redact: false
 
 configs:

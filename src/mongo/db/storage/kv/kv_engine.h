@@ -40,7 +40,7 @@ class KVEngineDirectCrudCursor;
 enum class [[MONGO_MOD_PUBLIC]] BlindWritePolicy {
     // Storage engine performs its usual existence check before writing.
     nonBlind,
-    // Skip the existence check; overwrite if a value is already present.
+    // Skip the existence check on inserts and updates; overwrite if a value is already present.
     blind,
 };
 

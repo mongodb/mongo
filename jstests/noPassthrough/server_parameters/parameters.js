@@ -35,6 +35,12 @@ setAndCheckParameter(dbConn, "traceExceptions", "", true);
 setAndCheckParameter(dbConn, "syncdelay", 0);
 setAndCheckParameter(dbConn, "syncdelay", 3000);
 setAndCheckParameter(dbConn, "wiredTigerCursorCacheSize", -50);
+// Read before toggling, so the startup check below can use the non-default value.
+const blindRemoveDefault = assert.commandWorked(
+    dbConn.adminCommand({getParameter: 1, wiredTigerBlindRemoveEnabled: 1}),
+).wiredTigerBlindRemoveEnabled;
+setAndCheckParameter(dbConn, "wiredTigerBlindRemoveEnabled", true);
+setAndCheckParameter(dbConn, "wiredTigerBlindRemoveEnabled", false);
 
 function ensureSetParameterFailure(dbConn, parameterName, newValue, reason) {
     jsTest.log("Test setting parameter: " + parameterName + " to invalid value: " + newValue);
@@ -79,5 +85,18 @@ ensureSetParameterFailure(
 ensureSetParameterFailure(dbConn, "wiredTigerCursorCacheSize", 5);
 
 MongoRunner.stopMongod(dbConn);
+
+// wiredTigerBlindRemoveEnabled can also be set at startup, and testing diagnostics must not reset
+// it. Use the non-default value so the check still means something if the default changes.
+const blindRemoveConn = MongoRunner.runMongod({
+    setParameter: {wiredTigerBlindRemoveEnabled: !blindRemoveDefault},
+});
+assert.eq(
+    assert.commandWorked(
+        blindRemoveConn.adminCommand({getParameter: 1, wiredTigerBlindRemoveEnabled: 1}),
+    ).wiredTigerBlindRemoveEnabled,
+    !blindRemoveDefault,
+);
+MongoRunner.stopMongod(blindRemoveConn);
 
 jsTest.log("noPassthrough_parameters_test succeeded!");

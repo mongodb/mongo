@@ -43,7 +43,7 @@ public:
 
     /**
      * If 'allowOverwrite' is true, insert operations will not return an error if the record
-     * already exists, and update/remove operations will not return error if the record does not
+     * already exists, and update operations will not return an error if the record does not
      * exist.
      *
      * If 'random' is true, every next calls will yield records in a random order.
