@@ -86,7 +86,20 @@ void inheritFixedBucketingIfOmitted(TimeseriesOptions& requested,
  * Validates the combination of bucketRoundingSeconds, bucketMaxSpanSeconds and granularity in
  * TimeseriesOptions. If the parameters are not valid we return a bad status and if no parameters
  * are passed through we set them to their default values.
+ *
+ * The non-overlapping variant is the target behavior: granularity-only and no-parameter specs get
+ * bucketRoundingSeconds equal to bucketMaxSpanSeconds and no stored granularity. New collections
+ * use it once featureFlagFixedBucketingDefault is enabled.
+ *
+ * validateAndSetBucketingParameters keeps the pre-existing (legacy) format: a stored granularity
+ * (seconds if omitted) with only bucketMaxSpanSeconds. It is used for new collections while the
+ * flag is disabled, and to normalize a request against an existing legacy-format collection, which
+ * can exist indefinitely.
+ *
+ * TODO SERVER-139741: Clean up the old interface, e.g. rename validateAndSetBucketingParameters to
+ * make its legacy behavior explicit or remove it.
  */
+Status validateAndSetNonOverlappingBucketingParameters(TimeseriesOptions& timeseriesOptions);
 Status validateAndSetBucketingParameters(TimeseriesOptions& timeseriesOptions);
 
 /**

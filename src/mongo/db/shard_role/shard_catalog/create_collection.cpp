@@ -60,6 +60,7 @@
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/db/timeseries/viewless_timeseries_collection_creation_helpers.h"
+#include "mongo/db/version_context.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
@@ -559,10 +560,25 @@ BSONObj pipelineAsBsonObj(const std::vector<BSONObj>& pipeline) {
 }
 
 /**
+ * Fills in omitted time-series bucketing parameters for a new collection. The non-overlapping
+ * defaults (bucketRoundingSeconds == bucketMaxSpanSeconds, no stored granularity) are FCV-gated:
+ * while a binary that rejects that format may still be present, defaults use the legacy format.
+ */
+Status _validateAndSetBucketingParameters(OperationContext* opCtx,
+                                          TimeseriesOptions& timeseriesOptions) {
+    if (gFeatureFlagFixedBucketingDefault.isEnabledUseLatestFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx))) {
+        return timeseries::validateAndSetNonOverlappingBucketingParameters(timeseriesOptions);
+    }
+    return timeseries::validateAndSetBucketingParameters(timeseriesOptions);
+}
+
+/**
  * Given a create timeseries collection options generates and returns the corresponding options for
  * the creation of the corresponding timeseries view.
  */
-CollectionOptions _generateLegacyTimeseriesViewOptions(const NamespaceString& bucketsNss,
+CollectionOptions _generateLegacyTimeseriesViewOptions(OperationContext* opCtx,
+                                                       const NamespaceString& bucketsNss,
                                                        const CollectionOptions& requestedOptions) {
     tassert(12128201,
             "Attempt to generate legacy timeseries view options from a non-timeseries collection "
@@ -578,7 +594,7 @@ CollectionOptions _generateLegacyTimeseriesViewOptions(const NamespaceString& bu
 
     constexpr bool asArray = true;
     auto timeseriesOptions = requestedOptions.timeseries.get();
-    uassertStatusOK(timeseries::validateAndSetBucketingParameters(timeseriesOptions));
+    uassertStatusOK(_validateAndSetBucketingParameters(opCtx, timeseriesOptions));
     timeseriesViewOptions.pipeline = timeseries::generateViewPipeline(timeseriesOptions, asArray);
 
     return timeseriesViewOptions;
@@ -613,8 +629,16 @@ void checkExistingCollectionIsCompatible(OperationContext* opCtx,
         // When checking that the options for the timeseries collection are the same,
         // filter out the options that were internally generated upon time-series
         // collection creation (i.e. were not specified by the user).
-        uassertStatusOK(timeseries::validateAndSetBucketingParameters(
-            normalizedRequestedOptions.timeseries.get()));
+        // Normalize omitted bucketing parameters in the format the existing collection already
+        // uses, so that re-issuing a create that matches the existing collection stays idempotent
+        // regardless of the current default (e.g. after an FCV change).
+        if (existingOptions.timeseries->getGranularity().has_value()) {
+            uassertStatusOK(timeseries::validateAndSetBucketingParameters(
+                normalizedRequestedOptions.timeseries.get()));
+        } else {
+            uassertStatusOK(timeseries::validateAndSetNonOverlappingBucketingParameters(
+                normalizedRequestedOptions.timeseries.get()));
+        }
 
         // The 'validator' and 'clusteredIndex' options are normally user-provided create options,
         // but for timeseries collections they are auto-generated internally. Users are still
@@ -734,7 +758,7 @@ bool checkNamespaceAlreadyExistsAndCompatible(OperationContext* opCtx,
         const auto& requestedViewOptions = [&] {
             if (requestedOptions.timeseries) {
                 return _generateLegacyTimeseriesViewOptions(
-                    collAcq.nss().makeTimeseriesBucketsNamespace(), requestedOptions);
+                    opCtx, collAcq.nss().makeTimeseriesBucketsNamespace(), requestedOptions);
             }
             return requestedOptions;
         }();
@@ -763,9 +787,10 @@ Status _createView(OperationContext* opCtx,
     });
 }
 
-Status _setBucketingParametersAndAddClusteredIndex(CollectionOptions& options) {
+Status _setBucketingParametersAndAddClusteredIndex(OperationContext* opCtx,
+                                                   CollectionOptions& options) {
     Status timeseriesOptionsValidateAndSetStatus =
-        timeseries::validateAndSetBucketingParameters(options.timeseries.get());
+        _validateAndSetBucketingParameters(opCtx, options.timeseries.get());
     if (!timeseriesOptionsValidateAndSetStatus.isOK()) {
         return timeseriesOptionsValidateAndSetStatus;
     }
@@ -980,7 +1005,7 @@ void _createTimeseriesCollection(
                 timeseries::setFixedBucketingDefaultForNewCollection(*bucketsOptions.timeseries,
                                                                      fixedBucketingEnabled);
             }
-            uassertStatusOK(_setBucketingParametersAndAddClusteredIndex(bucketsOptions));
+            uassertStatusOK(_setBucketingParametersAndAddClusteredIndex(opCtx, bucketsOptions));
 
             if (viewlessTimeseriesEnabled) {
                 _createTimeseriesBucketsCollection(
@@ -1013,7 +1038,8 @@ void _createTimeseriesCollection(
             return;
         }
 
-        CollectionOptions viewOptions = _generateLegacyTimeseriesViewOptions(bucketsNs, optionsArg);
+        CollectionOptions viewOptions =
+            _generateLegacyTimeseriesViewOptions(opCtx, bucketsNs, optionsArg);
         const auto viewCreationStatus = _createViewNoRetry(opCtx, mainNs, mainAcq, viewOptions);
         uassertStatusOKWithContext(
             viewCreationStatus,
@@ -1342,7 +1368,8 @@ Status createCollectionForApplyOps(
     collectionOptions.uuid = ui ? ui : collectionOptions.uuid;
 
     if (collectionOptions.timeseries) {
-        auto bucketingStatus = _setBucketingParametersAndAddClusteredIndex(collectionOptions);
+        auto bucketingStatus =
+            _setBucketingParametersAndAddClusteredIndex(opCtx, collectionOptions);
         if (!bucketingStatus.isOK()) {
             return bucketingStatus;
         }

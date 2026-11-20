@@ -51,3 +51,5 @@
 - featureFlagExtensionSearchIndexManagement
 # TODO SERVER-136310: Enable this feature flag once batched ixscan+fetch plans can run e2e.
 - featureFlagBatchedIndexScanFetch
+# TODO SERVER-139739: Remove once new time-series collections use non-overlapping bucketing by default.
+- featureFlagFixedBucketingDefault

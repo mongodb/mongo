@@ -20,6 +20,7 @@
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
@@ -27,6 +28,7 @@
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/version_context.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/util/assert_util.h"
 
@@ -247,8 +249,16 @@ public:
                 // format it is feature flagged to 7.1+
                 if (requestToForward.getTimeseries()) {
                     auto timeseriesOptions = *requestToForward.getTimeseries();
-                    uassertStatusOK(
-                        timeseries::validateAndSetBucketingParameters(timeseriesOptions));
+                    // The opCtx has no OFCV yet; the FixedFCVRegion held above pins the FCV, so
+                    // evaluate the flag against a snapshot of it.
+                    if (gFeatureFlagFixedBucketingDefault.isEnabledUseLatestFCVWhenUninitialized(
+                            VersionContext((*optFixedFcvRegion)->acquireFCVSnapshot()))) {
+                        uassertStatusOK(timeseries::validateAndSetNonOverlappingBucketingParameters(
+                            timeseriesOptions));
+                    } else {
+                        uassertStatusOK(
+                            timeseries::validateAndSetBucketingParameters(timeseriesOptions));
+                    }
                     requestToForward.setTimeseries(std::move(timeseriesOptions));
                 }
 

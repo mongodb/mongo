@@ -196,6 +196,18 @@ feature_flags:
         version: 9.0
         fcv_gated: true
         check_against_fcv: operation_fcv_only
+    featureFlagFixedBucketingDefault:
+        description: >-
+            Makes new time-series collections created with only a granularity (or with no bucketing
+            parameters) use the non-overlapping bucketing defaults (bucketRoundingSeconds equal to
+            bucketMaxSpanSeconds, no stored granularity), which makes them eligible for the
+            fixedBucketing query optimization. While disabled, binaries that cannot read this format
+            may still be present (FCV 9.0), so new collections store the legacy granularity-based
+            format.
+        cpp_varname: gFeatureFlagFixedBucketingDefault
+        default: false
+        fcv_gated: true
+        check_against_fcv: operation_fcv_only
     # Gates the generation of persisted statistics metadata (the 'persistentStatsConfig' collection
     # option) in create and collMod. featureFlagPersistentStats gates its consumption.
     featureFlagPersistentStatsCatalog:

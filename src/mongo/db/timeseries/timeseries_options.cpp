@@ -38,8 +38,15 @@ enum class MissingParameterTolerance {
     kError,
 };
 
+/**
+ * Validates the combination of 'granularity', 'bucketMaxSpanSeconds' and 'bucketRoundingSeconds'.
+ * With kSetToDefault, omitted parameters are filled in: the non-overlapping format if
+ * 'nonOverlappingDefaults' is true, otherwise the legacy granularity-based format. With kError,
+ * omitted parameters are an error and 'timeseriesOptions' is not modified.
+ */
 Status checkBucketingParameters(TimeseriesOptions& timeseriesOptions,
-                                MissingParameterTolerance tolerance) {
+                                MissingParameterTolerance tolerance,
+                                bool nonOverlappingDefaults) {
     auto roundingSeconds = timeseriesOptions.getBucketRoundingSeconds();
     auto maxSpanSeconds = timeseriesOptions.getBucketMaxSpanSeconds();
     auto granularity = timeseriesOptions.getGranularity();
@@ -64,7 +71,16 @@ Status checkBucketingParameters(TimeseriesOptions& timeseriesOptions,
         if (!maxSpanSeconds) {
             switch (tolerance) {
                 case MissingParameterTolerance::kSetToDefault:
-                    timeseriesOptions.setBucketMaxSpanSeconds(maxSpanSecondsFromGranularity);
+                    if (nonOverlappingDefaults) {
+                        // Only granularity was specified: clear granularity from storage and use
+                        // the non-overlapping default.
+                        timeseriesOptions.setGranularity(boost::none);
+                        timeseriesOptions.setBucketMaxSpanSeconds(maxSpanSecondsFromGranularity);
+                        timeseriesOptions.setBucketRoundingSeconds(maxSpanSecondsFromGranularity);
+                    } else {
+                        // Legacy format: keep granularity and store only bucketMaxSpanSeconds.
+                        timeseriesOptions.setBucketMaxSpanSeconds(maxSpanSecondsFromGranularity);
+                    }
                     break;
                 case MissingParameterTolerance::kError:
                     return {ErrorCodes::InvalidOptions,
@@ -83,25 +99,18 @@ Status checkBucketingParameters(TimeseriesOptions& timeseriesOptions,
                                 "than the default of {} for the provided granularity",
                                 maxSpanSecondsFromGranularity)};
         }
-        if (!granularity) {
-            switch (tolerance) {
-                case MissingParameterTolerance::kSetToDefault:
-                    timeseriesOptions.setGranularity(BucketGranularityEnum::Seconds);
-                    break;
-                case MissingParameterTolerance::kError:
-                    return {ErrorCodes::InvalidOptions, "Time-series 'granularity' is missing"};
-            }
+        if (tolerance == MissingParameterTolerance::kError) {
+            return {ErrorCodes::InvalidOptions, "Time-series 'granularity' is missing"};
         }
-
-        if (!maxSpanSeconds) {
-            switch (tolerance) {
-                case MissingParameterTolerance::kSetToDefault:
-                    timeseriesOptions.setBucketMaxSpanSeconds(maxSpanSecondsFromGranularity);
-                    break;
-                case MissingParameterTolerance::kError:
-                    return {ErrorCodes::InvalidOptions,
-                            "Time-series 'bucketMaxSpanSeconds' is missing"};
-            }
+        if (nonOverlappingDefaults) {
+            // Seconds-sized defaults. 'granularity' is not stored; the defaults are represented via
+            // bucketMaxSpanSeconds and bucketRoundingSeconds.
+            timeseriesOptions.setBucketMaxSpanSeconds(maxSpanSecondsFromGranularity);
+            timeseriesOptions.setBucketRoundingSeconds(maxSpanSecondsFromGranularity);
+        } else {
+            // Legacy format: seconds granularity with its default bucketMaxSpanSeconds.
+            timeseriesOptions.setGranularity(BucketGranularityEnum::Seconds);
+            timeseriesOptions.setBucketMaxSpanSeconds(maxSpanSecondsFromGranularity);
         }
     }
 
@@ -434,13 +443,22 @@ void inheritFixedBucketingIfOmitted(TimeseriesOptions& requested,
     }
 }
 
+Status validateAndSetNonOverlappingBucketingParameters(TimeseriesOptions& timeseriesOptions) {
+    return checkBucketingParameters(timeseriesOptions,
+                                    MissingParameterTolerance::kSetToDefault,
+                                    /*nonOverlappingDefaults=*/true);
+}
+
 Status validateAndSetBucketingParameters(TimeseriesOptions& timeseriesOptions) {
-    return checkBucketingParameters(timeseriesOptions, MissingParameterTolerance::kSetToDefault);
+    return checkBucketingParameters(timeseriesOptions,
+                                    MissingParameterTolerance::kSetToDefault,
+                                    /*nonOverlappingDefaults=*/false);
 }
 
 Status validateBucketingParameters(const TimeseriesOptions& timeseriesOptions) {
     return checkBucketingParameters(const_cast<TimeseriesOptions&>(timeseriesOptions),
-                                    MissingParameterTolerance::kError);
+                                    MissingParameterTolerance::kError,
+                                    /*nonOverlappingDefaults=*/true);
 }
 
 }  // namespace timeseries

@@ -496,4 +496,42 @@ INSTANTIATE_TEST_SUITE_P(TimeseriesOptions,
                              InheritFixedBucketingTestParams{false, false, false},
                              InheritFixedBucketingTestParams{false, boost::none, false}));
 
+TEST(TimeseriesOptionsTest, ValidateAndSetBucketingParametersNonOverlappingDefaults) {
+    // No parameters: non-overlapping defaults store equal span and rounding, with no granularity.
+    {
+        TimeseriesOptions opts;
+        ASSERT_OK(timeseries::validateAndSetNonOverlappingBucketingParameters(opts));
+        ASSERT_FALSE(opts.getGranularity());
+        ASSERT_EQ(opts.getBucketMaxSpanSeconds(), 3600);
+        ASSERT_EQ(opts.getBucketRoundingSeconds(), 3600);
+    }
+    // Granularity only: granularity is dropped in favor of span/rounding.
+    {
+        auto opts = createTimeseriesOptionsWithGranularity(BucketGranularityEnum::Hours);
+        ASSERT_OK(timeseries::validateAndSetNonOverlappingBucketingParameters(opts));
+        ASSERT_FALSE(opts.getGranularity());
+        ASSERT_EQ(opts.getBucketMaxSpanSeconds(), 2592000);
+        ASSERT_EQ(opts.getBucketRoundingSeconds(), 2592000);
+    }
+}
+
+TEST(TimeseriesOptionsTest, ValidateAndSetBucketingParametersLegacyDefaults) {
+    // No parameters: legacy format stores seconds granularity and only the max span.
+    {
+        TimeseriesOptions opts;
+        ASSERT_OK(timeseries::validateAndSetBucketingParameters(opts));
+        ASSERT_EQ(opts.getGranularity(), BucketGranularityEnum::Seconds);
+        ASSERT_EQ(opts.getBucketMaxSpanSeconds(), 3600);
+        ASSERT_FALSE(opts.getBucketRoundingSeconds());
+    }
+    // Granularity only: granularity is kept.
+    {
+        auto opts = createTimeseriesOptionsWithGranularity(BucketGranularityEnum::Minutes);
+        ASSERT_OK(timeseries::validateAndSetBucketingParameters(opts));
+        ASSERT_EQ(opts.getGranularity(), BucketGranularityEnum::Minutes);
+        ASSERT_EQ(opts.getBucketMaxSpanSeconds(), 86400);
+        ASSERT_FALSE(opts.getBucketRoundingSeconds());
+    }
+}
+
 }  // namespace mongo
