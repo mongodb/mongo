@@ -39,7 +39,7 @@ Change Streams provide various guarantees:
 - Resumability: change stream consumption can be interrupted due to transient errors (e.g. network
   issues, node failures, application errors), but it can be resumed from the exact point where the
   consumption stopped. This is made possible by the resume token (`_id` field) that accompanies
-  every change event, which acts as a bookmark. This allows to the consumer to continue processing
+  every change event, which acts as a bookmark. This allows the consumer to continue processing
   changes from the last known position without missing events.
 
 ### Change Stream Namespace Scopes
