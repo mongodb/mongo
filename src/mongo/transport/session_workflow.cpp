@@ -291,20 +291,36 @@ using Metrics = NoopSessionWorkflowMetrics;
 }  // namespace metrics_detail
 
 /**
- * Given a request and its already generated response, checks for exhaust flags. If exhaust is
- * allowed, produces the subsequent request message, and modifies the response message to indicate
- * it is part of an exhaust stream. Returns the subsequent request message, which is known as a
- * 'synthetic' exhaust request. Returns an empty optional if exhaust is not allowed.
+ * Returns true if 'response' continues an exhaust stream started by 'requestMsg'.
  */
-boost::optional<Message> makeExhaustMessage(Message requestMsg, DbResponse& response) {
-    if (!OpMsgRequest::isFlagSet(requestMsg, OpMsg::kExhaustSupported) ||
-        !response.shouldRunAgainForExhaust)
-        return {};
+bool shouldContinueExhaust(const Message& requestMsg, const DbResponse& response) {
+    return OpMsgRequest::isFlagSet(requestMsg, OpMsg::kExhaustSupported) &&
+        response.shouldRunAgainForExhaust;
+}
 
+/**
+ * Sets the final flags on a response that continues an exhaust stream. Must be called before the
+ * response is checksummed, so that a large exhaust response is checksummed only once.
+ */
+void markExhaustResponse(DbResponse& response) {
     int32_t responseOp = response.response.operation();
     invariant(responseOp == dbMsg,
               fmt::format("Exhaust response must use OP_MSG opcode, instead used {}", responseOp));
+    invariant(!OpMsg::isFlagSet(response.response, OpMsg::kChecksumPresent),
+              "Exhaust response must be checksummed after its flags are final");
 
+    // Indicate that the response is part of an exhaust stream (unless the 'doNotSetMoreToCome'
+    // failpoint is set).
+    if (!MONGO_unlikely(doNotSetMoreToCome.shouldFail())) {
+        OpMsg::setFlag(&response.response, OpMsg::kMoreToCome);
+    }
+}
+
+/**
+ * Given a request and its finalized exhaust response, produces the subsequent request message,
+ * which is known as a 'synthetic' exhaust request. Does not modify the response.
+ */
+Message makeExhaustMessage(Message requestMsg, const DbResponse& response) {
     const bool checksumPresent = OpMsg::isFlagSet(requestMsg, OpMsg::kChecksumPresent);
     Message exhaustMessage;
 
@@ -326,16 +342,6 @@ boost::optional<Message> makeExhaustMessage(Message requestMsg, DbResponse& resp
     OpMsg::setFlag(&exhaustMessage, OpMsg::kExhaustSupported);
     if (checksumPresent) {
         OpMsg::appendChecksum(&exhaustMessage);
-    }
-
-    OpMsg::removeChecksum(&response.response);
-    // Indicate that the response is part of an exhaust stream (unless the 'doNotSetMoreToCome'
-    // failpoint is set). Re-checksum if needed.
-    if (!MONGO_unlikely(doNotSetMoreToCome.shouldFail())) {
-        OpMsg::setFlag(&response.response, OpMsg::kMoreToCome);
-    }
-    if (checksumPresent) {
-        OpMsg::appendChecksum(&response.response);
     }
 
     return exhaustMessage;
@@ -642,12 +648,13 @@ public:
      * request, as if we sourced a new message from the network. This new request is
      * sent to the database once again to be processed. This cycle repeats as long as
      * the command indicates the exhaust stream should continue.
+     *
+     * The response must already have been marked with markExhaustResponse(). The response is not
+     * modified. When the request is reused, the synthetic request shares and rewrites the buffer of
+     * in(), so this must run after every other use of the original request.
      */
-    std::unique_ptr<WorkItem> synthesizeExhaust(DbResponse& response) {
-        auto m = makeExhaustMessage(_in, response);
-        if (!m)
-            return nullptr;
-        auto synth = std::make_unique<WorkItem>(_swf, std::move(*m));
+    std::unique_ptr<WorkItem> synthesizeExhaust(const DbResponse& response) {
+        auto synth = std::make_unique<WorkItem>(_swf, makeExhaustMessage(_in, response));
         synth->_isExhaust = true;
         synth->_compressorId = _compressorId;
         return synth;
@@ -986,17 +993,31 @@ void SessionWorkflow::Impl::_acceptResponse(DbResponse response) {
     // Update the header for the response message.
     toSink.header().setId(nextMessageId());
     toSink.header().setResponseToMsgId(work.in().header().getId());
-    if (!isTLS() && OpMsg::isFlagSet(work.in(), OpMsg::kChecksumPresent))
-        OpMsg::appendChecksum(&toSink);
-
-    MessageHooks::onReplyReady(*session(), _work->in(), toSink);
 
     // If the incoming message has the exhaust flag set, then bypass the normal RPC
     // behavior. Sink the response to the network, but also synthesize a new
     // request, as if a new message was sourced from the network. This new request is
     // sent to the database once again to be processed. This cycle repeats as long as
     // the dbresponses continue to indicate the exhaust stream should continue.
-    _nextWork = work.synthesizeExhaust(response);
+    //
+    // Finalize the response flags before checksumming so the response is checksummed only once.
+    const bool continueExhaust = shouldContinueExhaust(work.in(), response);
+    if (continueExhaust) {
+        markExhaustResponse(response);
+    }
+
+    // Exhaust responses have always been checksummed whenever the request was, even over TLS.
+    // Preserve that wire behavior.
+    if (OpMsg::isFlagSet(work.in(), OpMsg::kChecksumPresent) && (continueExhaust || !isTLS()))
+        OpMsg::appendChecksum(&toSink);
+
+    MessageHooks::onReplyReady(*session(), work.in(), toSink);
+
+    // Synthesizing may rewrite the request's buffer, so it must come after every use of the
+    // original request header, including the reply hook above.
+    if (continueExhaust) {
+        _nextWork = work.synthesizeExhaust(response);
+    }
 
     globalNetworkCounter().hitLogicalOut(NetworkCounter::ConnectionType::kIngress,
                                          toSink.size(),

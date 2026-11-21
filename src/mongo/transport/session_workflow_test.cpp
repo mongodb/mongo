@@ -13,6 +13,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/config.h"
 #include "mongo/db/admission/egress_response_rate_limiter.h"
 #include "mongo/db/admission/ingress_request_rate_limiter.h"
 #include "mongo/db/admission/rate_limiter.h"
@@ -69,6 +70,7 @@
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
+#include "mongo/util/net/ssl_peer_info.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/synchronized_value.h"
@@ -76,6 +78,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <deque>
 #include <functional>
 #include <iosfwd>
@@ -305,6 +308,14 @@ public:
         LOGV2(6742613, "Starting session");
         sessionManager()->startSession(_session);
     }
+
+#ifdef MONGO_CONFIG_SSL
+    /** Marks the current session as using TLS. Must be called before startSession(). */
+    void markSessionAsTLS() {
+        std::shared_ptr<Session> session = _session;
+        SSLPeerInfo::forSession(session) = std::make_shared<SSLPeerInfo>(SSLX509Name{});
+    }
+#endif
 
     MockServiceEntryPoint* sep() {
         return checked_cast<MockServiceEntryPoint*>(
@@ -705,6 +716,332 @@ TEST_F(SessionWorkflowTest, CleanupFromGetMore) {
     expect<Event::sepEndSession>();
     joinSessions();
 }
+
+#ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
+class SessionWorkflowExhaustChecksumTest : public SessionWorkflowTest {
+public:
+    static void assertValidChecksum(const Message& m) {
+        ASSERT_TRUE(OpMsg::isFlagSet(m, OpMsg::kChecksumPresent));
+        ASSERT_EQ(
+            OpMsg::getChecksum(m),
+            wiredtiger_crc32c_func()(m.singleData().view2ptr(), m.size() - OpMsg::kCrc32Size));
+        ASSERT_DOES_NOT_THROW(OpMsg::parse(m));
+    }
+
+    static Message copyMessage(const Message& m) {
+        auto buffer = SharedBuffer::allocate(m.size());
+        std::memcpy(buffer.get(), m.buf(), m.size());
+        return Message{std::move(buffer)};
+    }
+
+    /** Reconstructs the old response-finalization order using the actual response IDs. */
+    static void assertMatchesLegacyResponse(const Message& original,
+                                            const Message& actual,
+                                            bool requestHasChecksum,
+                                            bool continueExhaust,
+                                            bool moreToCome,
+                                            bool tls) {
+        auto expected = copyMessage(original);
+        expected.header().setId(actual.header().getId());
+        expected.header().setResponseToMsgId(actual.header().getResponseToMsgId());
+        if (requestHasChecksum && !tls) {
+            OpMsg::appendChecksum(&expected);
+        }
+        if (continueExhaust) {
+            OpMsg::removeChecksum(&expected);
+            if (moreToCome) {
+                OpMsg::setFlag(&expected, OpMsg::kMoreToCome);
+            }
+            if (requestHasChecksum) {
+                OpMsg::appendChecksum(&expected);
+            }
+        }
+        ASSERT_EQ(expected.size(), actual.size());
+        ASSERT_EQ(std::string_view(expected.buf(), expected.size()),
+                  std::string_view(actual.buf(), actual.size()));
+    }
+
+    /**
+     * Runs one exhaust continuation followed by a final batch and an ordinary request on the
+     * same connection. 'nextInvocation', if set, is the body of the synthetic request.
+     */
+    void runExhaustIteration(bool requestHasChecksum,
+                             bool expectMoreToCome,
+                             boost::optional<BSONObj> nextInvocation = boost::none,
+                             bool tls = false,
+                             bool compressed = false) {
+        auto request = setExhaustSupported(makeOpMsg());
+        request.header().setId(nextMessageId());
+        request.header().setResponseToMsgId(0);
+        const auto requestBody = OpMsg::parse(request).body.getOwned();
+        if (requestHasChecksum) {
+            OpMsg::appendChecksum(&request);
+        }
+        const auto requestId = request.header().getId();
+
+        auto firstResponse = setExhaust(makeResponse(makeOpMsg()));
+        firstResponse.nextInvocation = nextInvocation;
+        const auto originalFirstResponse = copyMessage(firstResponse.response);
+        auto finalResponse = makeResponse(makeOpMsg());
+        const auto originalFinalResponse = copyMessage(finalResponse.response);
+
+        if (compressed) {
+            _compressorRegistry.setSupportedCompressors({"snappy"});
+            _compressorRegistry.registerImplementation(std::make_unique<SnappyMessageCompressor>());
+            uassertStatusOK(_compressorRegistry.finalizeSupportedCompressors());
+            onClientConnectCb = [this](Client* client) {
+                MessageCompressorManager::forSession(client->session()) = MessageCompressorManager(
+                    MessageCompressionDirection::kIngress, &_compressorRegistry);
+            };
+            const auto snappyId = static_cast<MessageCompressorId>(MessageCompressor::kSnappy);
+            request = uassertStatusOK(_compressionManager.compressMessage(request, &snappyId));
+        }
+
+        startSession();
+        expect<Event::sessionSourceMessage>(request);
+        expect<Event::sepHandleRequest>(std::move(firstResponse));
+
+        Message sunk;
+        expect<Event::sessionSinkMessage>([&](const Message& m) {
+            sunk = m;
+            return Status::OK();
+        });
+
+        Message synthetic;
+        expect<Event::sepHandleRequest>(
+            [&](OperationContext*, const Message& m) -> Future<DbResponse> {
+                synthetic = copyMessage(m);
+                return std::move(finalResponse);
+            });
+
+        Message finalSunk;
+        expect<Event::sessionSinkMessage>([&](const Message& m) {
+            finalSunk = m;
+            return Status::OK();
+        });
+
+        auto ordinaryRequest = makeOpMsg();
+        ordinaryRequest.header().setId(nextMessageId());
+        ordinaryRequest.header().setResponseToMsgId(0);
+        const auto ordinaryRequestId = ordinaryRequest.header().getId();
+        expect<Event::sessionSourceMessage>(ordinaryRequest);
+        expect<Event::sepHandleRequest>(makeResponse(makeOpMsg()));
+        Message ordinarySunk;
+        expect<Event::sessionSinkMessage>([&](const Message& m) {
+            ordinarySunk = m;
+            return Status::OK();
+        });
+        expect<Event::sessionSourceMessage>(kClosedSessionError);
+        expect<Event::sepEndSession>();
+        joinSessions();
+        onClientConnectCb = nullptr;
+
+        if (compressed) {
+            ASSERT_EQ(sunk.operation(), dbCompressed);
+            ASSERT_EQ(finalSunk.operation(), dbCompressed);
+            sunk = uassertStatusOK(_compressionManager.decompressMessage(sunk));
+            finalSunk = uassertStatusOK(_compressionManager.decompressMessage(finalSunk));
+        }
+
+        ASSERT_EQ(sunk.header().getResponseToMsgId(), requestId);
+        ASSERT_EQ(OpMsg::isFlagSet(sunk, OpMsg::kMoreToCome), expectMoreToCome);
+        ASSERT_EQ(OpMsg::isFlagSet(sunk, OpMsg::kChecksumPresent), requestHasChecksum);
+        if (requestHasChecksum) {
+            assertValidChecksum(sunk);
+        }
+        ASSERT_DOES_NOT_THROW(OpMsg::parse(sunk));
+        assertMatchesLegacyResponse(originalFirstResponse,
+                                    sunk,
+                                    requestHasChecksum,
+                                    true /* continueExhaust */,
+                                    expectMoreToCome,
+                                    tls);
+
+        ASSERT_TRUE(OpMsg::isFlagSet(synthetic, OpMsg::kExhaustSupported));
+        ASSERT_EQ(OpMsg::isFlagSet(synthetic, OpMsg::kChecksumPresent), requestHasChecksum);
+        ASSERT_EQ(synthetic.header().getId(), sunk.header().getId());
+        ASSERT_EQ(synthetic.header().getResponseToMsgId(), requestId);
+        if (requestHasChecksum) {
+            assertValidChecksum(synthetic);
+        }
+        ASSERT_BSONOBJ_EQ(OpMsg::parse(synthetic).body,
+                          nextInvocation ? *nextInvocation : requestBody);
+
+        // The final batch ends the stream: no moreToCome. It is an ordinary response, so it is
+        // checksummed when requested, except over TLS.
+        const bool finalHasChecksum = requestHasChecksum && !tls;
+        ASSERT_EQ(finalSunk.header().getResponseToMsgId(), synthetic.header().getId());
+        ASSERT_FALSE(OpMsg::isFlagSet(finalSunk, OpMsg::kMoreToCome));
+        ASSERT_EQ(OpMsg::isFlagSet(finalSunk, OpMsg::kChecksumPresent), finalHasChecksum);
+        if (finalHasChecksum) {
+            assertValidChecksum(finalSunk);
+        }
+        ASSERT_DOES_NOT_THROW(OpMsg::parse(finalSunk));
+        assertMatchesLegacyResponse(originalFinalResponse,
+                                    finalSunk,
+                                    requestHasChecksum,
+                                    false /* continueExhaust */,
+                                    false /* moreToCome */,
+                                    tls);
+
+        ASSERT_EQ(ordinarySunk.operation(), dbMsg);
+        ASSERT_EQ(ordinarySunk.header().getResponseToMsgId(), ordinaryRequestId);
+        ASSERT_FALSE(OpMsg::isFlagSet(ordinarySunk, OpMsg::kMoreToCome));
+        ASSERT_FALSE(OpMsg::isFlagSet(ordinarySunk, OpMsg::kChecksumPresent));
+        ASSERT_DOES_NOT_THROW(OpMsg::parse(ordinarySunk));
+    }
+
+private:
+    MessageCompressorRegistry _compressorRegistry;
+    MessageCompressorManager _compressionManager{MessageCompressionDirection::kEgress,
+                                                 &_compressorRegistry};
+};
+
+TEST_F(SessionWorkflowExhaustChecksumTest, ExhaustResponseChecksumCoversMoreToCome) {
+    runExhaustIteration(true /* requestHasChecksum */, true /* expectMoreToCome */);
+}
+
+TEST_F(SessionWorkflowExhaustChecksumTest, ExhaustResponseWithoutChecksum) {
+    runExhaustIteration(false /* requestHasChecksum */, true /* expectMoreToCome */);
+}
+
+TEST_F(SessionWorkflowExhaustChecksumTest, ExhaustResponseChecksumWithoutMoreToCome) {
+    FailPointEnableBlock fp("doNotSetMoreToCome");
+    runExhaustIteration(true /* requestHasChecksum */, false /* expectMoreToCome */);
+}
+
+TEST_F(SessionWorkflowExhaustChecksumTest, ExhaustNextInvocationChecksum) {
+    runExhaustIteration(true /* requestHasChecksum */,
+                        true /* expectMoreToCome */,
+                        BSON("next" << 1 << "$db"
+                                    << "test"));
+}
+
+TEST_F(SessionWorkflowExhaustChecksumTest, CompressedExhaustResponseChecksum) {
+    runExhaustIteration(true /* requestHasChecksum */,
+                        true /* expectMoreToCome */,
+                        boost::none,
+                        false /* tls */,
+                        true /* compressed */);
+}
+
+TEST_F(SessionWorkflowExhaustChecksumTest, CompressedExhaustResponseWithoutChecksum) {
+    runExhaustIteration(false /* requestHasChecksum */,
+                        true /* expectMoreToCome */,
+                        boost::none,
+                        false /* tls */,
+                        true /* compressed */);
+}
+
+TEST_F(SessionWorkflowExhaustChecksumTest, CompressedExhaustNextInvocationChecksum) {
+    runExhaustIteration(true /* requestHasChecksum */,
+                        true /* expectMoreToCome */,
+                        BSON("next" << 1 << "$db" << "test"),
+                        false /* tls */,
+                        true /* compressed */);
+}
+
+TEST_F(SessionWorkflowExhaustChecksumTest, ExhaustContinuationRequiresClientSupport) {
+    auto request = makeOpMsg();
+    request.header().setId(nextMessageId());
+    request.header().setResponseToMsgId(0);
+    OpMsg::appendChecksum(&request);
+    const auto requestId = request.header().getId();
+    auto response = setExhaust(makeResponse(makeOpMsg()));
+    const auto originalResponse = copyMessage(response.response);
+
+    startSession();
+    expect<Event::sessionSourceMessage>(request);
+    expect<Event::sepHandleRequest>(std::move(response));
+    Message sunk;
+    expect<Event::sessionSinkMessage>([&](const Message& m) {
+        sunk = m;
+        return Status::OK();
+    });
+    expect<Event::sessionSourceMessage>(kClosedSessionError);
+    expect<Event::sepEndSession>();
+    joinSessions();
+
+    ASSERT_EQ(sunk.header().getResponseToMsgId(), requestId);
+    ASSERT_FALSE(OpMsg::isFlagSet(sunk, OpMsg::kMoreToCome));
+    assertValidChecksum(sunk);
+    assertMatchesLegacyResponse(originalResponse,
+                                sunk,
+                                true /* requestHasChecksum */,
+                                false /* continueExhaust */,
+                                false /* moreToCome */,
+                                false /* tls */);
+}
+
+TEST_F(SessionWorkflowExhaustChecksumTest, OrdinaryResponseChecksum) {
+    auto request = makeOpMsg();
+    request.header().setId(nextMessageId());
+    request.header().setResponseToMsgId(0);
+    OpMsg::appendChecksum(&request);
+    const auto requestId = request.header().getId();
+
+    startSession();
+    expect<Event::sessionSourceMessage>(request);
+    expect<Event::sepHandleRequest>(makeResponse(makeOpMsg()));
+    Message sunk;
+    expect<Event::sessionSinkMessage>([&](const Message& m) {
+        sunk = m;
+        return Status::OK();
+    });
+    expect<Event::sessionSourceMessage>(kClosedSessionError);
+    expect<Event::sepEndSession>();
+    joinSessions();
+
+    ASSERT_EQ(sunk.header().getResponseToMsgId(), requestId);
+    ASSERT_FALSE(OpMsg::isFlagSet(sunk, OpMsg::kMoreToCome));
+    assertValidChecksum(sunk);
+}
+
+#ifdef MONGO_CONFIG_SSL
+TEST_F(SessionWorkflowExhaustChecksumTest, TLSOrdinaryResponseHasNoChecksum) {
+    auto request = makeOpMsg();
+    request.header().setId(nextMessageId());
+    request.header().setResponseToMsgId(0);
+    OpMsg::appendChecksum(&request);
+
+    markSessionAsTLS();
+    startSession();
+    expect<Event::sessionSourceMessage>(request);
+    expect<Event::sepHandleRequest>(makeResponse(makeOpMsg()));
+    Message sunk;
+    expect<Event::sessionSinkMessage>([&](const Message& m) {
+        sunk = m;
+        return Status::OK();
+    });
+    expect<Event::sessionSourceMessage>(kClosedSessionError);
+    expect<Event::sepEndSession>();
+    joinSessions();
+
+    ASSERT_FALSE(OpMsg::isFlagSet(sunk, OpMsg::kChecksumPresent));
+}
+
+TEST_F(SessionWorkflowExhaustChecksumTest, TLSExhaustResponseKeepsChecksum) {
+    markSessionAsTLS();
+    runExhaustIteration(
+        true /* requestHasChecksum */, true /* expectMoreToCome */, boost::none, true /* tls */);
+}
+
+TEST_F(SessionWorkflowExhaustChecksumTest, TLSCompressedExhaustResponseKeepsChecksum) {
+    markSessionAsTLS();
+    runExhaustIteration(true /* requestHasChecksum */,
+                        true /* expectMoreToCome */,
+                        boost::none,
+                        true /* tls */,
+                        true /* compressed */);
+}
+
+TEST_F(SessionWorkflowExhaustChecksumTest, TLSExhaustResponseWithoutChecksum) {
+    markSessionAsTLS();
+    runExhaustIteration(
+        false /* requestHasChecksum */, true /* expectMoreToCome */, boost::none, true /* tls */);
+}
+#endif  // MONGO_CONFIG_SSL
+#endif  // MONGO_CONFIG_WIREDTIGER_ENABLED
 
 class ConnectionEstablishmentQueueingTest : public SessionWorkflowTest {
 public:
@@ -1833,6 +2170,15 @@ TEST_F(SessionWorkflowTest, ResponseWithOpReplyOpcodeIsAccepted) {
 }
 
 using SessionWorkflowTestDeathTest = SessionWorkflowTest;
+DEATH_TEST_F(SessionWorkflowTestDeathTest,
+             ExhaustResponseWithOpReplyOpcodeTriggersInvariant,
+             "Exhaust response must use OP_MSG opcode") {
+    startSession();
+    expect<Event::sessionSourceMessage>(setExhaustSupported(makeOpMsg()));
+    expect<Event::sepHandleRequest>(setExhaust(makeResponse(makeOpReplyMsg())));
+    joinSessions();
+}
+
 DEATH_TEST_F(SessionWorkflowTestDeathTest,
              ResponseWithUnsupportedOpcodeTriggersInvariant,
              "Response uses unsupported opcode") {
