@@ -73,7 +73,8 @@ DBClientConnection::DBClientConnection(DBClientConnectionOptions options)
                       std::move(options.uri),
                       options.hook,
                       options.apiParameters,
-                      options.connectionPurpose),
+                      options.connectionPurpose,
+                      options.disableCompression),
       _autoReconnectBackoff(Seconds(1), Seconds(2)) {
     _numConnections.fetchAndAdd(1);
 }

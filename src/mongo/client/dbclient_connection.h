@@ -53,6 +53,8 @@ struct [[MONGO_MOD_PUBLIC]] DBClientConnectionOptions {
         DBClientSession::HandshakeValidationHook();
     const ClientAPIVersionParameters* apiParameters = nullptr;
     ConnectionPurpose connectionPurpose = ConnectionPurpose::kDefault;
+    // If true, the connection does not negotiate network message compression.
+    bool disableCompression = false;
 };
 /**
  *  A basic connection to the database.

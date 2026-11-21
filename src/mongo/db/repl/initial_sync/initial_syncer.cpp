@@ -228,7 +228,9 @@ InitialSyncer::InitialSyncer(
       _onCompletion(onCompletion),
       _createClientFn([] {
           return std::make_unique<DBClientConnection>(DBClientConnectionOptions{
-              .autoReconnect = true, .connectionPurpose = ConnectionPurpose::kReplication});
+              .autoReconnect = true,
+              .connectionPurpose = ConnectionPurpose::kReplication,
+              .disableCompression = disableReplicationNetworkCompression});
       }),
       _createOplogFetcherFn(CreateOplogFetcherFn::get()),
       _currentPhase(Phase::kNotStarted) {
