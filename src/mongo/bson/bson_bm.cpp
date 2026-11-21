@@ -345,6 +345,40 @@ void BM_validateObj(benchmark::State& state) {
     state.SetBytesProcessed(totalSize);
 }
 
+/**
+ * Benchmark default-mode validation of one flat object with many int32 fields whose names all have
+ * the same length. The first range argument is the number of fields and the second is the field
+ * name length. Validation cost is dominated by locating the end of each field name when the names
+ * are short, so this isolates that part of the validator.
+ */
+void BM_validateFieldNameLength(benchmark::State& state) {
+    const auto numFields = state.range(0);
+    const auto nameLength = static_cast<size_t>(state.range(1));
+
+    BSONObjBuilder builder;
+    for (int64_t i = 0; i < numFields; ++i) {
+        // Fixed-width hex digits keep every name the same length and unique.
+        std::string name = fmt::format("{:0>{}x}", static_cast<uint64_t>(i), nameLength);
+        name.erase(0, name.size() - nameLength);
+        builder.append(name, static_cast<int>(i));
+    }
+    BSONObj obj = builder.obj();
+    invariant(validateBSON(obj.objdata(), obj.objsize()).isOK());
+
+    size_t totalSize = 0;
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        benchmark::DoNotOptimize(validateBSON(obj.objdata(), obj.objsize()));
+        totalSize += obj.objsize();
+    }
+    state.SetBytesProcessed(totalSize);
+    state.SetItemsProcessed(state.iterations() * numFields);
+}
+
+BENCHMARK(BM_validateFieldNameLength)
+    ->ArgsProduct({{20'000}, {4, 8, 12, 16, 24, 32, 64}})
+    ->Unit(benchmark::kMicrosecond);
+
 BENCHMARK(BM_arrayBuilder)->Ranges({{{1}, {100'000}}});
 BENCHMARK(BM_arrayLookup)->Ranges({{{1}, {100'000}}});
 BENCHMARK(BM_arrayNonStlIterate)->Ranges({{{1}, {100'000}}});
