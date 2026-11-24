@@ -801,5 +801,277 @@ TEST(ZlibMessageCompressor, WrongUncompressedSize) {
                                "Decompressing message returned less data than expected");
 }
 
+Message makeSnappyPrefixMessage(const std::vector<uint8_t>& raw,
+                                int32_t uncompressedSize = 4,
+                                int32_t originalOpCode = dbMsg,
+                                MessageCompressorId compressorId =
+                                    static_cast<MessageCompressorId>(MessageCompressor::kSnappy)) {
+    const auto size = MsgData::MsgDataHeaderSize + CompressionHeader::size() + raw.size();
+    auto buffer = SharedBuffer::allocate(size);
+    MsgData::View header(buffer.get());
+    header.setLen(size);
+    header.setId(123);
+    header.setResponseToMsgId(456);
+    header.setOperation(dbCompressed);
+    DataRangeCursor output(header.data(), header.data() + header.dataLen());
+    CompressionHeader compressionHeader(originalOpCode, uncompressedSize, compressorId);
+    compressionHeader.serialize(&output);
+    if (!raw.empty()) {
+        std::memcpy(output.data(), raw.data(), raw.size());
+    }
+    return Message(std::move(buffer));
+}
+
+TEST(SnappyOpMsgFlags, MatchesFullDecompressionWithoutUpdatingCounters) {
+    MessageCompressorRegistry registry;
+    auto compressor = std::make_unique<SnappyMessageCompressor>();
+    auto* counters = compressor.get();
+    const auto compressorId = compressor->getId();
+    registry.setSupportedCompressors({compressor->getName()});
+    registry.registerImplementation(std::move(compressor));
+    ASSERT_OK(registry.finalizeSupportedCompressors());
+    MessageCompressorManager manager(&registry);
+
+    for (uint32_t flags : {0u,
+                           OpMsg::kMoreToCome,
+                           OpMsg::kExhaustSupported | OpMsg::kMoreToCome,
+                           OpMsg::kChecksumPresent}) {
+        OpMsgBuilder builder;
+        builder.setBody(BSON("ok" << 1 << "payload" << std::string(1024, 'x')));
+        auto original = builder.finish();
+        OpMsg::replaceFlags(&original, flags & ~OpMsg::kChecksumPresent);
+        if (flags & OpMsg::kChecksumPresent) {
+            OpMsg::appendChecksum(&original);
+        }
+        auto compressed = assertOk(manager.compressMessage(original, &compressorId));
+        const auto bytesIn = counters->getDecompressorBytesIn();
+        const auto bytesOut = counters->getDecompressorBytesOut();
+        // appendChecksum is a no-op in builds without WiredTiger checksum support.
+        const auto expectedFlags = OpMsg::flags(original);
+        ASSERT_EQ(assertOk(readSnappyOpMsgFlags(compressed)), expectedFlags);
+        ASSERT_EQ(counters->getDecompressorBytesIn(), bytesIn);
+        ASSERT_EQ(counters->getDecompressorBytesOut(), bytesOut);
+        auto decompressed = assertOk(manager.decompressMessage(compressed));
+        ASSERT_EQ(OpMsg::flags(decompressed), expectedFlags);
+        ASSERT_EQ(OpMsg::parse(decompressed).body.woCompare(OpMsg::parse(original).body), 0);
+    }
+}
+
+TEST(SnappyOpMsgFlags, MultipleShortLiteralsAndOptionalFlags) {
+    const auto message = makeSnappyPrefixMessage({4, 0, 3, 0, 0, 0, 1, 0, 0x80});
+    ASSERT_EQ(assertOk(readSnappyOpMsgFlags(message)),
+              0x80000000u | OpMsg::kExhaustSupported | OpMsg::kChecksumPresent |
+                  OpMsg::kMoreToCome);
+}
+
+TEST(SnappyOpMsgFlags, AllLongLiteralLengthEncodings) {
+    for (uint8_t lengthBytes = 1; lengthBytes <= 4; ++lengthBytes) {
+        std::vector<uint8_t> raw{60, static_cast<uint8_t>((59 + lengthBytes) << 2), 59};
+        raw.insert(raw.end(), lengthBytes - 1, 0);
+        raw.insert(raw.end(), {3, 0, 1, 0});
+        raw.insert(raw.end(), 56, 0);
+        ASSERT_EQ(assertOk(readSnappyOpMsgFlags(makeSnappyPrefixMessage(raw, 60))),
+                  OpMsg::kChecksumPresent | OpMsg::kMoreToCome | OpMsg::kExhaustSupported);
+    }
+}
+
+TEST(SnappyOpMsgFlags, CopyOneWithOverlap) {
+    ASSERT_EQ(assertOk(readSnappyOpMsgFlags(makeSnappyPrefixMessage({5, 0, 0, 1, 1}, 5))), 0u);
+    ASSERT_EQ(assertOk(readSnappyOpMsgFlags(makeSnappyPrefixMessage({12, 0, 0, 29, 1}, 12))), 0u);
+}
+
+TEST(SnappyOpMsgFlags, CopyTwoAndFourWithOverlap) {
+    ASSERT_EQ(assertOk(readSnappyOpMsgFlags(makeSnappyPrefixMessage({4, 0, 0, 10, 1, 0}))), 0u);
+    ASSERT_EQ(assertOk(readSnappyOpMsgFlags(makeSnappyPrefixMessage({4, 0, 0, 11, 1, 0, 0, 0}))),
+              0u);
+    ASSERT_EQ(assertOk(readSnappyOpMsgFlags(makeSnappyPrefixMessage({4, 0, 0, 0, 0, 6, 2, 0}))),
+              0u);
+    ASSERT_EQ(assertOk(readSnappyOpMsgFlags(makeSnappyPrefixMessage({4, 4, 3, 0, 6, 2, 0}))),
+              0x00030003u);
+    ASSERT_EQ(assertOk(readSnappyOpMsgFlags(
+                  makeSnappyPrefixMessage({4, 0, 0, 2, 1, 0, 3, 2, 0, 0, 0, 2, 3, 0}))),
+              0u);
+}
+
+TEST(SnappyOpMsgFlags, RejectsTruncatedOrOverflowingVarints) {
+    for (const std::vector<uint8_t>& raw :
+         std::vector<std::vector<uint8_t>>{{},
+                                           {0x80},
+                                           {0x80, 0x80},
+                                           {0x80, 0x80, 0x80},
+                                           {0x80, 0x80, 0x80, 0x80},
+                                           {0x84, 0x80, 0x80, 0x80, 0x10},
+                                           {0x84, 0x80, 0x80, 0x80, 0x80, 0},
+                                           {0xff, 0xff, 0xff, 0xff, 0x0f}}) {
+        ASSERT_EQ(readSnappyOpMsgFlags(makeSnappyPrefixMessage(raw)).getStatus().code(),
+                  ErrorCodes::BadValue);
+    }
+    ASSERT_EQ(assertOk(readSnappyOpMsgFlags(
+                  makeSnappyPrefixMessage({0x84, 0x80, 0x80, 0x80, 0, 12, 0, 0, 0, 0}))),
+              0u);
+}
+
+TEST(SnappyOpMsgFlags, RejectsMismatchedOrInvalidDeclaredSize) {
+    const std::vector<uint8_t> raw{4, 12, 0, 0, 0, 0};
+    for (int32_t size :
+         {-1,
+          0,
+          1,
+          2,
+          3,
+          5,
+          std::numeric_limits<int32_t>::max(),
+          static_cast<int32_t>(MaxMessageSizeBytes - MsgData::MsgDataHeaderSize + 1)}) {
+        ASSERT_EQ(readSnappyOpMsgFlags(makeSnappyPrefixMessage(raw, size)).getStatus().code(),
+                  ErrorCodes::BadValue);
+    }
+    const auto maxSize = static_cast<int32_t>(MaxMessageSizeBytes - MsgData::MsgDataHeaderSize);
+    for (int32_t size : {4, 128, 16384, maxSize}) {
+        std::vector<uint8_t> prefix;
+        for (uint32_t remaining = size;; remaining >>= 7) {
+            const auto byte = static_cast<uint8_t>(remaining & 0x7f);
+            prefix.push_back(byte | (remaining > 0x7f ? 0x80 : 0));
+            if (remaining <= 0x7f) {
+                break;
+            }
+        }
+        prefix.insert(prefix.end(), {12, 0, 0, 0, 0});
+        ASSERT_EQ(assertOk(readSnappyOpMsgFlags(makeSnappyPrefixMessage(prefix, size))), 0u);
+    }
+}
+
+TEST(SnappyOpMsgFlags, RejectsTruncatedShortLiterals) {
+    for (const std::vector<uint8_t>& raw : std::vector<std::vector<uint8_t>>{
+             {4}, {4, 12}, {4, 12, 0}, {4, 12, 0, 0}, {4, 12, 0, 0, 0}, {4, 0, 0}}) {
+        ASSERT_EQ(readSnappyOpMsgFlags(makeSnappyPrefixMessage(raw)).getStatus().code(),
+                  ErrorCodes::BadValue);
+    }
+    ASSERT_EQ(
+        readSnappyOpMsgFlags(makeSnappyPrefixMessage({8, 28, 0, 0, 0, 0}, 8)).getStatus().code(),
+        ErrorCodes::BadValue);
+}
+
+TEST(SnappyOpMsgFlags, RejectsTruncatedLongLiteralLengthsAndPayloads) {
+    for (uint8_t lengthBytes = 1; lengthBytes <= 4; ++lengthBytes) {
+        const auto tag = static_cast<uint8_t>((59 + lengthBytes) << 2);
+        for (uint8_t available = 0; available < lengthBytes; ++available) {
+            std::vector<uint8_t> raw{4, tag};
+            raw.insert(raw.end(), available, 0);
+            ASSERT_EQ(readSnappyOpMsgFlags(makeSnappyPrefixMessage(raw)).getStatus().code(),
+                      ErrorCodes::BadValue);
+        }
+        std::vector<uint8_t> raw{4, tag, 3};
+        raw.insert(raw.end(), lengthBytes - 1, 0);
+        raw.insert(raw.end(), 3, 0);
+        ASSERT_EQ(readSnappyOpMsgFlags(makeSnappyPrefixMessage(raw)).getStatus().code(),
+                  ErrorCodes::BadValue);
+    }
+}
+
+TEST(SnappyOpMsgFlags, RejectsLiteralLengthOverflowAndOutputOverrun) {
+    ASSERT_EQ(readSnappyOpMsgFlags(makeSnappyPrefixMessage({4, 252, 255, 255, 255, 255}))
+                  .getStatus()
+                  .code(),
+              ErrorCodes::BadValue);
+    ASSERT_EQ(
+        readSnappyOpMsgFlags(makeSnappyPrefixMessage({4, 16, 0, 0, 0, 0, 0})).getStatus().code(),
+        ErrorCodes::BadValue);
+}
+
+TEST(SnappyOpMsgFlags, RejectsTruncatedCopyOffsets) {
+    for (const auto [tag, offsetBytes] :
+         std::array<std::pair<uint8_t, size_t>, 3>{{{1, 1}, {10, 2}, {11, 4}}}) {
+        for (size_t available = 0; available < offsetBytes; ++available) {
+            std::vector<uint8_t> raw{5, 0, 0, tag};
+            raw.insert(raw.end(), available, 1);
+            ASSERT_EQ(readSnappyOpMsgFlags(makeSnappyPrefixMessage(raw, 5)).getStatus().code(),
+                      ErrorCodes::BadValue);
+        }
+    }
+}
+
+TEST(SnappyOpMsgFlags, RejectsZeroOrTooDistantCopyOffsets) {
+    for (const std::vector<uint8_t>& raw :
+         std::vector<std::vector<uint8_t>>{{5, 0, 0, 1, 0},
+                                           {5, 0, 0, 1, 2},
+                                           {5, 0, 0, 33, 1},
+                                           {5, 0, 0, 10, 0, 0},
+                                           {5, 0, 0, 10, 2, 0},
+                                           {5, 0, 0, 11, 0, 0, 0, 0},
+                                           {5, 0, 0, 11, 2, 0, 0, 0},
+                                           {5, 0, 0, 11, 255, 255, 255, 255},
+                                           {5, 1, 1},
+                                           {5, 10, 1, 0},
+                                           {5, 11, 1, 0, 0, 0}}) {
+        ASSERT_EQ(readSnappyOpMsgFlags(makeSnappyPrefixMessage(raw, 5)).getStatus().code(),
+                  ErrorCodes::BadValue);
+    }
+}
+
+TEST(SnappyOpMsgFlags, RejectsCopyOutputOverrun) {
+    for (const std::vector<uint8_t>& raw : std::vector<std::vector<uint8_t>>{
+             {4, 0, 0, 1, 1}, {4, 0, 0, 14, 1, 0}, {4, 0, 0, 15, 1, 0, 0, 0}}) {
+        ASSERT_EQ(readSnappyOpMsgFlags(makeSnappyPrefixMessage(raw)).getStatus().code(),
+                  ErrorCodes::BadValue);
+    }
+}
+
+TEST(SnappyOpMsgFlags, RejectsUnknownRequiredFlags) {
+    for (uint32_t bit = 2; bit < 16; ++bit) {
+        std::vector<uint8_t> raw{4, 12, 0, 0, 0, 0};
+        raw[2 + bit / 8] = static_cast<uint8_t>(1u << (bit % 8));
+        ASSERT_EQ(readSnappyOpMsgFlags(makeSnappyPrefixMessage(raw)).getStatus().code(),
+                  ErrorCodes::IllegalOpMsgFlag);
+    }
+}
+
+TEST(SnappyOpMsgFlags, RejectsInvalidOuterHeadersAndCompressionKinds) {
+    ASSERT_EQ(readSnappyOpMsgFlags(Message{}).getStatus().code(), ErrorCodes::BadValue);
+    ASSERT_EQ(readSnappyOpMsgFlags(Message(SharedBuffer::allocate(3))).getStatus().code(),
+              ErrorCodes::BadValue);
+    const std::vector<uint8_t> raw{4, 12, 0, 0, 0, 0};
+    auto message = makeSnappyPrefixMessage(raw);
+    for (int32_t size = 0;
+         size < MsgData::MsgDataHeaderSize + static_cast<int32_t>(CompressionHeader::size());
+         ++size) {
+        message.header().setLen(size);
+        ASSERT_EQ(readSnappyOpMsgFlags(message).getStatus().code(), ErrorCodes::BadValue);
+    }
+    for (int32_t size : {-1,
+                         static_cast<int32_t>(message.capacity() + 1),
+                         static_cast<int32_t>(MaxMessageSizeBytes + 1)}) {
+        message.header().setLen(size);
+        ASSERT_EQ(readSnappyOpMsgFlags(message).getStatus().code(), ErrorCodes::BadValue);
+    }
+    message = makeSnappyPrefixMessage(raw);
+    message.header().setOperation(dbMsg);
+    ASSERT_EQ(readSnappyOpMsgFlags(message).getStatus().code(), ErrorCodes::BadValue);
+    ASSERT_EQ(readSnappyOpMsgFlags(makeSnappyPrefixMessage(raw, 4, dbQuery)).getStatus().code(),
+              ErrorCodes::BadValue);
+    for (auto compressorId : {MessageCompressor::kNoop,
+                              MessageCompressor::kZlib,
+                              MessageCompressor::kZstd,
+                              MessageCompressor::kExtended}) {
+        ASSERT_EQ(
+            readSnappyOpMsgFlags(makeSnappyPrefixMessage(
+                                     raw, 4, dbMsg, static_cast<MessageCompressorId>(compressorId)))
+                .getStatus()
+                .code(),
+            ErrorCodes::BadValue);
+    }
+}
+
+TEST(SnappyOpMsgFlags, SuccessfulPrefixDoesNotValidateCorruptTail) {
+    for (const std::vector<uint8_t>& raw : std::vector<std::vector<uint8_t>>{
+             {8, 12, 0, 0, 0, 0}, {8, 12, 0, 0, 0, 0, 1, 0}, {8, 12, 0, 0, 0, 0, 252}}) {
+        auto message = makeSnappyPrefixMessage(raw, 8);
+        ASSERT_EQ(assertOk(readSnappyOpMsgFlags(message)), 0u);
+        std::array<char, 8> output{};
+        SnappyMessageCompressor compressor;
+        ASSERT_NOT_OK(compressor.decompressData(ConstDataRange(raw.data(), raw.size()),
+                                                DataRange(output.data(), output.size())));
+    }
+}
+
 }  // namespace
 }  // namespace mongo

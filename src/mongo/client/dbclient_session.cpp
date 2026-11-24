@@ -36,6 +36,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/reply_interface.h"
+#include "mongo/transport/message_compressor_base.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -537,6 +538,21 @@ void DBClientSession::say(Message& toSend, bool isRetry, string* actualServer) {
     uassertStatusOK(
         _session->sinkMessage(uassertStatusOK(_compressorManager.compressMessage(toSend))));
     killSessionOnError.dismiss();
+}
+
+std::shared_ptr<transport::Session> DBClientSession::getExhaustReceiveSession() {
+    std::lock_guard<std::mutex> lk(_sessionMutex);
+    if (_failed.load() || _stayFailed.load()) {
+        return nullptr;
+    }
+    return _session;
+}
+
+bool DBClientSession::supportsSnappyExhaustReceive() const {
+    const auto& compressors = _compressorManager.getNegotiatedCompressors();
+    return !compressors.empty() &&
+        compressors.front()->getId() ==
+        static_cast<MessageCompressorId>(MessageCompressor::kSnappy);
 }
 
 Message DBClientSession::recv(int lastRequestId) {

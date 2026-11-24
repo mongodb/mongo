@@ -175,6 +175,14 @@ void DBClientCursor::requestMore() {
     });
 }
 
+void DBClientCursor::releaseExhaustReplyBuffers(bool discardUnconsumed) {
+    invariant(_isExhaust);
+    invariant(discardUnconsumed || _batch.pos == _batch.objs.size());
+    _batch.objs.clear();
+    _batch.pos = 0;
+    _postBatchResumeToken = boost::none;
+}
+
 /**
  * For exhaust cursors, the server just blasts data at us. The end of a stream is marked with a
  * cursor id of 0.
@@ -185,15 +193,24 @@ void DBClientCursor::exhaustReceiveMore() {
     Message response;
     MONGO_verify(_client);
     try {
-        auto response = _client->recv(_lastRequestId);
-        dataReceived(response);
+        if (_exhaustReplyReader) {
+            auto reply = _exhaustReplyReader(_lastRequestId);
+            uassert(ErrorCodes::BadValue,
+                    "Exhaust reply reader returned no parsed reply",
+                    reply.parsed.operator->() != nullptr);
+            dataReceived(reply.message, std::move(reply.parsed));
+        } else {
+            auto response = _client->recv(_lastRequestId);
+            dataReceived(response);
+        }
     } catch (DBException& e) {
         e.addContext("recv failed while exhausting cursor");
         throw;
     }
 }
 
-BSONObj DBClientCursor::commandDataReceived(const Message& reply) {
+BSONObj DBClientCursor::commandDataReceived(const Message& reply,
+                                            boost::optional<rpc::UniqueReply> parsed) {
     NetworkOp op = reply.operation();
     tassert(9279710,
             str::stream() << "Operation should either be 'opReply' or 'dbMsg', but got "
@@ -207,7 +224,9 @@ BSONObj DBClientCursor::commandDataReceived(const Message& reply) {
         _lastRequestId = reply.header().getId();
     }
 
-    auto commandReply = _client->parseCommandReplyMessage(_client->getServerAddress(), reply);
+    auto commandReply = parsed
+        ? _client->processParsedCommandReply(_client->getServerAddress(), std::move(*parsed))
+        : _client->parseCommandReplyMessage(_client->getServerAddress(), reply);
     auto commandStatus = getStatusFromCommandResult(commandReply->getCommandReply());
 
     if (commandStatus == ErrorCodes::StaleConfig) {
@@ -220,7 +239,10 @@ BSONObj DBClientCursor::commandDataReceived(const Message& reply) {
     return commandReply->getCommandReply().getOwned();
 }
 
-void DBClientCursor::dataReceived(const Message& reply, bool& retry, string& host) {
+void DBClientCursor::dataReceived(const Message& reply,
+                                  bool& retry,
+                                  string& host,
+                                  boost::optional<rpc::UniqueReply> parsed) {
     _batch.objs.clear();
     _batch.pos = 0;
 
@@ -237,7 +259,7 @@ void DBClientCursor::dataReceived(const Message& reply, bool& retry, string& hos
                 << ", requestID=" << hdr.getId() << ", responseTo=" << hdr.getResponseToMsgId());
     }
 
-    const auto replyObj = commandDataReceived(reply);
+    const auto replyObj = commandDataReceived(reply, std::move(parsed));
 
     StatusWith<CursorResponse> swCr =
         CursorResponse::parseFromBSON(replyObj, nullptr, _ns.tenantId());

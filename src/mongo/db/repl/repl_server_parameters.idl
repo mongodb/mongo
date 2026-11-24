@@ -165,6 +165,91 @@ server_parameters:
         default: true
         redact: false
 
+    internalReplReceiveDecodePipelineEnabled:
+        description: >-
+            Enable bounded read-ahead and parallel Snappy decoding and OP_MSG validation for
+            steady-state oplog exhaust streams. Authentication and initial finds stay synchronous.
+            Valid replies requiring full decoding instead of prefix read-ahead are counted under
+            metrics.repl.network.receiveDecode.snappyPrefixFallbacks or
+            metrics.repl.network.receiveDecode.unsupportedCompressorFallbacks. These are not
+            failures; continuing replies make the current fetcher resume without read-ahead.
+            Disabling closes the current prefetched stream and resumes from the last enqueued optime.
+            A fetcher waiting for a reply checks this about every 100 milliseconds. That is only
+            how often the wait is checked: closing the stream still waits for in-flight decode
+            tasks to finish, so a decode that never returns is not interrupted.
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<bool>
+        cpp_varname: gReplReceiveDecodePipelineEnabled
+        default: false
+        redact: false
+
+    internalReplReceiveDecodeMaxConsecutiveFailures:
+        description: >-
+            Number of consecutive non-network receive decode pipeline failures on this node, with no
+            batch read through the pipeline and fully processed in between, after which the
+            pipeline is not used on this node for internalReplReceiveDecodeFallbackSeconds and
+            oplog fetchers read synchronously. Counted across fetchers, so it also applies when a
+            fetcher has no restarts left. Falling back does not spend a fetcher restart. It bounds
+            restarts that would otherwise repeat forever, because each restart's successful
+            synchronous first batch resets the fetcher's restart budget. Errors that also happen
+            on the synchronous path are still handled by the normal restart policy.
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<int>
+        cpp_varname: gReplReceiveDecodeMaxConsecutiveFailures
+        default: 3
+        validator:
+            gte: 1
+        redact: false
+
+    internalReplReceiveDecodeFallbackSeconds:
+        description: >-
+            How long, in seconds, the receive decode pipeline stays off on this node after
+            internalReplReceiveDecodeMaxConsecutiveFailures is reached. A new stream may use the
+            pipeline again afterwards. The cooldown uses a monotonic clock, so wall-clock changes
+            do not change its duration. Changing this parameter applies to future cooldowns only.
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<int>
+        cpp_varname: gReplReceiveDecodeFallbackSeconds
+        default: 300
+        validator:
+            gte: 1
+        redact: false
+
+    internalReplReceiveDecodeThreadPoolSize:
+        description: Maximum number of shared replication receive decode workers.
+        set_at: startup
+        cpp_vartype: Atomic<int>
+        cpp_varname: gReplReceiveDecodeThreadPoolSize
+        default: 4
+        validator:
+            gte: 1
+            lte: 64
+        redact: false
+
+    internalReplReceiveDecodeQueueDepth:
+        description: Maximum number of received, decoding or queued replies per exhaust stream.
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<int>
+        cpp_varname: gReplReceiveDecodeQueueDepth
+        default: 4
+        validator:
+            gte: 1
+            lte: 64
+        redact: false
+
+    internalReplReceiveDecodeMaxPendingBytes:
+        description: >-
+            Node-wide receive/decode buffer budget, including delivered replies retained by the
+            fetcher. Before receiving, reserve one maximum wire input and maximum decode output
+            together. Parser containers and downstream oplog buffer allocations are not included.
+        set_at: startup
+        cpp_vartype: Atomic<long long>
+        cpp_varname: gReplReceiveDecodeMaxPendingBytes
+        default: 268435456
+        validator:
+            gte: 96000000
+        redact: false
+
     oplogBatchDelayMillis:
         description: >-
             How long, in milliseconds, to wait for more data when an oplog application batch is

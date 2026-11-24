@@ -108,20 +108,26 @@ const rpc::ReplyMetadataReader& DBClientBase::getReplyMetadataReader() {
 rpc::UniqueReply DBClientBase::parseCommandReplyMessage(const std::string& host,
                                                         const Message& replyMsg) {
     auto commandReply = rpc::makeReply(&replyMsg);
+    return processParsedCommandReply(host, rpc::UniqueReply(replyMsg, std::move(commandReply)));
+}
+
+rpc::UniqueReply DBClientBase::processParsedCommandReply(const std::string& host,
+                                                         rpc::UniqueReply reply) {
+    invariant(reply.operator->());
 
     if (_metadataReader) {
         auto opCtx = haveClient() ? cc().getOperationContext() : nullptr;
-        uassertStatusOK(_metadataReader(opCtx, commandReply->getCommandReply(), host));
+        uassertStatusOK(_metadataReader(opCtx, reply->getCommandReply(), host));
     }
 
     if (_shouldThrowOnStaleConfigError) {
-        auto status = getStatusFromCommandResult(commandReply->getCommandReply());
+        auto status = getStatusFromCommandResult(reply->getCommandReply());
         if (status == ErrorCodes::StaleConfig) {
             uassertStatusOK(status.withContext("stale config in runCommand"));
         }
     }
 
-    return rpc::UniqueReply(replyMsg, std::move(commandReply));
+    return reply;
 }
 
 namespace {

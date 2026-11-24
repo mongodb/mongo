@@ -6,6 +6,8 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/util/memory_util.h"
+#include "mongo/db/traffic_recorder/stashed_request.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
@@ -15,6 +17,7 @@
 #include "mongo/util/tick_source_mock.h"
 
 #include <memory>
+#include <string>
 
 namespace mongo {
 namespace {
@@ -64,6 +67,34 @@ public:
     }
 };
 
+
+TEST(TrafficRecorderTest, StashedRequestKeepsIndependentWireBytes) {
+    OpMsg opMsg;
+    opMsg.body = BSON("getMore" << 1LL << "$db" << "test");
+    auto message = opMsg.serialize();
+    message.header().setId(42);
+    message.header().setResponseToMsgId(17);
+    OpMsg::appendChecksum(&message);
+    const std::string expected(message.buf(), message.size());
+    StashedRequest stash;
+    stash.set(message);
+
+    OpMsg::removeChecksum(&message);
+    message.header().setId(99);
+    message.header().setResponseToMsgId(42);
+    OpMsg::setFlag(&message, OpMsg::kExhaustSupported);
+    OpMsg::appendChecksum(&message);
+    auto snapshot = stash.take();
+    ASSERT_TRUE(snapshot);
+    ASSERT_NE(snapshot->buf(), message.buf());
+    ASSERT_EQ(std::string(snapshot->buf(), snapshot->size()), expected);
+    ASSERT_EQ(snapshot->header().getId(), 42);
+    OpMsg::parse(*snapshot);
+
+    stash.set(message);
+    stash.clear();
+    ASSERT_FALSE(stash.take());
+}
 
 TEST(TrafficRecorderTest, CorrectOffsets) {
     TrafficRecorderForTest trafficRecorder;

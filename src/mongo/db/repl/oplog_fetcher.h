@@ -43,6 +43,8 @@ extern FailPoint stopReplProducer;
 
 namespace [[MONGO_MOD_PARENT_PRIVATE]] repl {
 
+class [[MONGO_MOD_PUBLIC]] ReceiveDecodePipeline;
+
 /**
  * The oplog fetcher, once started, reads operations from a remote oplog using a tailable,
  * awaitData, exhaust cursor.
@@ -207,6 +209,9 @@ public:
         // _enqueueDocumentsFn.
         bool requestResumeToken = false;
 
+        // Only steady-state BackgroundSync opts in; initial sync and other fetchers stay unchanged.
+        bool allowReceiveDecodePipeline = false;
+
         std::string name = "oplog fetcher";
     };
 
@@ -295,6 +300,8 @@ public:
     virtual OpTime getLastOpTimeFetched() const;
 
 private:
+    friend struct OplogFetcherReceiveDecodeTestAccess;
+
     // =============== AbstractAsyncComponent overrides ================
 
     /**
@@ -362,6 +369,24 @@ private:
      * _createNewCursor.
      */
     StatusWith<Documents> _getNextBatch();
+
+    void _startReceiveDecodePipeline();
+    void _stopReceiveDecodePipeline(bool abort);
+    // Best-effort close during receive/decode cleanup; never replaces the original error.
+    void _shutdownReceiveDecodeConnection() noexcept;
+    // Fetcher thread only. Non-OK if the pipeline wait must end because this fetcher was canceled
+    // or the pipeline was disabled; records which one in _receiveDecodeInterrupt.
+    Status _checkReceiveDecodeInterrupt();
+    // True if this fetcher is shutting down or its callback was canceled by the executor.
+    bool _isCanceledForReceiveDecode();
+    // Fetcher thread only. Counts a failure raised by the pipeline itself, or by starting it, in
+    // the node-wide breaker; remote command, cursor and metadata errors are never counted, and
+    // errors with their own handling (network, ShutdownInProgress, BSONObjectTooLarge, rollback
+    // and denylist errors) are neither counted nor allowed to trigger the fallback. Returns true
+    // once internalReplReceiveDecodeMaxConsecutiveFailures is reached: the pipeline then stays off
+    // on this node for internalReplReceiveDecodeFallbackSeconds, and the caller resumes
+    // synchronously without spending a restart.
+    bool _noteReceiveDecodeFailure(const Status& status);
 
     /**
      * Function called by the oplog fetcher when it gets a successful batch from the sync source.
@@ -447,6 +472,30 @@ private:
 
     // Used to create the DBClientConnection for the oplog fetcher.
     CreateClientFn _createClientFn;
+
+    // Published under _mutex; only the fetcher thread joins or replaces it.
+    std::shared_ptr<ReceiveDecodePipeline> _receiveDecodePipeline;
+    std::shared_ptr<void> _decodeReservation;
+
+    // The following are fetcher-thread only.
+    // Why the last batch attempt that used the receive pipeline ended without a pipeline or
+    // network fault: the fetcher was canceled, the pipeline was disabled, or this failure tripped
+    // the node-wide fallback. None of these spends a restart.
+    enum class ReceiveDecodeInterrupt { kNone, kDisabled, kCanceled, kFallback };
+    ReceiveDecodeInterrupt _receiveDecodeInterrupt = ReceiveDecodeInterrupt::kNone;
+    // Whether the batch last returned by _getNextBatch() was read through the pipeline.
+    bool _receiveDecodeBatchUsedPipeline = false;
+    // Set when the pipeline itself (receive, decode or OP_MSG validation) failed during the
+    // current batch attempt, as opposed to the remote command, cursor or metadata processing.
+    bool _receiveDecodeStageFailed = false;
+    // Set by the exhaust reply reader when the pipeline stopped reading after a valid reply that
+    // still continues the stream.
+    bool _receiveDecodeEndedReadAhead = false;
+    // The batch is valid, but its stream was abandoned; recreate the cursor after enqueuing it.
+    bool _resetCursorAfterBatch = false;
+    // The sync source replied with a compressor the pipeline cannot read ahead. This fetcher reads
+    // synchronously from then on; a replacement fetcher tries again.
+    bool _receiveDecodeUnsupportedStream = false;
 
     // The tailable, awaitData, exhaust cursor used to fetch oplog entries from the sync source.
     // When an error is encountered, depending on the result of OplogFetcherRestartDecision's

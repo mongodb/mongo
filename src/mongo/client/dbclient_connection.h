@@ -82,6 +82,8 @@ public:
 
     rpc::UniqueReply parseCommandReplyMessage(const std::string& host,
                                               const Message& replyMsg) override;
+    rpc::UniqueReply processParsedCommandReply(const std::string& host,
+                                               rpc::UniqueReply reply) override;
 
     static int getNumConnections() {
         return _numConnections.load();

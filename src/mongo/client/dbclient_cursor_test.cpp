@@ -210,6 +210,21 @@ TEST_F(DBClientCursorTest, DBClientCursorCallsMetaDataReaderOncePerBatch) {
     ASSERT_EQ(2, numMetaRead);
 }
 
+TEST_F(DBClientCursorTest, AbandonedExhaustReplyCanDiscardUnconsumedBuffersWithoutIO) {
+    DBClientConnectionForTest conn;
+    const auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    const long long cursorId = 42;
+    DBClientCursor cursor(
+        &conn, nss, cursorId, true, {docObj(1), docObj(2)}, boost::none, BSON("token" << 1), true);
+    ASSERT_EQ(cursor.objsLeftInBatch(), 2);
+    ASSERT(cursor.getPostBatchResumeToken());
+    cursor.releaseExhaustReplyBuffers(true);
+    ASSERT_EQ(cursor.objsLeftInBatch(), 0);
+    ASSERT_FALSE(cursor.getPostBatchResumeToken());
+    ASSERT_EQ(cursor.getCursorId(), cursorId);
+    ASSERT_FALSE(conn.killedCursor(cursorId));
+}
+
 TEST_F(DBClientCursorTest, DBClientCursorGetMoreWithTenant) {
     // Set up the DBClientCursor and a mock client connection.
     DBClientConnectionForTest conn;

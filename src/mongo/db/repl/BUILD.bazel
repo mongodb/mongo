@@ -1148,12 +1148,29 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "receive_decode_pipeline",
+    srcs = [
+        "receive_decode_pipeline.cpp",
+    ],
+    deps = [
+        ":repl_server_parameters",
+        "//src/mongo/db/commands/server_status:server_status_metric",
+        "//src/mongo/rpc",
+        "//src/mongo/rpc:message",
+        "//src/mongo/transport:message_compressor",
+        "//src/mongo/transport:transport_layer_common",
+        "//src/mongo/util/concurrency:thread_pool",
+    ],
+)
+
+mongo_cc_library(
     name = "oplog_fetcher",
     srcs = [
         "oplog_fetcher.cpp",
     ],
     deps = [
         ":abstract_async_component",
+        ":receive_decode_pipeline",
         ":repl_coordinator_interface",
         ":repl_network_traffic_stats",
         ":repl_server_parameters",
@@ -2241,6 +2258,24 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_unit_test(
+    name = "receive_decode_pipeline_test",
+    srcs = [
+        "receive_decode_pipeline_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":receive_decode_pipeline",
+        ":repl_server_parameters",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/commands/server_status:server_status_metric",
+        "//src/mongo/rpc",
+        "//src/mongo/rpc:message",
+        "//src/mongo/transport:message_compressor",
+        "//src/mongo/transport:transport_layer_mock",
+    ],
+)
+
+mongo_cc_unit_test(
     name = "oplog_fetcher_test",
     srcs = [
         "oplog_fetcher_test.cpp",
@@ -2251,11 +2286,13 @@ mongo_cc_unit_test(
         ":oplog",
         ":oplog_entry",
         ":oplog_fetcher",
+        ":receive_decode_pipeline",
         ":repl_server_parameters",
         ":task_executor_mock",
         "//src/mongo/db:server_base",
         "//src/mongo/dbtests:mocklib",
         "//src/mongo/executor:thread_pool_task_executor_test_fixture",
+        "//src/mongo/transport:transport_layer_mock",
     ],
 )
 

@@ -24,6 +24,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/repl/optime_with.h"
+#include "mongo/db/repl/receive_decode_pipeline.h"
 #include "mongo/db/repl/repl_network_traffic_stats.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_auth.h"
@@ -44,12 +45,15 @@
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/log_and_backoff.h"
 #include "mongo/util/observable_mutex_registry.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/static_immortal.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
 #include <algorithm>
+#include <chrono>
 #include <mutex>
 #include <string_view>
 
@@ -75,8 +79,13 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeStartingOplogFetcher);
 MONGO_FAIL_POINT_DEFINE(hangBeforeOplogFetcherRetries);
 MONGO_FAIL_POINT_DEFINE(hangBeforeProcessingSuccessfulBatch);
 MONGO_FAIL_POINT_DEFINE(hangOplogFetcherBeforeAdvancingLastFetched);
+// Throws an InternalError before starting the receive decode pipeline, like a decode pool that
+// could not start a worker.
+MONGO_FAIL_POINT_DEFINE(replReceiveDecodeStartThrows);
 
 namespace {
+void resetReceiveDecodeFailures();
+
 class OplogBatchStats {
 public:
     void recordMillis(int millis, bool isEmptyBatch);
@@ -257,6 +266,9 @@ OplogFetcher::OplogFetcher(executor::TaskExecutor* executor,
 OplogFetcher::~OplogFetcher() {
     shutdown();
     join();
+    _cursor.reset();
+    _metadataObj = BSONObj{};
+    _decodeReservation.reset();
 }
 
 void OplogFetcher::setConnection(std::unique_ptr<DBClientConnection>&& _connectedClient) {
@@ -284,6 +296,9 @@ void OplogFetcher::_doStartup(WithLock lk) {
 void OplogFetcher::_doShutdown(WithLock lk) noexcept {
     _cancelHandle(lk, _runQueryHandle);
 
+    if (_receiveDecodePipeline) {
+        _receiveDecodePipeline->cancel();
+    }
     if (_conn) {
         _conn->shutdownAndDisallowReconnect();
     }
@@ -363,6 +378,16 @@ Milliseconds OplogFetcher::_getRetriedFindMaxTime() const {
 }
 
 void OplogFetcher::_finishCallback(Status status) {
+    _stopReceiveDecodePipeline(true);
+    if (_decodeReservation) {
+        // Completion can outlive the last delivered reply. Release all fetcher-owned views before
+        // returning its budget, even when an error left the cursor batch partially consumed.
+        if (_cursor) {
+            _cursor->releaseExhaustReplyBuffers(true);
+        }
+        _metadataObj = BSONObj{};
+        _decodeReservation.reset();
+    }
     invariant(isActive());
     // If the oplog fetcher is shutting down, consolidate return code to CallbackCanceled.
     if (_isShuttingDown() && status != ErrorCodes::CallbackCanceled) {
@@ -439,6 +464,26 @@ void OplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& callbac
 
         auto batchResult = _getNextBatch();
         if (!batchResult.isOK()) {
+            const auto interrupt =
+                std::exchange(_receiveDecodeInterrupt, ReceiveDecodeInterrupt::kNone);
+            if (interrupt != ReceiveDecodeInterrupt::kNone) {
+                // The attempt used the pipeline and ended without a fetch fault: the fetcher was
+                // canceled, the pipeline was disabled, or this failure tripped the fallback. If
+                // canceled, the check above finishes the callback; otherwise resume synchronously
+                // from the last enqueued optime. None of these spends a restart, so a fallback
+                // happens even when no restarts are configured.
+                if ((interrupt == ReceiveDecodeInterrupt::kFallback ||
+                     interrupt == ReceiveDecodeInterrupt::kDisabled) &&
+                    _dataReplicatorExternalState->shouldStopFetchingOnError(
+                        _config.source, getLastOpTimeFetched()) !=
+                        ChangeSyncSourceAction::kContinueSyncing) {
+                    _finishCallback(batchResult.getStatus().withContext(
+                        "Sync source change required after receive decode interruption"));
+                    return;
+                }
+                _cursor.reset();
+                continue;
+            }
             auto brStatus = batchResult.getStatus();
             // Determine if we should stop syncing from our current sync source. If we're going
             // to change sync sources anyway, do it immediately rather than checking if we can
@@ -460,6 +505,20 @@ void OplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& callbac
 
         // This will advance our view of _lastFetched.
         status = _onSuccessfulBatch(batchResult.getValue());
+        // The downstream buffer has taken its own references. No local batch view may outlive the
+        // decode reservation released by _finishCallback(), including an enqueue-error exit.
+        batchResult.getValue().clear();
+        if (status.isOK() && std::exchange(_receiveDecodeBatchUsedPipeline, false)) {
+            // Only a batch read through the pipeline and fully processed proves the pipeline
+            // works; a decoded reply whose cursor or metadata is bad must not reset the count.
+            resetReceiveDecodeFailures();
+        }
+        if (status.isOK() && std::exchange(_resetCursorAfterBatch, false)) {
+            // The batch was enqueued, but its exhaust stream was abandoned unread. Resume from the
+            // last enqueued optime with a new cursor; this is not a failure and spends no restart.
+            _cursor.reset();
+            continue;
+        }
         if (!status.isOK()) {
             // The stopReplProducer fail point expects this to return successfully. If another fail
             // point wants this to return unsuccessfully, it should use a different error code.
@@ -637,10 +696,212 @@ Status OplogFetcher::_createNewCursor(bool initialFind) {
     return Status::OK();
 }
 
+void OplogFetcher::_startReceiveDecodePipeline() {
+    auto session = _conn->getExhaustReceiveSession();
+    if (!session) {
+        return;
+    }
+    auto pipeline = ReceiveDecodePipeline::make(std::move(session), _cursor->getLastRequestId());
+    {
+        std::lock_guard lock(_mutex);
+        if (_isShuttingDown(lock)) {
+            pipeline->cancel();
+        } else {
+            _receiveDecodePipeline = pipeline;
+        }
+    }
+    uassert(ErrorCodes::CallbackCanceled,
+            "Oplog fetcher shut down while starting receive decode",
+            !_isShuttingDown());
+    _cursor->setExhaustReplyReader([this, pipeline](int expectedResponseTo) {
+        ReceiveDecodePipeline::Reply reply;
+        try {
+            reply = pipeline->take(expectedResponseTo,
+                                   [this] { return _checkReceiveDecodeInterrupt(); });
+        } catch (const DBException&) {
+            // Receive, decode and OP_MSG validation failures surface here. Command, cursor and
+            // metadata errors are raised later by the cursor and keep the normal restart policy.
+            _receiveDecodeStageFailed = true;
+            throw;
+        }
+        // _getNextBatch() releases the previous reply's buffers and budget before calling more().
+        // Assigning over a live reservation would return its budget while those buffers survive.
+        invariant(!_decodeReservation);
+        _receiveDecodeEndedReadAhead = reply.endedReadAhead;
+        _decodeReservation = std::move(reply.reservation);
+        auto parsed = rpc::UniqueReply(reply.message, std::move(reply.parsed));
+        return DBClientCursor::ExhaustReply{std::move(reply.message), std::move(parsed)};
+    });
+}
+
+void OplogFetcher::_shutdownReceiveDecodeConnection() noexcept {
+    try {
+        // DBClientSession marks the connection failed before ending its session. A close failure
+        // must not make that connection reusable or replace the receive/decode error.
+        _conn->shutdown();
+    } catch (...) {
+        LOGV2_ERROR(11369903,
+                    "Error closing the oplog fetcher connection during receive decode cleanup",
+                    "error"_attr = redact(exceptionToStatus()));
+    }
+}
+
+void OplogFetcher::_stopReceiveDecodePipeline(bool abort) {
+    std::shared_ptr<ReceiveDecodePipeline> pipeline;
+    {
+        std::lock_guard lock(_mutex);
+        pipeline = std::exchange(_receiveDecodePipeline, {});
+    }
+    if (!pipeline) {
+        return;
+    }
+    bool closeConnection = true;
+    ON_BLOCK_EXIT([&] {
+        if (closeConnection) {
+            _shutdownReceiveDecodeConnection();
+        }
+    });
+    if (_cursor) {
+        _cursor->setExhaustReplyReader({});
+    }
+    const bool interrupted = pipeline->stop(abort);
+    // Only a successful, healthy handoff permits reuse. Any exception also marks the client
+    // failed, even if another owner still retains the pipeline and its session.
+    closeConnection = abort || interrupted;
+}
+
+namespace {
+// Node-wide, so that it survives fetcher replacement: with no restarts left, each failure ends
+// the fetcher and BackgroundSync creates a new one. Only steady-state BackgroundSync uses the
+// pipeline, but the mutex keeps this safe for any number of fetchers.
+struct ReceiveDecodeBreaker {
+    std::mutex mutex;
+    int consecutiveFailures = 0;
+    std::chrono::steady_clock::time_point disabledUntil{};
+};
+
+ReceiveDecodeBreaker& receiveDecodeBreaker() {
+    static StaticImmortal<ReceiveDecodeBreaker> breaker;
+    return *breaker;
+}
+
+auto& receiveDecodeFallbacks = *MetricBuilder<Counter64>{"repl.network.receiveDecode.fallbacks"};
+
+bool receiveDecodeBreakerOpen() {
+    auto& breaker = receiveDecodeBreaker();
+    std::lock_guard lk(breaker.mutex);
+    return std::chrono::steady_clock::now() < breaker.disabledUntil;
+}
+
+void resetReceiveDecodeFailures() {
+    auto& breaker = receiveDecodeBreaker();
+    std::lock_guard lk(breaker.mutex);
+    breaker.consecutiveFailures = 0;
+}
+
+/**
+ * Errors that keep their synchronous-path handling even when the pipeline raised them, and so
+ * never count toward or trigger the fallback. Network errors are retried as usual. The restart
+ * policy stops on ShutdownInProgress and fasserts on BSONObjectTooLarge; BackgroundSync rolls
+ * back, denylists or changes sync source on the others. A fallback resumes without the restart
+ * policy, so it must not replace that handling.
+ */
+bool keepsNormalErrorHandling(ErrorCodes::Error code) {
+    switch (code) {
+        case ErrorCodes::ShutdownInProgress:
+        case ErrorCodes::BSONObjectTooLarge:
+        case ErrorCodes::InvalidBSON:
+        case ErrorCodes::OplogStartMissing:
+        case ErrorCodes::TooStaleToSyncFromSource:
+        case ErrorCodes::OplogOutOfOrder:
+            return true;
+        default:
+            return ErrorCodes::isNetworkError(code);
+    }
+}
+}  // namespace
+
+bool OplogFetcher::_isCanceledForReceiveDecode() {
+    std::lock_guard lock(_mutex);
+    return _isShuttingDown(lock) || _runQueryHandle.isCanceled();
+}
+
+Status OplogFetcher::_checkReceiveDecodeInterrupt() {
+    // Called on the fetcher thread while it waits for the pipeline, without the pipeline mutex.
+    if (_isCanceledForReceiveDecode()) {
+        _receiveDecodeInterrupt = ReceiveDecodeInterrupt::kCanceled;
+        return {ErrorCodes::CallbackCanceled,
+                "Oplog fetcher canceled while waiting for the receive decode pipeline"};
+    }
+    if (!gReplReceiveDecodePipelineEnabled.load()) {
+        _receiveDecodeInterrupt = ReceiveDecodeInterrupt::kDisabled;
+        return {ErrorCodes::CallbackCanceled, "Receive decode pipeline disabled"};
+    }
+    return Status::OK();
+}
+
+bool OplogFetcher::_noteReceiveDecodeFailure(const Status& status) {
+    // Only failures raised by the pipeline itself, or by starting it, reach here; remote command,
+    // cursor and metadata errors keep the normal restart policy. A restart's successful
+    // synchronous first batch resets the restart budget, so a persistent pipeline failure would
+    // otherwise restart forever.
+    if (keepsNormalErrorHandling(status.code())) {
+        return false;
+    }
+    const int limit = gReplReceiveDecodeMaxConsecutiveFailures.load();
+    const Seconds cooldown{gReplReceiveDecodeFallbackSeconds.load()};
+    int failures;
+    {
+        auto& breaker = receiveDecodeBreaker();
+        std::lock_guard lk(breaker.mutex);
+        failures = ++breaker.consecutiveFailures;
+        if (failures < limit) {
+            return false;
+        }
+        breaker.consecutiveFailures = 0;
+        breaker.disabledUntil = std::chrono::steady_clock::now() + cooldown.toSystemDuration();
+    }
+    receiveDecodeFallbacks.increment();
+    LOGV2_WARNING(11369900,
+                  "Receive decode pipeline failed repeatedly; oplog fetchers on this node read "
+                  "synchronously until the fallback period ends",
+                  "syncSource"_attr = _config.source,
+                  "consecutiveFailures"_attr = failures,
+                  "fallbackPeriod"_attr = cooldown,
+                  "error"_attr = redact(status));
+    return true;
+}
+
 StatusWith<OplogFetcher::Documents> OplogFetcher::_getNextBatch() {
     Documents batch;
+    // Whether this attempt read through the receive pipeline. Set before more() runs, because a
+    // failure during more() stops and clears the pipeline.
+    bool usedPipeline = false;
+    // Starting can fail before or after publishing a receiver. Cleanup checks the actual pipeline
+    // ownership; this flag only identifies the failure stage for the breaker.
+    bool pipelineStartFailed = false;
+    _receiveDecodeBatchUsedPipeline = false;
+    _receiveDecodeStageFailed = false;
+    _resetCursorAfterBatch = false;
     try {
         Timer timer;
+        if (_decodeReservation) {
+            // The preceding batch has been enqueued. Release its cursor/metadata owners before
+            // its reservation, so retaining an old reply cannot starve the next receive.
+            if (_cursor) {
+                _cursor->releaseExhaustReplyBuffers();
+            }
+            _metadataObj = BSONObj{};
+            _decodeReservation.reset();
+        }
+        if (_receiveDecodePipeline && !gReplReceiveDecodePipelineEnabled.load()) {
+            _stopReceiveDecodePipeline(true);
+            // Use the same interruption path as disabling while take() is waiting: check the
+            // sync source before any new find, without spending a restart.
+            _receiveDecodeInterrupt = ReceiveDecodeInterrupt::kDisabled;
+            return {ErrorCodes::CallbackCanceled,
+                    "Receive decode pipeline disabled between batches"};
+        }
         if (!_cursor) {
             // An error occurred and we should recreate the cursor.
             // When recreating the cursor, use the longer initial max time
@@ -699,7 +960,44 @@ StatusWith<OplogFetcher::Documents> OplogFetcher::_getNextBatch() {
                         lastCommittedWithCurrentTerm.value, lastCommittedWithCurrentTerm.opTime);
                 }
             }
+            if (!_receiveDecodePipeline && !_receiveDecodeUnsupportedStream &&
+                _config.allowReceiveDecodePipeline && gReplReceiveDecodePipelineEnabled.load() &&
+                _cursor->isExhaust() && _cursor->hasMoreToCome() &&
+                _conn->supportsSnappyExhaustReceive() && !receiveDecodeBreakerOpen()) {
+                try {
+                    replReceiveDecodeStartThrows.execute([](const BSONObj&) {
+                        uasserted(ErrorCodes::InternalError,
+                                  "Injected receive decode pipeline start failure");
+                    });
+                    _startReceiveDecodePipeline();
+                } catch (const DBException&) {
+                    // Start failures are local, like a decode pool without a worker. They happen
+                    // before the synchronous restart's first batch resets the restart budget, so
+                    // they must reach the breaker too.
+                    pipelineStartFailed = true;
+                    throw;
+                }
+            }
+            usedPipeline = static_cast<bool>(_receiveDecodePipeline);
+            _receiveDecodeEndedReadAhead = false;
             _cursor->more();
+            if (_receiveDecodePipeline && _receiveDecodeEndedReadAhead) {
+                // The receiver stopped after a valid frame whose flags it could not read in
+                // advance. The remaining frames of this stream were never read, so abandon the
+                // stream; the next attempt resumes from the last enqueued optime. This fetcher
+                // stops using read-ahead for an unsupported compressor or a noncanonical Snappy
+                // prefix rather than reconnecting after every batch.
+                _stopReceiveDecodePipeline(true);
+                _resetCursorAfterBatch = true;
+                _receiveDecodeUnsupportedStream = true;
+                LOGV2(11369902,
+                      "Receive decode pipeline disabled for this oplog fetcher: reply flags "
+                      "require full decoding",
+                      "syncSource"_attr = _config.source);
+            } else if (_receiveDecodePipeline && !_cursor->hasMoreToCome()) {
+                // The final frame is validated. Return I/O ownership before another getMore.
+                _stopReceiveDecodePipeline(false);
+            }
         }
 
         batch.reserve(_cursor->objsLeftInBatch());
@@ -711,15 +1009,29 @@ StatusWith<OplogFetcher::Documents> OplogFetcher::_getNextBatch() {
         // metric intentionally tracks the time taken by the initial find as well.
         _lastBatchElapsedMS = timer.millis();
     } catch (const DBException& ex) {
-        if (_cursor->connectionHasPendingReplies()) {
-            // Close the connection because the connection cannot be used anymore as more data is on
-            // the way from the server for the exhaust stream. Thus, we have to reconnect. The
-            // DBClientConnection does autoreconnect on the next network operation.
-            _conn->shutdown();
+        auto status = ex.toStatus("Error while getting the next batch in the oplog fetcher");
+        _stopReceiveDecodePipeline(true);
+        if (_cursor && _cursor->connectionHasPendingReplies() && !_conn->isFailed()) {
+            // A pipeline abort already marks its connection failed. Otherwise close the pending
+            // exhaust stream too, preserving the batch error if closing the session throws.
+            _shutdownReceiveDecodeConnection();
         }
-        return ex.toStatus("Error while getting the next batch in the oplog fetcher");
+        const bool pipelineStageFailed = std::exchange(_receiveDecodeStageFailed, false);
+        if ((usedPipeline || pipelineStartFailed) &&
+            _receiveDecodeInterrupt == ReceiveDecodeInterrupt::kNone) {
+            if (_isCanceledForReceiveDecode()) {
+                // shutdown() cancels the pipeline directly, so take() can return before the
+                // interrupt check runs. A cancellation is not a pipeline fault.
+                _receiveDecodeInterrupt = ReceiveDecodeInterrupt::kCanceled;
+            } else if ((pipelineStageFailed || pipelineStartFailed) &&
+                       _noteReceiveDecodeFailure(status)) {
+                _receiveDecodeInterrupt = ReceiveDecodeInterrupt::kFallback;
+            }
+        }
+        return status;
     }
 
+    _receiveDecodeBatchUsedPipeline = usedPipeline;
     return batch;
 }
 

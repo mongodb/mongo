@@ -15,6 +15,7 @@ public:
 
     void clear();
 
+    // Keeps an independent wire-byte snapshot; later mutations of the message cannot alter it.
     void set(const Message& message);
 
     boost::optional<Message> take();

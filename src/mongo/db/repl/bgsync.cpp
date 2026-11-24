@@ -487,6 +487,9 @@ void BackgroundSync::_produce() {
         // replication coordinator.
         auto numRestarts =
             _replicationCoordinatorExternalState->getOplogFetcherSteadyStateMaxFetcherRestarts();
+        OplogFetcher::Config fetcherConfig(
+            lastOpTimeFetched, source, _replCoord->getConfig(), bgSyncOplogFetcherBatchSize.load());
+        fetcherConfig.allowReceiveDecodePipeline = true;
         auto oplogFetcherPtr = std::make_unique<OplogFetcher>(
             _replicationCoordinatorExternalState->getTaskExecutor(),
             std::make_unique<OplogFetcher::OplogFetcherRestartDecisionDefault>(numRestarts),
@@ -495,10 +498,7 @@ void BackgroundSync::_produce() {
                 return this->_enqueueDocuments(a1, a2, a3);
             },
             onOplogFetcherShutdownCallbackFn,
-            OplogFetcher::Config(lastOpTimeFetched,
-                                 source,
-                                 _replCoord->getConfig(),
-                                 bgSyncOplogFetcherBatchSize.load()));
+            std::move(fetcherConfig));
         std::lock_guard lock(_mutex);
         if (_state != ProducerState::Running) {
             return;
