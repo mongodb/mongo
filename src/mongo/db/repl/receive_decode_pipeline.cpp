@@ -21,6 +21,8 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/message_compressor_snappy.h"
+#include "mongo/transport/message_compressor_zlib.h"
+#include "mongo/transport/message_compressor_zstd.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -59,6 +61,7 @@ auto& delivered = *MetricBuilder<Counter64>{"repl.network.receiveDecode.repliesD
 auto& failures = *MetricBuilder<Counter64>{"repl.network.receiveDecode.failures"};
 // Successfully validated replies whose flags required full decoding instead of prefix read-ahead.
 // These are not failures; a continuing reply makes the owner resume without read-ahead.
+auto& prefixFallbacks = *MetricBuilder<Counter64>{"repl.network.receiveDecode.prefixFallbacks"};
 auto& snappyPrefixFallbacks =
     *MetricBuilder<Counter64>{"repl.network.receiveDecode.snappyPrefixFallbacks"};
 auto& unsupportedCompressorFallbacks =
@@ -225,13 +228,41 @@ PrefixFlags prefixFlags(const Message& message) {
                 "Invalid compressed message header",
                 input.length() >= CompressionHeader::size());
         const CompressionHeader header(&input);
-        if (header.compressorId == static_cast<MessageCompressorId>(MessageCompressor::kSnappy)) {
-            const auto flags = readSnappyOpMsgFlags(message);
+        const size_t workspaceBytes =
+            header.compressorId == static_cast<MessageCompressorId>(MessageCompressor::kZstd)
+            ? kZstdOpMsgPrefixWorkspaceBytes
+            : (header.compressorId == static_cast<MessageCompressorId>(MessageCompressor::kZlib)
+                   ? kZlibOpMsgPrefixWorkspaceBytes
+                   : 0);
+        // Prefix workspace borrows from the already acquired input/output reservation. If the
+        // frame uses that entire reservation, don't allocate scratch or wait for extra budget:
+        // stop read-ahead at this frame and let the worker fully decode it normally.
+        const bool fitsWorkspace = header.uncompressedSize >= 0 &&
+            message.capacity() <= kReceiveReservation &&
+            static_cast<size_t>(header.uncompressedSize) + MsgData::MsgDataHeaderSize <=
+                kReceiveReservation - message.capacity() &&
+            workspaceBytes <= kReceiveReservation - message.capacity() -
+                    (static_cast<size_t>(header.uncompressedSize) + MsgData::MsgDataHeaderSize);
+        if (fitsWorkspace) {
+            StatusWith<uint32_t> flags(ErrorCodes::BadValue, "Unsupported prefix compressor");
+            switch (static_cast<MessageCompressor>(header.compressorId)) {
+                case MessageCompressor::kSnappy:
+                    flags = readSnappyOpMsgFlags(message);
+                    break;
+                case MessageCompressor::kZstd:
+                    flags = readZstdOpMsgFlags(message);
+                    break;
+                case MessageCompressor::kZlib:
+                    flags = readZlibOpMsgFlags(message);
+                    break;
+                default:
+                    break;
+            }
             if (flags.isOK()) {
                 return {flags.getValue(), true};
             }
-            // Full decoding decides validity and error precedence, including noncanonical
-            // encodings accepted by libsnappy and illegal flags followed by a corrupt tail.
+            // Full decoding decides validity and error precedence, including prefix work limits,
+            // noncanonical encodings, and illegal flags followed by a corrupt tail.
         }
         // Unknown flags stop read-ahead at this frame. The worker decodes and validates it in
         // full before the owner decides whether to hand back or abandon the stream.
@@ -453,6 +484,7 @@ struct ReceiveDecodePipeline::State : std::enable_shared_from_this<State> {
                 });
                 Timer decompressTimer;
                 bool snappyPrefixFallback = false;
+                bool supportedPrefixFallback = false;
                 if (raw.operation() == dbCompressed) {
                     if (!prefixKnown) {
                         ConstDataRangeCursor input(raw.header().data(),
@@ -460,8 +492,13 @@ struct ReceiveDecodePipeline::State : std::enable_shared_from_this<State> {
                         const CompressionHeader header(&input);
                         snappyPrefixFallback = header.compressorId ==
                             static_cast<MessageCompressorId>(MessageCompressor::kSnappy);
+                        supportedPrefixFallback = snappyPrefixFallback ||
+                            header.compressorId ==
+                                static_cast<MessageCompressorId>(MessageCompressor::kZstd) ||
+                            header.compressorId ==
+                                static_cast<MessageCompressorId>(MessageCompressor::kZlib);
                     }
-                    MessageCompressorManager manager;
+                    MessageCompressorManager manager(MessageCompressionDirection::kEgress);
                     reply.message = uassertStatusOK(manager.decompressMessage(raw));
                     raw = Message{};
                 } else {
@@ -493,8 +530,11 @@ struct ReceiveDecodePipeline::State : std::enable_shared_from_this<State> {
                         std::lock_guard lk(mutex);
                         terminalFrameReceived = true;
                     }
-                    if (snappyPrefixFallback) {
-                        snappyPrefixFallbacks.increment();
+                    if (supportedPrefixFallback) {
+                        prefixFallbacks.increment();
+                        if (snappyPrefixFallback) {
+                            snappyPrefixFallbacks.increment();
+                        }
                     } else {
                         unsupportedCompressorFallbacks.increment();
                     }
@@ -502,7 +542,7 @@ struct ReceiveDecodePipeline::State : std::enable_shared_from_this<State> {
                         11369904,
                         "Receive decode reply required full decoding instead of prefix read-ahead",
                         "reason"_attr =
-                            (snappyPrefixFallback ? "snappyPrefix" : "unsupportedCompressor"),
+                            (supportedPrefixFallback ? "prefix" : "unsupportedCompressor"),
                         "endsReadAhead"_attr = reply.endedReadAhead);
                 }
                 decoded.increment();

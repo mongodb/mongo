@@ -188,10 +188,11 @@ public:
     std::shared_ptr<transport::Session> getExhaustReceiveSession();
 
     /**
-     * Returns whether the preferred negotiated compressor is Snappy. May only be called on the
-     * client-owning thread; the session snapshot lock does not guard compressor negotiation.
+     * Returns whether the preferred negotiated compressor supports bounded prefix decoding
+     * (Snappy, zstd or zlib). May only be called on the client-owning thread; the session snapshot
+     * lock does not guard compressor negotiation.
      */
-    bool supportsSnappyExhaustReceive() const;
+    bool supportsExhaustReceiveDecode() const;
 
     ConnectionString::ConnectionType type() const override {
         return ConnectionString::ConnectionType::kStandalone;

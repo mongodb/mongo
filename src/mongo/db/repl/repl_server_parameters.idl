@@ -167,10 +167,10 @@ server_parameters:
 
     internalReplReceiveDecodePipelineEnabled:
         description: >-
-            Enable bounded read-ahead and parallel Snappy decoding and OP_MSG validation for
-            steady-state oplog exhaust streams. Authentication and initial finds stay synchronous.
-            Valid replies requiring full decoding instead of prefix read-ahead are counted under
-            metrics.repl.network.receiveDecode.snappyPrefixFallbacks or
+            Enable bounded read-ahead and parallel Snappy, zstd or zlib decoding and OP_MSG
+            validation for steady-state oplog exhaust streams. Authentication and initial finds
+            stay synchronous. Valid replies requiring full decoding instead of prefix read-ahead
+            are counted under metrics.repl.network.receiveDecode.prefixFallbacks or
             metrics.repl.network.receiveDecode.unsupportedCompressorFallbacks. These are not
             failures; continuing replies make the current fetcher resume without read-ahead.
             Disabling closes the current prefetched stream and resumes from the last enqueued optime.
@@ -241,7 +241,9 @@ server_parameters:
         description: >-
             Node-wide receive/decode buffer budget, including delivered replies retained by the
             fetcher. Before receiving, reserve one maximum wire input and maximum decode output
-            together. Parser containers and downstream oplog buffer allocations are not included.
+            together. zstd/zlib prefix workspace uses spare bytes in this reservation; if it does
+            not fit, stop read-ahead and fully decode the frame. Parser containers and downstream
+            oplog buffer allocations are not included.
         set_at: startup
         cpp_vartype: Atomic<long long>
         cpp_varname: gReplReceiveDecodeMaxPendingBytes

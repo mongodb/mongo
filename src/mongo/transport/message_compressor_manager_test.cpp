@@ -830,7 +830,7 @@ TEST(SnappyOpMsgFlags, MatchesFullDecompressionWithoutUpdatingCounters) {
     registry.setSupportedCompressors({compressor->getName()});
     registry.registerImplementation(std::move(compressor));
     ASSERT_OK(registry.finalizeSupportedCompressors());
-    MessageCompressorManager manager(&registry);
+    MessageCompressorManager manager(MessageCompressionDirection::kIngress, &registry);
 
     for (uint32_t flags : {0u,
                            OpMsg::kMoreToCome,
@@ -1051,7 +1051,7 @@ TEST(SnappyOpMsgFlags, RejectsInvalidOuterHeadersAndCompressionKinds) {
     for (auto compressorId : {MessageCompressor::kNoop,
                               MessageCompressor::kZlib,
                               MessageCompressor::kZstd,
-                              MessageCompressor::kExtended}) {
+                              static_cast<MessageCompressor>(255)}) {
         ASSERT_EQ(
             readSnappyOpMsgFlags(makeSnappyPrefixMessage(
                                      raw, 4, dbMsg, static_cast<MessageCompressorId>(compressorId)))
@@ -1071,6 +1071,136 @@ TEST(SnappyOpMsgFlags, SuccessfulPrefixDoesNotValidateCorruptTail) {
         ASSERT_NOT_OK(compressor.decompressData(ConstDataRange(raw.data(), raw.size()),
                                                 DataRange(output.data(), output.size())));
     }
+}
+
+std::unique_ptr<MessageCompressorBase> makeStreamCompressor(MessageCompressor algorithm) {
+    if (algorithm == MessageCompressor::kZstd) {
+        return std::make_unique<ZstdMessageCompressor>();
+    }
+    return std::make_unique<ZlibMessageCompressor>();
+}
+
+StatusWith<uint32_t> readStreamFlags(const Message& message, MessageCompressor algorithm) {
+    return algorithm == MessageCompressor::kZstd ? readZstdOpMsgFlags(message)
+                                                 : readZlibOpMsgFlags(message);
+}
+
+Message makeStreamPrefixMessage(MessageCompressor algorithm, const std::string& body) {
+    auto compressor = makeStreamCompressor(algorithm);
+    std::vector<uint8_t> bytes(compressor->getMaxCompressedSize(body.size()));
+    auto size = assertOk(compressor->compressData(ConstDataRange(body.data(), body.size()),
+                                                  DataRange(bytes.data(), bytes.size())));
+    bytes.resize(size);
+    return makeSnappyPrefixMessage(
+        bytes, body.size(), dbMsg, static_cast<MessageCompressorId>(algorithm));
+}
+
+TEST(StreamOpMsgFlags, MatchesFullDecodeAcrossSizesWithoutUpdatingCounters) {
+    for (auto algorithm : {MessageCompressor::kZstd, MessageCompressor::kZlib}) {
+        MessageCompressorRegistry registry;
+        auto compressor = makeStreamCompressor(algorithm);
+        auto* counters = compressor.get();
+        registry.setSupportedCompressors({compressor->getName()});
+        registry.registerImplementation(std::move(compressor));
+        ASSERT_OK(registry.finalizeSupportedCompressors());
+        MessageCompressorManager manager(MessageCompressionDirection::kIngress, &registry);
+        for (size_t size : {size_t{4}, size_t{32}, size_t{4096}, size_t{131073}, size_t{4194304}}) {
+            for (uint32_t flags : {0u, OpMsg::kMoreToCome, OpMsg::kChecksumPresent, 0x80010003u}) {
+                std::string body(size, '\0');
+                DataView(body.data()).write<LittleEndian<uint32_t>>(flags);
+                uint32_t random = 123;
+                for (size_t i = 4; i < size; ++i) {
+                    random = random * 1664525u + 1013904223u;
+                    body[i] = static_cast<char>(random >> 24);
+                }
+                auto message = makeStreamPrefixMessage(algorithm, body);
+                const auto bytesIn = counters->getDecompressorBytesIn();
+                const auto bytesOut = counters->getDecompressorBytesOut();
+                ASSERT_EQ(assertOk(readStreamFlags(message, algorithm)), flags);
+                ASSERT_EQ(counters->getDecompressorBytesIn(), bytesIn);
+                ASSERT_EQ(counters->getDecompressorBytesOut(), bytesOut);
+                auto decoded = assertOk(manager.decompressMessage(message));
+                ASSERT_EQ(OpMsg::flags(decoded), flags);
+                ASSERT_EQ(std::memcmp(decoded.header().data(), body.data(), body.size()), 0);
+            }
+        }
+    }
+}
+
+TEST(StreamOpMsgFlags, RejectsMalformedHeadersAndIncompletePrefixes) {
+    for (auto algorithm : {MessageCompressor::kZstd, MessageCompressor::kZlib}) {
+        const auto id = static_cast<MessageCompressorId>(algorithm);
+        MessageCompressorRegistry registry;
+        auto compressor = makeStreamCompressor(algorithm);
+        registry.setSupportedCompressors({compressor->getName()});
+        registry.registerImplementation(std::move(compressor));
+        ASSERT_OK(registry.finalizeSupportedCompressors());
+        MessageCompressorManager manager(MessageCompressionDirection::kIngress, &registry);
+        ASSERT_NOT_OK(readStreamFlags(Message{}, algorithm));
+        ASSERT_NOT_OK(readStreamFlags(Message(SharedBuffer::allocate(3)), algorithm));
+        for (size_t size = 0; size < 4; ++size) {
+            auto message = makeStreamPrefixMessage(algorithm, std::string(size, '\0'));
+            ASSERT_NOT_OK(readStreamFlags(message, algorithm));
+        }
+        auto message = makeStreamPrefixMessage(algorithm, std::string(4096, '\0'));
+        std::vector<uint8_t> raw(message.header().data() + CompressionHeader::size(),
+                                 message.header().data() + message.header().dataLen());
+        for (size_t size = 0; size < raw.size(); ++size) {
+            const auto truncated = makeSnappyPrefixMessage(
+                std::vector<uint8_t>(raw.begin(), raw.begin() + size), 4096, dbMsg, id);
+            auto prefix = readStreamFlags(truncated, algorithm);
+            if (prefix.isOK()) {
+                ASSERT_EQ(prefix.getValue(), 0u);
+            }
+            ASSERT_NOT_OK(manager.decompressMessage(truncated));
+        }
+        for (int32_t size : {-1, 0, 1, 2, 3, std::numeric_limits<int32_t>::max()}) {
+            ASSERT_NOT_OK(
+                readStreamFlags(makeSnappyPrefixMessage(raw, size, dbMsg, id), algorithm));
+        }
+        ASSERT_NOT_OK(readStreamFlags(makeSnappyPrefixMessage(raw, 4096, dbQuery, id), algorithm));
+        ASSERT_NOT_OK(readStreamFlags(makeSnappyPrefixMessage(raw, 4096, dbMsg, 255), algorithm));
+        message.header().setLen(message.capacity() + 1);
+        ASSERT_NOT_OK(readStreamFlags(message, algorithm));
+        message = makeStreamPrefixMessage(algorithm, std::string(4096, '\0'));
+        message.header().setOperation(dbMsg);
+        ASSERT_NOT_OK(readStreamFlags(message, algorithm));
+    }
+}
+
+TEST(StreamOpMsgFlags, RejectsIllegalFlagsAndDoesNotValidateCompressedTail) {
+    for (auto algorithm : {MessageCompressor::kZstd, MessageCompressor::kZlib}) {
+        for (uint32_t bit = 2; bit < 16; ++bit) {
+            std::string body(4096, '\0');
+            DataView(body.data()).write<LittleEndian<uint32_t>>(1u << bit);
+            ASSERT_EQ(readStreamFlags(makeStreamPrefixMessage(algorithm, body), algorithm)
+                          .getStatus()
+                          .code(),
+                      ErrorCodes::IllegalOpMsgFlag);
+        }
+        std::string body(2 * 1024 * 1024, 'x');
+        DataView(body.data()).write<LittleEndian<uint32_t>>(OpMsg::kMoreToCome);
+        auto message = makeStreamPrefixMessage(algorithm, body);
+        auto truncated = makeSnappyPrefixMessage(
+            std::vector<uint8_t>(message.header().data() + CompressionHeader::size(),
+                                 message.header().data() + message.header().dataLen() - 1),
+            body.size(),
+            dbMsg,
+            static_cast<MessageCompressorId>(algorithm));
+        ASSERT_EQ(assertOk(readStreamFlags(truncated, algorithm)), OpMsg::kMoreToCome);
+        std::vector<char> output(body.size());
+        ASSERT_NOT_OK(makeStreamCompressor(algorithm)->decompressData(
+            ConstDataRange(truncated.header().data() + CompressionHeader::size(),
+                           truncated.header().dataLen() - CompressionHeader::size()),
+            DataRange(output.data(), output.size())));
+    }
+}
+
+TEST(StreamOpMsgFlags, ZstdRejectsOversizedWindowWithoutAllocatingIt) {
+    const auto id = static_cast<MessageCompressorId>(MessageCompressor::kZstd);
+    const auto message =
+        makeSnappyPrefixMessage({0x28, 0xb5, 0x2f, 0xfd, 0x00, 0x80}, 4096, dbMsg, id);
+    ASSERT_NOT_OK(readZstdOpMsgFlags(message));
 }
 
 }  // namespace

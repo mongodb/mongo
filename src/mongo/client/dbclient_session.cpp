@@ -548,11 +548,19 @@ std::shared_ptr<transport::Session> DBClientSession::getExhaustReceiveSession() 
     return _session;
 }
 
-bool DBClientSession::supportsSnappyExhaustReceive() const {
+bool DBClientSession::supportsExhaustReceiveDecode() const {
     const auto& compressors = _compressorManager.getNegotiatedCompressors();
-    return !compressors.empty() &&
-        compressors.front()->getId() ==
-        static_cast<MessageCompressorId>(MessageCompressor::kSnappy);
+    if (compressors.empty()) {
+        return false;
+    }
+    switch (static_cast<MessageCompressor>(compressors.front()->getId())) {
+        case MessageCompressor::kSnappy:
+        case MessageCompressor::kZstd:
+        case MessageCompressor::kZlib:
+            return true;
+        default:
+            return false;
+    }
 }
 
 Message DBClientSession::recv(int lastRequestId) {

@@ -52,8 +52,8 @@ public:
         Message message;
         std::unique_ptr<rpc::ReplyInterface> parsed;
         // True if this reply continues the exhaust stream but the receiver stopped reading after
-        // it, because its flags were unavailable without full decoding (an unsupported compressor
-        // or a noncanonical Snappy prefix).
+        // it, because its flags were unavailable without full decoding (an unsupported compressor,
+        // a noncanonical prefix, or a prefix workspace/work limit).
         // The reply is valid; the owner must abandon the stream and resume without the pipeline.
         bool endedReadAhead = false;
     };

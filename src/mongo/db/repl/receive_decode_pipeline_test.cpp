@@ -3,6 +3,7 @@
 
 #include "mongo/db/repl/receive_decode_pipeline.h"
 
+#include "mongo/base/data_range_cursor.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -23,6 +24,7 @@
 #include "mongo/transport/message_compressor_registry.h"
 #include "mongo/transport/message_compressor_snappy.h"
 #include "mongo/transport/message_compressor_zlib.h"
+#include "mongo/transport/message_compressor_zstd.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -145,10 +147,18 @@ private:
 
 MessageCompressorId snappyId() {
     auto& registry = MessageCompressorRegistry::get();
-    if (!registry.getCompressor("snappy")) {
-        registry.setSupportedCompressors({"snappy", "zlib"});
-        registry.registerImplementation(std::make_unique<SnappyMessageCompressor>());
-        registry.registerImplementation(std::make_unique<ZlibMessageCompressor>());
+    if (!registry.getCompressor("snappy") || !registry.getCompressor("zlib") ||
+        !registry.getCompressor("zstd")) {
+        registry.setSupportedCompressors({"snappy", "zlib", "zstd"});
+        if (!registry.getCompressor("snappy")) {
+            registry.registerImplementation(std::make_unique<SnappyMessageCompressor>());
+        }
+        if (!registry.getCompressor("zlib")) {
+            registry.registerImplementation(std::make_unique<ZlibMessageCompressor>());
+        }
+        if (!registry.getCompressor("zstd")) {
+            registry.registerImplementation(std::make_unique<ZstdMessageCompressor>());
+        }
         uassertStatusOK(registry.finalizeSupportedCompressors());
     }
     auto* compressor = registry.getCompressor("snappy");
@@ -156,9 +166,10 @@ MessageCompressorId snappyId() {
     return compressor->getId();
 }
 
-Message compress(Message message) {
-    MessageCompressorManager manager;
-    const auto id = snappyId();
+Message compress(Message message, MessageCompressor algorithm = MessageCompressor::kSnappy) {
+    MessageCompressorManager manager(MessageCompressionDirection::kUncounted);
+    snappyId();
+    const auto id = static_cast<MessageCompressorId>(algorithm);
     auto compressed = uassertStatusOK(manager.compressMessage(message, &id));
     ASSERT_EQ(compressed.operation(), dbCompressed);
     return compressed;
@@ -179,6 +190,7 @@ Message makeReply(int marker, bool moreToCome, bool compressed = false) {
 class ReceiveDecodePipelineTest : public ServiceContextTest {
 protected:
     void setUp() override {
+        ServiceContextTest::setUp();
         snappyId();
         _oldDepth = gReplReceiveDecodeQueueDepth.load();
         _oldBytes = gReplReceiveDecodeMaxPendingBytes.load();
@@ -634,7 +646,7 @@ TEST_F(ReceiveDecodePipelineTest, NoncanonicalSnappyLiteralFallsBackToFullDecode
         Message message(std::move(buffer));
         message.header().setLen(size + zeroLiteral.size());
         ASSERT_EQ(readSnappyOpMsgFlags(message).getStatus().code(), ErrorCodes::BadValue);
-        MessageCompressorManager manager;
+        MessageCompressorManager manager(MessageCompressionDirection::kUncounted);
         auto fullDecode = uassertStatusOK(manager.decompressMessage(message));
         ASSERT_EQ(OpMsg::parse(fullDecode).body.woCompare(OpMsg::parse(original).body), 0);
 
@@ -1095,34 +1107,140 @@ TEST_F(ReceiveDecodePipelineTest, PassingInterruptCheckDoesNotAffectDelivery) {
     ASSERT_TRUE(session->isConnected());
 }
 
-// A frame compressed with another negotiated compressor is decoded and validated in full. Its
-// flags can't be read ahead, so the receiver stops after it and the reply says so.
-TEST_F(ReceiveDecodePipelineTest, NonSnappyFrameIsDecodedAndEndsReadAhead) {
-    const auto prefixFallbacksBefore = pipelineMetric("snappyPrefixFallbacks");
-    const auto compressorFallbacksBefore = pipelineMetric("unsupportedCompressorFallbacks");
-    const auto failuresBefore = pipelineMetric("failures");
-    auto* zlib = MessageCompressorRegistry::get().getCompressor("zlib");
-    ASSERT(zlib);
-    MessageCompressorManager manager;
-    const auto id = zlib->getId();
-    auto compressed = uassertStatusOK(manager.compressMessage(makeReply(0, true), &id));
-    ASSERT_EQ(compressed.operation(), dbCompressed);
+TEST_F(ReceiveDecodePipelineTest, ZstdAndZlibContinueReadAheadWithCompletedSuccessors) {
+    for (auto algorithm : {MessageCompressor::kZstd, MessageCompressor::kZlib}) {
+        const auto decodedBefore = pipelineMetric("repliesDecoded");
+        const auto fallbacksBefore = pipelineMetric("prefixFallbacks");
+        auto hang =
+            std::make_unique<FailPointEnableBlock>("hangReplReceiveDecode", BSON("seq" << 0));
+        auto session = std::make_shared<ReceiveSession>();
+        for (int i = 0; i < 3; ++i) {
+            session->push(compress(makeReply(i, i != 2), algorithm));
+        }
+        auto pipeline = start(session);
+        ON_BLOCK_EXIT([&] {
+            hang.reset();
+            pipeline->stop(true);
+        });
+        auto opCtx = makeOperationContext();
+        opCtx->runWithDeadline(Date_t::now() + Seconds(30), ErrorCodes::ExceededTimeLimit, [&] {
+            (*hang)->waitForTimesEntered(opCtx.get(), hang->initialTimesEntered() + 1);
+        });
+        ASSERT_TRUE(waitForMetric("repliesDecoded", decodedBefore + 2));
+        hang.reset();
+        for (int i = 0; i < 3; ++i) {
+            auto reply = pipeline->take(kRequestId + i);
+            assertReply(reply, i, i != 2);
+            ASSERT_FALSE(reply.endedReadAhead);
+        }
+        ASSERT_FALSE(pipeline->stop(false));
+        ASSERT_EQ(session->reads(), 3U);
+        ASSERT_TRUE(session->isConnected());
+        ASSERT_EQ(pipelineMetric("prefixFallbacks"), fallbacksBefore);
+    }
+}
 
+TEST_F(ReceiveDecodePipelineTest, MixedCompressorsAndUncompressedRepliesShareOneOrderedStream) {
     auto session = std::make_shared<ReceiveSession>();
-    session->push(std::move(compressed));
+    session->push(compress(makeReply(0, true), MessageCompressor::kZstd));
+    session->push(compress(makeReply(1, true), MessageCompressor::kZlib));
+    session->push(makeReply(2, true, true));
+    session->push(makeReply(3, false));
+    auto pipeline = start(session);
+    for (int i = 0; i < 4; ++i) {
+        auto reply = pipeline->take(kRequestId + i);
+        assertReply(reply, i, i != 3);
+        ASSERT_FALSE(reply.endedReadAhead);
+    }
+    ASSERT_FALSE(pipeline->stop(false));
+    ASSERT_EQ(session->reads(), 4U);
+}
+
+TEST_F(ReceiveDecodePipelineTest, ZstdLargeWindowFallbackStillValidatesAndEndsReadAhead) {
+    const auto before = pipelineMetric("prefixFallbacks");
+    const auto failuresBefore = pipelineMetric("failures");
+    auto original = makeReply(0, true);
+    // Standard zstd frame, unknown content size, 64 MiB window, one final raw block.
+    std::vector<uint8_t> frame{0x28, 0xb5, 0x2f, 0xfd, 0x00, 0x80};
+    const uint32_t block = (static_cast<uint32_t>(original.dataSize()) << 3) | 1;
+    for (int i = 0; i < 3; ++i) {
+        frame.push_back(static_cast<uint8_t>(block >> (8 * i)));
+    }
+    frame.insert(
+        frame.end(), original.header().data(), original.header().data() + original.dataSize());
+    const auto size = MsgData::MsgDataHeaderSize + CompressionHeader::size() + frame.size();
+    auto buffer = SharedBuffer::allocate(size);
+    Message message(std::move(buffer));
+    message.header().setLen(size);
+    message.header().setOperation(dbCompressed);
+    message.header().setId(kFirstReplyId);
+    message.header().setResponseToMsgId(kRequestId);
+    DataRangeCursor output(message.header().data(),
+                           message.header().data() + message.header().dataLen());
+    CompressionHeader(
+        dbMsg, original.dataSize(), static_cast<MessageCompressorId>(MessageCompressor::kZstd))
+        .serialize(&output);
+    std::memcpy(output.data(), frame.data(), frame.size());
+    ASSERT_NOT_OK(readZstdOpMsgFlags(message));
+    auto session = std::make_shared<ReceiveSession>();
+    session->push(std::move(message));
     session->push(makeReply(1, false, true));
     auto pipeline = start(session);
     auto reply = pipeline->take(kRequestId);
     assertReply(reply, 0, true);
     ASSERT_TRUE(reply.endedReadAhead);
-    // The next frame was left unread for the synchronous path.
     ASSERT_TRUE(pipeline->stop(true));
     ASSERT_EQ(session->reads(), 1U);
     ASSERT_EQ(session->queued(), 1U);
-    ASSERT_EQ(pipelineMetric("snappyPrefixFallbacks"), prefixFallbacksBefore);
-    ASSERT_EQ(pipelineMetric("unsupportedCompressorFallbacks"), compressorFallbacksBefore + 1);
+    ASSERT_EQ(pipelineMetric("prefixFallbacks"), before + 1);
     ASSERT_EQ(pipelineMetric("failures"), failuresBefore);
 }
+
+TEST_F(ReceiveDecodePipelineTest, ZstdAndZlibRejectCorruptTailsBeforeDelivery) {
+    for (auto algorithm : {MessageCompressor::kZstd, MessageCompressor::kZlib}) {
+        OpMsgBuilder builder;
+        builder.setBody(BSON("ok" << 1 << "pad" << std::string(2 * 1024 * 1024, 'x')));
+        auto original = builder.finish();
+        original.header().setId(kFirstReplyId);
+        original.header().setResponseToMsgId(kRequestId);
+        auto damaged = compress(std::move(original), algorithm);
+        damaged.header().setLen(damaged.size() - 1);
+        const auto flags = algorithm == MessageCompressor::kZstd ? readZstdOpMsgFlags(damaged)
+                                                                 : readZlibOpMsgFlags(damaged);
+        ASSERT_OK(flags);
+        auto session = std::make_shared<ReceiveSession>();
+        session->push(std::move(damaged));
+        auto pipeline = start(session);
+        ASSERT_THROWS_CODE(pipeline->take(kRequestId), DBException, ErrorCodes::BadValue);
+        ASSERT_TRUE(pipeline->stop(false));
+    }
+}
+
+#ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
+TEST_F(ReceiveDecodePipelineTest, ZstdAndZlibKeepChecksumValidation) {
+    for (auto algorithm : {MessageCompressor::kZstd, MessageCompressor::kZlib}) {
+        for (bool corrupt : {false, true}) {
+            auto original = makeReply(0, false);
+            OpMsg::appendChecksum(&original);
+            if (corrupt) {
+                original.buf()[original.size() - 1] ^= 1;
+            }
+            auto session = std::make_shared<ReceiveSession>();
+            session->push(compress(std::move(original), algorithm));
+            auto pipeline = start(session);
+            if (corrupt) {
+                ASSERT_THROWS_CODE(
+                    pipeline->take(kRequestId), DBException, ErrorCodes::ChecksumMismatch);
+                ASSERT_TRUE(pipeline->stop(false));
+            } else {
+                auto reply = pipeline->take(kRequestId);
+                assertReply(reply, 0, false);
+                ASSERT_FALSE(pipeline->stop(false));
+            }
+        }
+    }
+}
+#endif
 
 // Oplog getMore replies are a single body section. A document sequence is rejected before the
 // parser materializes one BSONObj per document outside the receive budget.

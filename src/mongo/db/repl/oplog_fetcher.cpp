@@ -963,7 +963,7 @@ StatusWith<OplogFetcher::Documents> OplogFetcher::_getNextBatch() {
             if (!_receiveDecodePipeline && !_receiveDecodeUnsupportedStream &&
                 _config.allowReceiveDecodePipeline && gReplReceiveDecodePipelineEnabled.load() &&
                 _cursor->isExhaust() && _cursor->hasMoreToCome() &&
-                _conn->supportsSnappyExhaustReceive() && !receiveDecodeBreakerOpen()) {
+                _conn->supportsExhaustReceiveDecode() && !receiveDecodeBreakerOpen()) {
                 try {
                     replReceiveDecodeStartThrows.execute([](const BSONObj&) {
                         uasserted(ErrorCodes::InternalError,
