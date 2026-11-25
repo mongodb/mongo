@@ -849,6 +849,170 @@ TEST(BSONValidateFast, MaxNestingDepth) {
     ASSERT_EQ(status.code(), ErrorCodes::Overflow);
 }
 
+// The validator scans field names with a vectorized probe over 16-byte chunks. These tests cover
+// names around that boundary and positions near the end of the buffer, where the probe must fall
+// back to the scalar scan instead of reading past the end.
+TEST(BSONValidateFast, FieldNameLengthsAroundVectorChunk) {
+    for (size_t nameLen = 1; nameLen <= 70; ++nameLen) {
+        const std::string name(nameLen, 'f');
+        BSONObj x = BSON(name << 1 << "z" << std::string(nameLen, 'v') << "n"
+                              << BSON(name << BSON_ARRAY(1 << 2)));
+        ASSERT_OK(validateBSON(x)) << "nameLen=" << nameLen;
+        ASSERT_OK(validateBSON(x, BSONValidateModeEnum::kExtended)) << "nameLen=" << nameLen;
+    }
+}
+
+TEST(BSONValidateFast, FieldNameLengthsManyFieldsMixed) {
+    // Many fields with names of every length up to two chunks, so that each possible position of
+    // the terminating NUL within a chunk is exercised repeatedly and at varying alignments.
+    BSONObjBuilder b;
+    for (size_t i = 0; i < 400; ++i) {
+        const size_t nameLen = 1 + i % 40;
+        std::string name(nameLen, static_cast<char>('a' + i % 26));
+        name += std::to_string(i);  // keep names unique
+        b.append(name, static_cast<int>(i));
+    }
+    BSONObj x = b.obj();
+    ASSERT_OK(validateBSON(x));
+    ASSERT_OK(validateBSON(x, BSONValidateModeEnum::kFull));
+}
+
+TEST(BSONValidateFast, FieldNameNearEndOfBufferUsesExactSizeAllocation) {
+    // Copy into an exact-size heap allocation so sanitizers detect any read past the end of the
+    // buffer, including by the vectorized name scan.
+    for (size_t nameLen = 0; nameLen <= 40; ++nameLen) {
+        const std::string name(nameLen, 'q');
+        BSONObj x = BSON(name << 1);
+        const size_t size = static_cast<size_t>(x.objsize());
+        auto exact = std::make_unique<char[]>(size);
+        memcpy(exact.get(), x.objdata(), size);
+        ASSERT_OK(validateBSON(exact.get(), size)) << "nameLen=" << nameLen;
+    }
+}
+
+// Returns an exact-size heap copy of 'bytes', so that sanitizers flag any read past its end.
+std::unique_ptr<char[]> exactCopy(const std::string& bytes) {
+    auto copy = std::make_unique<char[]>(bytes.size());
+    memcpy(copy.get(), bytes.data(), bytes.size());
+    return copy;
+}
+
+// Builds {<name>: null} as raw bytes: length, type, name, NUL, EOO.
+std::string nullElementObject(const std::string& name) {
+    std::string bytes(4, '\0');
+    bytes += static_cast<char>(BSONType::null);
+    bytes += name;
+    bytes += '\0';
+    bytes += '\0';  // EOO
+    const auto len = static_cast<int32_t>(bytes.size());
+    DataView(bytes.data()).write(tagLittleEndian(len));
+    return bytes;
+}
+
+const BSONValidateModeEnum kAllValidateModes[] = {
+    BSONValidateModeEnum::kDefault, BSONValidateModeEnum::kExtended, BSONValidateModeEnum::kFull};
+
+TEST(BSONValidateFast, FieldNameWithoutTerminatorIsRejected) {
+    // Replace the NUL that ends a field name while keeping the object's final EOO intact, so the
+    // validator really scans the corrupted name. The scan starts at the type byte, so names of up
+    // to 14 bytes end inside the first 16-byte chunk, up to 30 in the second, longer ones continue
+    // with the scalar scan, and the shortest ones leave fewer than 16 bytes before the end.
+    for (size_t nameLen = 0; nameLen <= 40; ++nameLen) {
+        std::string bytes = nullElementObject(std::string(nameLen, 'q'));
+        auto valid = exactCopy(bytes);
+        for (auto mode : kAllValidateModes)
+            ASSERT_OK(validateBSON(valid.get(), bytes.size(), mode)) << "nameLen=" << nameLen;
+
+        // The scan now runs into the object's EOO, which leaves no room for the value.
+        bytes[5 + nameLen] = 'x';
+        auto corrupt = exactCopy(bytes);
+        for (auto mode : kAllValidateModes)
+            ASSERT_EQ(validateBSON(corrupt.get(), bytes.size(), mode).code(),
+                      ErrorCodes::InvalidBSON)
+                << "nameLen=" << nameLen << " mode=" << static_cast<int>(mode);
+    }
+}
+
+TEST(BSONValidateFast, FieldNameScanAlignmentsAndByteValues) {
+    // Every start alignment within a 16-byte chunk, every name length up to two chunks, and name
+    // bytes with the high bit set or equal to 0x01, which must never be taken for a terminator.
+    // The object is validated at the very end of an exact-size allocation.
+    const char kNameBytes[] = {'a', '\x01', '\x7f', '\x80', '\xff'};
+    for (size_t nameLen = 0; nameLen <= 34; ++nameLen) {
+        std::string name;
+        for (size_t i = 0; i < nameLen; ++i)
+            name += kNameBytes[(i + nameLen) % sizeof(kNameBytes)];
+        std::string bytes = nullElementObject(name);
+        for (size_t offset = 0; offset < 16; ++offset) {
+            auto buf = std::make_unique<char[]>(offset + bytes.size());
+            memcpy(buf.get() + offset, bytes.data(), bytes.size());
+            // Full mode would reject the non-UTF-8 names, so only check the structural modes.
+            for (auto mode : {BSONValidateModeEnum::kDefault, BSONValidateModeEnum::kExtended})
+                ASSERT_OK(validateBSON(buf.get() + offset, bytes.size(), mode))
+                    << "nameLen=" << nameLen << " offset=" << offset;
+
+            buf[offset + 5 + nameLen] = 'x';
+            ASSERT_EQ(validateBSON(buf.get() + offset, bytes.size()).code(),
+                      ErrorCodes::InvalidBSON)
+                << "nameLen=" << nameLen << " offset=" << offset;
+        }
+    }
+}
+
+TEST(BSONValidateFast, RegexStringLengthsAroundVectorChunk) {
+    // Regular expressions are two more NUL-terminated strings scanned the same way as field names.
+    // Vary both the pattern and the options so each string crosses the 16-byte probe. Repeated 'x'
+    // keeps the options valid for the extended and full modes.
+    for (size_t patternLen = 0; patternLen <= 40; ++patternLen) {
+        for (size_t optionsLen : {size_t{1}, size_t{14}, size_t{15}, size_t{16}, size_t{33}}) {
+            BSONObjBuilder b;
+            b.appendRegex("r", std::string(patternLen, 'p'), std::string(optionsLen, 'x'));
+            BSONObj x = b.obj();
+            std::string bytes(x.objdata(), x.objsize());
+            auto valid = exactCopy(bytes);
+            for (auto mode : kAllValidateModes)
+                ASSERT_OK(validateBSON(valid.get(), bytes.size(), mode))
+                    << "patternLen=" << patternLen << " optionsLen=" << optionsLen;
+
+            // Layout: length(4), type(1), "r\0"(2), pattern, NUL, options, NUL, EOO.
+            const size_t patternEnd = 7 + patternLen;
+            const size_t optionsEnd = patternEnd + 1 + optionsLen;
+            ASSERT_EQ(bytes[patternEnd], '\0');
+            ASSERT_EQ(bytes[optionsEnd], '\0');
+            ASSERT_EQ(optionsEnd + 2, bytes.size());
+
+            // Unterminated options run into the EOO; unterminated pattern swallows the options,
+            // so the options scan starts at the EOO. Both leave no room for the terminator.
+            for (size_t corruptAt : {optionsEnd, patternEnd}) {
+                std::string corrupted = bytes;
+                corrupted[corruptAt] = 'x';
+                auto corrupt = exactCopy(corrupted);
+                for (auto mode : kAllValidateModes)
+                    ASSERT_EQ(validateBSON(corrupt.get(), corrupted.size(), mode).code(),
+                              ErrorCodes::InvalidBSON)
+                        << "patternLen=" << patternLen << " optionsLen=" << optionsLen
+                        << " corruptAt=" << corruptAt << " mode=" << static_cast<int>(mode);
+            }
+        }
+    }
+}
+
+TEST(BSONValidateFast, EmptyAndTinyNestedObjects) {
+    // Many objects end immediately after their header or after one short field, so most scans
+    // start at an EOO byte.
+    BSONObjBuilder b;
+    for (int i = 0; i < 200; ++i) {
+        BSONObjBuilder sub(b.subobjStart(std::to_string(i)));
+        if (i % 2)
+            sub.append("a", i);
+        sub.append("e", BSONObj());
+        sub.append("v", BSONArray());
+    }
+    BSONObj x = b.obj();
+    ASSERT_OK(validateBSON(x));
+    ASSERT_OK(validateBSON(x, BSONValidateModeEnum::kFull));
+}
+
 TEST(BSONValidateFast, ErrorTooShort) {
     BSONObj x;
     x = BSON("foo" << 17 << "bar"
@@ -1249,6 +1413,54 @@ TEST(BSONValidateColumn, BSONColumnFieldnameNotEmpty) {
     memcpy(buf + 4, ((const char*)columnData.data) + 1, columnData.length - 1);
 
     ASSERT_EQ(validateBSONColumn(buf, columnData.length + 3).code(), ErrorCodes::NonConformantBSON);
+}
+
+TEST(BSONValidateColumn, BSONColumnObjectLiteralMustEndWithEOO) {
+    // An object or array literal whose declared length leaves a non-EOO byte at its end. The
+    // column itself still ends with EOO, so this checks the literal's own terminator rather than
+    // the column's. The literals hold field names on both sides of the 16-byte probe so the valid
+    // case also scans them. Layout: literal (type byte, empty field name, embedded object), an
+    // int32 literal (0x10, empty field name, value 1), then the column's EOO.
+    const BSONObj objectLiteral =
+        BSON("a" << 1 << "abcdefghijklm" << 2 << "abcdefghijklmnopqrstuvwxyz" << 3);
+    const BSONObj arrayLiteral = BSON_ARRAY(1 << "x" << 3.5);
+    for (auto [type, literal] :
+         {std::pair{BSONType::object, objectLiteral}, std::pair{BSONType::array, arrayLiteral}}) {
+        std::string bytes;
+        bytes += static_cast<char>(type);
+        bytes += '\0';
+        bytes.append(literal.objdata(), literal.objsize());
+        bytes.append("\x10\x00\x01\x00\x00\x00\x00", 7);
+        const size_t literalEoo = 2 + literal.objsize() - 1;
+        ASSERT_EQ(bytes[literalEoo], '\0');
+
+        auto valid = exactCopy(bytes);
+        for (auto mode : kAllValidateModes)
+            ASSERT_OK(validateBSONColumn(valid.get(), static_cast<int>(bytes.size()), mode))
+                << "type=" << typeName(type) << " mode=" << static_cast<int>(mode);
+        ASSERT_OK(validateBSON(BSON("a" << BSONBinData(bytes.data(),
+                                                       static_cast<int>(bytes.size()),
+                                                       BinDataType::Column))));
+
+        bytes[literalEoo] = '\x0a';  // The literal's EOO becomes a Null type byte.
+        auto corrupt = exactCopy(bytes);
+        const BSONObj invalidObj = BSON(
+            "a" << BSONBinData(bytes.data(), static_cast<int>(bytes.size()), BinDataType::Column));
+        for (auto mode : kAllValidateModes) {
+            // The column validator reports the literal's own error code; once wrapped in a
+            // document, column errors are reported as NonConformantBSON.
+            ASSERT_EQ(
+                validateBSONColumn(corrupt.get(), static_cast<int>(bytes.size()), mode).code(),
+                ErrorCodes::InvalidBSON)
+                << "type=" << typeName(type) << " mode=" << static_cast<int>(mode);
+            boost::optional<std::string> description;
+            Status status = validateBSON(invalidObj, mode, mongo::V2_Column, &description);
+            ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON)
+                << "type=" << typeName(type) << " mode=" << static_cast<int>(mode);
+            ASSERT_TRUE(description);
+            EXPECT_EQ(*description, "BSON literal content not terminated with EOO");
+        }
+    }
 }
 
 TEST(BSONValidateColumn, BSONColumnNoOverflowMissingAllEOOInColumn) {
