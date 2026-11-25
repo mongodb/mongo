@@ -1,0 +1,23 @@
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
+
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/db/basic_types.idl"
+
+server_parameters:
+    internalUpdateObjectNodeChildLookupCacheThreshold:
+        description: >-
+            Number of static direct children an UpdateObjectNode must have before
+            UpdateObjectNode::apply() looks them up through a hash map instead of scanning the
+            object's children for each one. Counts children in the update tree, not fields in the
+            document. 0 disables it. Does not change the result of an update.
+        set_at: [startup, runtime]
+        cpp_vartype: "Atomic<int>"
+        cpp_varname: gUpdateObjectNodeChildLookupCacheThreshold
+        default: 0
+        validator:
+            gte: 0
+        redact: false
