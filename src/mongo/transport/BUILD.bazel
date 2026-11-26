@@ -450,6 +450,8 @@ mongo_cc_unit_test(
         "//src/mongo/db:commands",
         "//src/mongo/db:dbmessage",
         "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db:traffic_reader",
+        "//src/mongo/db:traffic_recorder",
         "//src/mongo/db/admission:egress_response_rate_limiter",
         "//src/mongo/db/auth:authmocks",
         "//src/mongo/db/commands/server_status:server_status_core",

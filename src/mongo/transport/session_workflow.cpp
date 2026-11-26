@@ -62,11 +62,13 @@
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/net/ssl_peer_info.h"
+#include "mongo/util/shared_buffer.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
 #include <array>
 #include <cstddef>
+#include <cstring>
 #include <memory>
 #include <ratio>
 #include <string>
@@ -918,9 +920,20 @@ Future<DbResponse> SessionWorkflow::Impl::_dispatchWork() {
     // If a traffic recording is active, we may need to record this request.
     // The decision as to whether to record depends on the _parsed_ request
     // (to know if the request is "sensitive" e.g., auth), but we wish to record
-    // exactly what was received off the wire.
-    auto requestForTrafficRecording =
-        boost::make_optional(TrafficRecorder::get(_serviceContext).isActive(), _work->in());
+    // exactly what was received off the wire. Keep an independent snapshot because exhaust may
+    // rewrite the execution buffer before the request is submitted to the recorder.
+    boost::optional<Message> requestForTrafficRecording;
+    if (TrafficRecorder::get(_serviceContext).isActive()) {
+        const auto& request = _work->in();
+        const auto size = request.size();
+        uassert(ErrorCodes::ProtocolError,
+                "Traffic recording request length does not match its buffer",
+                size >= MsgData::MsgDataHeaderSize &&
+                    static_cast<size_t>(size) <= request.capacity());
+        auto buffer = SharedBuffer::allocate(static_cast<size_t>(size));
+        std::memcpy(buffer.get(), request.buf(), static_cast<size_t>(size));
+        requestForTrafficRecording.emplace(std::move(buffer));
+    }
 
     _work->decompressRequest();
 
