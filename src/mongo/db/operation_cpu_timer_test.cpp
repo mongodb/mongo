@@ -5,6 +5,7 @@
 #include "mongo/db/operation_cpu_timer.h"
 
 #include "mongo/db/client.h"
+#include "mongo/db/operation_context_options_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/logv2/log.h"
@@ -16,6 +17,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
 #include <mutex>
@@ -292,6 +294,19 @@ TEST_F(OperationCPUTimerTest, TimerPausesOnBlockingSleep) {
     }
 
     ASSERT_LTE(failures, kMaxFailures);
+}
+
+TEST_F(OperationCPUTimerTest, TimerNotSetIfDisabled) {
+    ASSERT(getTimers() != nullptr);
+
+    gOperationCPUTimingEnabled.store(false);
+    ON_BLOCK_EXIT([] { gOperationCPUTimingEnabled.store(true); });
+
+    // A client holds one operation at a time: release the fixture's operation before making a new
+    // one, which the observer creates while CPU timing is disabled.
+    resetOpCtx();
+    auto opCtx = getGlobalServiceContext()->makeOperationContext(Client::getCurrent());
+    ASSERT(OperationCPUTimers::get(opCtx.get()) == nullptr);
 }
 
 #else

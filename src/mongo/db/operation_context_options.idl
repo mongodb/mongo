@@ -29,3 +29,15 @@ server_parameters:
             gte: 0
             lte: 1
         redact: false
+
+    operationCPUTimingEnabled:
+        description: >-
+            Whether to measure the CPU time consumed by each operation. On Linux this costs two
+            clock_gettime(CLOCK_THREAD_CPUTIME_ID) system calls per operation. When false, new
+            operations do not report cpuNanos (slow query log, profiler, $currentOp, query stats)
+            and do not contribute to the CPU usage counters of execution control statistics.
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<bool>
+        cpp_varname: gOperationCPUTimingEnabled
+        default: true
+        redact: false
