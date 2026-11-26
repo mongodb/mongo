@@ -1,0 +1,23 @@
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
+
+global:
+    mod_visibility: private
+    cpp_namespace: "mongo"
+
+server_parameters:
+    remapCodeToHugePages:
+        description: >-
+            When enabled, the server copies the 2MB-aligned parts of its code segments that are
+            laid out for huge pages (segment alignment of at least 2MB, e.g. the BOLT-optimized code)
+            into anonymous memory backed by transparent huge pages on startup, and maps the copy at
+            the original addresses. This reduces instruction TLB misses on kernels that cannot map
+            executable files with huge pages. The code and its addresses do not change, but the
+            remapped range is no longer file-backed, so tools that symbolize addresses through the
+            file mapping (e.g. perf) cannot resolve symbols in it. Nothing is done when transparent
+            huge pages are disabled. This feature is only available on Linux.
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: gRemapCodeToHugePages
+        default: false
+        redact: false

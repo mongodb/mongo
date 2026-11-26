@@ -95,6 +95,11 @@ idl_generator(
     src = "pin_code_segments_params.idl",
 )
 
+idl_generator(
+    name = "text_huge_pages_params_gen",
+    src = "text_huge_pages_params.idl",
+)
+
 mongo_cc_library(
     name = "boost_assert_shim",
     srcs = [
@@ -351,6 +356,8 @@ mongo_cc_library(
             "@platforms//os:linux": [
                 "pin_code_segments.cpp",
                 ":pin_code_segments_params_gen",
+                "text_huge_pages.cpp",
+                ":text_huge_pages_params_gen",
             ],
             "//conditions:default": ["pin_code_segments_noop.cpp"],
         },
