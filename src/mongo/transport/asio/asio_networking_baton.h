@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "mongo/base/error_codes.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/platform/waitable_atomic.h"
@@ -174,6 +175,13 @@ private:
 
     Future<void> _addSession(Session& session, short events);
 
+    /**
+     * Adds the client's session to the poll set, so that the operation is killed if the client
+     * disconnects while the baton polls, if `markKillOnClientDisconnect()` was called and this has
+     * not been done yet. Called by `run()` before polling.
+     */
+    void _registerDeferredKillOnClientDisconnect();
+
     void detachImpl() override;
 
     std::mutex _mutex;
@@ -181,6 +189,12 @@ private:
     OperationContext* _opCtx;
 
     bool _inPoll = false;
+
+    /**
+     * Set by `markKillOnClientDisconnect()` to the error to kill the operation with, until the
+     * client's session is added to the poll set by the first call to `run()`.
+     */
+    boost::optional<ErrorCodes::Error> _deferredKillOnClientDisconnect;
 
     /**
      * We use `_notificationState` to allow the baton to use different polling/waiting mechanisms
