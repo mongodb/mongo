@@ -90,6 +90,8 @@ using namespace std::literals::string_view_literals;
 MONGO_FAIL_POINT_DEFINE(doNotSetMoreToCome);
 MONGO_FAIL_POINT_DEFINE(beforeCompressingExhaustResponse);
 MONGO_FAIL_POINT_DEFINE(sessionWorkflowDelayOrFailSendMessage);
+// Entered at each yield point of a session workflow; lets tests count the yields.
+MONGO_FAIL_POINT_DEFINE(sessionWorkflowYieldPoint);
 
 namespace metrics_detail {
 
@@ -479,8 +481,6 @@ private:
     /** Returns a Future for the next WorkItem. */
     Future<std::unique_ptr<WorkItem>> _getNextWork() {
         invariant(!_work);
-        if (_nextWork)
-            return Future{std::move(_nextWork)};  // Already have one ready.
 
         // Yield here to avoid pinning the CPU. Give other threads some CPU
         // time to avoid a spiky latency distribution (BF-27452). Even if
@@ -488,7 +488,14 @@ private:
         // without blocking, we yield anyway. We WANT context switching, and
         // we're trying deliberately to make it happen, to reduce long tail
         // latency.
+        // This is the only yield point of a loop iteration, so it runs once per
+        // request: after the response to the previous request was sent and its
+        // WorkItem (including the OperationContext) was destroyed, and also
+        // before running a synthetic exhaust request.
         _yieldPointReached();
+        if (_nextWork)
+            return Future{std::move(_nextWork)};  // Already have one ready.
+
         _iterationFrame->metrics.yieldedBeforeReceive();
         return _receiveRequest();
     }
@@ -535,6 +542,7 @@ private:
      * considered to be beneficial to performance.
      */
     void _yieldPointReached() {
+        sessionWorkflowYieldPoint.execute([](const BSONObj&) {});
         executor()->yieldIfAppropriate();
     }
 
@@ -1046,7 +1054,7 @@ Future<void> SessionWorkflow::Impl::_doOneIteration() {
             _iterationFrame->metrics.processed();
             _sendResponse();
             _iterationFrame->metrics.sent(*session());
-            _yieldPointReached();
+            // The next yield happens in `_getNextWork()`, at the start of the next iteration.
             _iterationFrame->metrics.yieldedAfterSend();
             _iterationFrame.reset();
         });
