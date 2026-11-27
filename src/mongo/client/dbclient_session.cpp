@@ -208,7 +208,14 @@ executor::RemoteCommandResponse initWireVersion(
         return {conn->getServerHostAndPort(), status};
     }
 
-    conn->getCompressorManager().clientBegin(&bob);
+    // Connections with compression disabled must clear any state negotiated on a previous session
+    // (the manager survives reconnects) before sending "hello", and must not offer compressors.
+    const bool skipCompression = conn->isCompressionDisabled();
+    if (skipCompression) {
+        conn->getCompressorManager().clientSkipNegotiation();
+    } else {
+        conn->getCompressorManager().clientBegin(&bob);
+    }
 
     WireSpec::getWireSpec(getGlobalServiceContext()).appendInternalClientWireVersionIfNeeded(&bob);
 
@@ -235,7 +242,9 @@ executor::RemoteCommandResponse initWireVersion(
         }
     }
 
-    conn->getCompressorManager().clientFinish(helloObj);
+    if (!skipCompression) {
+        conn->getCompressorManager().clientFinish(helloObj);
+    }
 
     return executor::RemoteCommandResponse{
         conn->getServerHostAndPort(), std::move(helloObj), finish - start};
@@ -497,9 +506,11 @@ DBClientSession::DBClientSession(bool autoReconnect,
                                  MongoURI uri,
                                  const HandshakeValidationHook& hook,
                                  const ClientAPIVersionParameters* apiParameters,
-                                 ConnectionPurpose connectionPurpose)
+                                 ConnectionPurpose connectionPurpose,
+                                 bool disableCompression)
     : DBClientBase(apiParameters),
       _connectionPurpose(connectionPurpose),
+      _disableCompression(disableCompression),
       _socketTimeout(clampTimeout(soTimeout)),
       _autoReconnect(autoReconnect),
       _rpcLocalTimingTickSource(globalSystemTickSource()),

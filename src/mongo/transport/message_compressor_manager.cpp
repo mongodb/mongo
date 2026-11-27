@@ -181,6 +181,11 @@ void MessageCompressorManager::clientBegin(BSONObjBuilder* output) {
     sub.doneFast();
 }
 
+void MessageCompressorManager::clientSkipNegotiation() {
+    LOGV2_DEBUG(13800100, 3, "Skipping client-side compression negotiation");
+    _negotiated.clear();
+}
+
 void MessageCompressorManager::clientFinish(const BSONObj& input) {
     auto elem = input.getField("compression");
     LOGV2_DEBUG(22930, 3, "Finishing client-side compression negotiation");
