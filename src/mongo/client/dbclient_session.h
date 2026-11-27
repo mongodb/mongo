@@ -177,6 +177,23 @@ public:
     void say(Message& toSend, bool isRetry = false, std::string* actualServer = nullptr) override;
     Message recv(int lastRequestId) override;
 
+    /**
+     * Returns a fixed snapshot of the current session, or nullptr if disconnected or reconnects
+     * have been disallowed. Does not establish or reconnect a session.
+     *
+     * A single raw exhaust receive thread may use this snapshot only for sourceMessage() and
+     * end(), without accessing mutable client state. The owner must stop and join that thread
+     * and detach any exhaust reply reader before resuming ordinary client call()/recv() use.
+     */
+    std::shared_ptr<transport::Session> getExhaustReceiveSession();
+
+    /**
+     * Returns whether the preferred negotiated compressor supports bounded prefix decoding
+     * (Snappy, zstd or zlib). May only be called on the client-owning thread; the session snapshot
+     * lock does not guard compressor negotiation.
+     */
+    bool supportsExhaustReceiveDecode() const;
+
     ConnectionString::ConnectionType type() const override {
         return ConnectionString::ConnectionType::kStandalone;
     }

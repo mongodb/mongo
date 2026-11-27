@@ -56,6 +56,11 @@ struct OpMsg {
     static constexpr uint32_t kMoreToCome = 1 << 1;
     static constexpr uint32_t kExhaustSupported = 1 << 16;
 
+    static bool hasUnknownRequiredFlags(uint32_t flags) {
+        constexpr uint32_t kRequiredFlagMask = 0xffff;
+        return (flags & kRequiredFlagMask & ~(kChecksumPresent | kMoreToCome)) != 0;
+    }
+
     /**
      * Returns the unvalidated flags for the given message if it is an OP_MSG message.
      * Returns 0 for other message kinds since they are the equivalent of no flags set.
@@ -121,6 +126,12 @@ struct OpMsg {
     static OpMsg parse(const Message& message, Client* client = nullptr);
 
     /**
+     * Parses an owned replication reply, rejecting document sequences before materializing them.
+     * Flags and preceding sections are validated in the same order as parse().
+     */
+    static OpMsg parseOwnedForReplicationReply(const Message& message);
+
+    /**
      * Parses and returns an OpMsg containing owned BSON.
      */
     static OpMsg parseOwned(const Message& message, Client* client = nullptr) {
@@ -166,6 +177,9 @@ struct OpMsg {
         }
         return validatedTenancyScope->tenantId();
     }
+
+private:
+    static OpMsg parseImpl(const Message& message, Client* client, bool allowDocumentSequences);
 };
 
 /**

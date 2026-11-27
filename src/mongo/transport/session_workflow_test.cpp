@@ -13,6 +13,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/admission/egress_response_rate_limiter.h"
 #include "mongo/db/admission/ingress_request_rate_limiter.h"
 #include "mongo/db/admission/rate_limiter.h"
@@ -1485,7 +1486,11 @@ TEST_F(RateLimitRejectionResponseTest, AppendChecksumUsesReservedSlackAndIsValid
 
     OpMsg::appendChecksum(&resp);
 
+#ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
     ASSERT_TRUE(OpMsg::isFlagSet(resp, OpMsg::kChecksumPresent));
+#else
+    ASSERT_FALSE(OpMsg::isFlagSet(resp, OpMsg::kChecksumPresent));
+#endif
     ASSERT_EQ(resp.capacity(), capacityBefore)
         << "appendChecksum reallocated the rejection response";
     ASSERT_EQ(resp.buf(), bufBefore) << "rejection response buffer moved during appendChecksum";

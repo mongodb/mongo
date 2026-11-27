@@ -48,11 +48,8 @@
 namespace mongo {
 namespace {
 
-auto kAllSupportedFlags = OpMsg::kChecksumPresent | OpMsg::kMoreToCome;
-
 bool containsUnknownRequiredFlags(uint32_t flags) {
-    const uint32_t kRequiredFlagMask = 0xffff;  // Low 2 bytes are required, high 2 are optional.
-    return (flags & ~kAllSupportedFlags & kRequiredFlagMask) != 0;
+    return OpMsg::hasUnknownRequiredFlags(flags);
 }
 
 enum class Section : uint8_t {
@@ -131,7 +128,17 @@ void OpMsg::appendChecksum(Message* message) {
 #endif
 }
 
-OpMsg OpMsg::parse(const Message& message, Client* client) try {
+OpMsg OpMsg::parse(const Message& message, Client* client) {
+    return parseImpl(message, client, true);
+}
+
+OpMsg OpMsg::parseOwnedForReplicationReply(const Message& message) {
+    auto msg = parseImpl(message, nullptr, false);
+    msg.shareOwnershipWith(message.sharedBuffer());
+    return msg;
+}
+
+OpMsg OpMsg::parseImpl(const Message& message, Client* client, bool allowDocumentSequences) try {
     // It is the caller's responsibility to call the correct parser for a given message type.
     invariant(!message.empty());
     invariant(message.operation() == dbMsg);
@@ -173,6 +180,9 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
             }
 
             case Section::kDocSequence: {
+                uassert(ErrorCodes::UnsupportedFormat,
+                        "Replication oplog replies must not contain OP_MSG document sequences",
+                        allowDocumentSequences);
                 // We use an O(N^2) algorithm here and an O(N*M) algorithm below. These are
                 // fastest for the current small values of N, but would be problematic if it is
                 // large. If we need more document sequences, raise the limit and use a better

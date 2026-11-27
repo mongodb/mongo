@@ -2895,6 +2895,7 @@ mongo_cc_library(
         "//src/mongo/client:clientdriver_minimal",
         "//src/mongo/db/auth:user_cache_invalidator",
         "//src/mongo/db/query/search:search_task_executors",
+        "//src/mongo/db/repl:receive_decode_pipeline",
         "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter",
         "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter_initializer",
         "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter_op_observer",
@@ -3501,6 +3502,7 @@ mongo_cc_unit_test(
     deps = [
         ":traffic_recorder",
         "//src/mongo:base",
+        "//src/mongo/rpc:message",
         "//src/mongo/transport:transport_layer_mock",
         "//src/mongo/util:clock_source_mock",
     ],

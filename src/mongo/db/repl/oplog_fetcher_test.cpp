@@ -18,6 +18,7 @@
 #include "mongo/db/repl/data_replicator_external_state_mock.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/receive_decode_pipeline.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/sync_source_selector.h"
@@ -41,16 +42,20 @@
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/stdx/type_traits.h"
+#include "mongo/transport/mock_session.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/task_executor_proxy.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
+#include <condition_variable>
 #include <memory>
+#include <mutex>
 #include <string_view>
 
 #include <boost/move/utility_core.hpp>
@@ -58,6 +63,35 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
+
+namespace mongo::repl {
+struct OplogFetcherReceiveDecodeTestAccess {
+    static void retainReservation(OplogFetcher& fetcher, std::shared_ptr<void> reservation) {
+        fetcher._decodeReservation = std::move(reservation);
+    }
+
+    static void installPipeline(OplogFetcher& fetcher,
+                                std::shared_ptr<ReceiveDecodePipeline> pipeline) {
+        fetcher._receiveDecodePipeline = std::move(pipeline);
+    }
+
+    static void stopPipeline(OplogFetcher& fetcher, bool abort) {
+        fetcher._stopReceiveDecodePipeline(abort);
+    }
+
+    static void startPipeline(OplogFetcher& fetcher) {
+        fetcher._startReceiveDecodePipeline();
+    }
+
+    static void markDisabled(OplogFetcher& fetcher) {
+        fetcher._receiveDecodeInterrupt = OplogFetcher::ReceiveDecodeInterrupt::kDisabled;
+    }
+
+    static bool interruptConsumed(const OplogFetcher& fetcher) {
+        return fetcher._receiveDecodeInterrupt == OplogFetcher::ReceiveDecodeInterrupt::kNone;
+    }
+};
+}  // namespace mongo::repl
 
 namespace {
 
@@ -67,6 +101,53 @@ using namespace unittest;
 
 HostAndPort source("localhost:12345");
 NamespaceString nss = NamespaceString::createNamespaceString_forTest("local.oplog.rs");
+
+class ReceiveDecodeCloseTestSession final : public transport::MockSession {
+public:
+    ReceiveDecodeCloseTestSession() : MockSession(nullptr) {}
+
+    StatusWith<Message> sourceMessage() override {
+        return Status(ErrorCodes::HostUnreachable, "Original receive failure before close");
+    }
+
+    void end() override {
+        _ended.store(true);
+        if (throwOnEnd.load()) {
+            closeExceptions.fetchAndAdd(1);
+            uasserted(ErrorCodes::InternalError, "Injected connection close failure");
+        }
+    }
+
+    bool isConnected() override {
+        return !_ended.load();
+    }
+
+    Atomic<bool> throwOnEnd{true};
+    Atomic<int> closeExceptions{0};
+
+private:
+    Atomic<bool> _ended{false};
+};
+
+class ReceiveDecodeCloseTestConnection final : public MockDBClientConnection {
+public:
+    explicit ReceiveDecodeCloseTestConnection(MockRemoteDBServer* server)
+        : MockDBClientConnection(server, true) {}
+
+    void installSession(std::shared_ptr<transport::Session> session) {
+        {
+            std::lock_guard lk(_sessionMutex);
+            _session.swap(session);
+        }
+    }
+
+    void shutdown() override {
+        shutdownCalls.fetchAndAdd(1);
+        MockDBClientConnection::shutdown();
+    }
+
+    Atomic<int> shutdownCalls{0};
+};
 
 ReplSetConfig _createConfig() {
     BSONObjBuilder bob;
@@ -339,7 +420,8 @@ protected:
         OplogFetcher::StartingPoint startingPoint = OplogFetcher::StartingPoint::kSkipFirstDoc,
         BSONObj filter = BSONObj(),
         ReadConcernArgs args = ReadConcernArgs(),
-        bool requestResumeToken = false);
+        bool requestResumeToken = false,
+        OplogFetcher::CreateClientFn createClient = {});
 
     std::unique_ptr<ShutdownState> processSingleBatch(const Message& response,
                                                       bool shouldShutdown = false,
@@ -450,7 +532,8 @@ std::unique_ptr<OplogFetcher> OplogFetcherTest::getOplogFetcherAfterConnectionCr
     OplogFetcher::StartingPoint startingPoint,
     BSONObj filter,
     ReadConcernArgs readConcern,
-    bool requestResumeToken) {
+    bool requestResumeToken,
+    OplogFetcher::CreateClientFn createClient) {
     auto oplogFetcher = makeOplogFetcherWithDifferentExecutor(&getExecutor(),
                                                               fn,
                                                               numRestarts,
@@ -459,6 +542,9 @@ std::unique_ptr<OplogFetcher> OplogFetcherTest::getOplogFetcherAfterConnectionCr
                                                               filter,
                                                               readConcern,
                                                               requestResumeToken);
+    if (createClient) {
+        oplogFetcher->setCreateClientFn_forTest(createClient);
+    }
 
     auto waitForConnCreatedFailPoint =
         globalFailPointRegistry().find("hangAfterOplogFetcherCallbackScheduled");
@@ -802,6 +888,335 @@ public:
         sharedCallbackStateDestroyed.store(true);
     }
 };
+
+TEST_F(OplogFetcherTest, CompletionReleasesDecodeReservationBeforeShutdownCallback) {
+    std::weak_ptr<int> reservation;
+    OplogFetcher* activeFetcher = nullptr;
+    bool reservationInstalled = false;
+    bool releasedBeforeCallback = false;
+    Status finalStatus = Status::OK();
+    enqueueDocumentsFn = [&](OplogFetcher::Documents::const_iterator,
+                             OplogFetcher::Documents::const_iterator,
+                             const OplogFetcher::DocumentsInfo&) {
+        auto retained = std::make_shared<int>(1);
+        reservation = retained;
+        reservationInstalled = true;
+        OplogFetcherReceiveDecodeTestAccess::retainReservation(*activeFetcher, std::move(retained));
+        return Status(ErrorCodes::InternalError, "Injected enqueue failure with a retained reply");
+    };
+    auto fetcher = getOplogFetcherAfterConnectionCreated([&](const Status& status) {
+        finalStatus = status;
+        releasedBeforeCallback = reservation.expired();
+    });
+    activeFetcher = fetcher.get();
+    const auto firstEntry = makeNoopOplogEntry(lastFetched);
+    const auto secondEntry = makeNoopOplogEntry({{Seconds(456), 0}, lastFetched.getTerm()});
+    const auto metadata = makeOplogBatchMetadata(replSetMetadata, oqMetadata);
+    processSingleRequestResponse(fetcher->getDBClientConnection_forTest(),
+                                 makeFirstBatch(22LL, {firstEntry, secondEntry}, metadata));
+    fetcher->join();
+    ASSERT_EQ(finalStatus.code(), ErrorCodes::InternalError);
+    ASSERT_TRUE(reservationInstalled);
+    ASSERT_TRUE(releasedBeforeCallback);
+    ASSERT_TRUE(reservation.expired());
+    // The completed fetcher intentionally remains alive during the lifetime assertions.
+    ASSERT_FALSE(fetcher->isActive());
+}
+
+TEST_F(OplogFetcherTest, StopExceptionMarksConnectionFailedBeforePipelineDestruction) {
+    class BlockingSession final : public transport::MockSession {
+    public:
+        BlockingSession() : MockSession(nullptr) {}
+
+        StatusWith<Message> sourceMessage() override {
+            std::unique_lock lk(_mutex);
+            _cv.wait(lk, [&] { return _ended; });
+            return Status(ErrorCodes::HostUnreachable, "Test session closed");
+        }
+
+        void end() override {
+            std::lock_guard lk(_mutex);
+            _ended = true;
+            _cv.notify_all();
+        }
+
+    private:
+        std::mutex _mutex;
+        std::condition_variable _cv;
+        bool _ended = false;
+    };
+
+    OplogFetcher* activeFetcher = nullptr;
+    ReceiveDecodeCloseTestConnection* connection = nullptr;
+    auto closeSession = std::make_shared<ReceiveDecodeCloseTestSession>();
+    Status stopStatus = Status::OK();
+    bool clientFailedBeforeCleanup = false;
+    enqueueDocumentsFn = [&](OplogFetcher::Documents::const_iterator,
+                             OplogFetcher::Documents::const_iterator,
+                             const OplogFetcher::DocumentsInfo&) {
+        connection->installSession(closeSession);
+        auto pipeline = ReceiveDecodePipeline::make(std::make_shared<BlockingSession>(), 100);
+        ON_BLOCK_EXIT([&] { pipeline->stop(true); });
+        OplogFetcherReceiveDecodeTestAccess::installPipeline(*activeFetcher, pipeline);
+        try {
+            OplogFetcherReceiveDecodeTestAccess::stopPipeline(*activeFetcher, false);
+        } catch (const DBException& ex) {
+            stopStatus = ex.toStatus();
+        }
+        clientFailedBeforeCleanup = connection->isFailed();
+        closeSession->throwOnEnd.store(false);
+        return Status(ErrorCodes::InternalError, "Test finished checking stop failure");
+    };
+    auto fetcher = getOplogFetcherAfterConnectionCreated(
+        [](const Status&) {},
+        0,
+        true,
+        OplogFetcher::StartingPoint::kSkipFirstDoc,
+        BSONObj(),
+        ReadConcernArgs(),
+        false,
+        [&]() -> std::unique_ptr<DBClientConnection> {
+            auto client = std::make_unique<ReceiveDecodeCloseTestConnection>(_mockServer.get());
+            connection = client.get();
+            return client;
+        });
+    activeFetcher = fetcher.get();
+    ON_BLOCK_EXIT([&] {
+        closeSession->throwOnEnd.store(false);
+        fetcher->shutdown();
+        fetcher->join();
+    });
+    const auto first = makeNoopOplogEntry(lastFetched);
+    const auto second = makeNoopOplogEntry({{Seconds(456), 0}, lastFetched.getTerm()});
+    processSingleRequestResponse(
+        fetcher->getDBClientConnection_forTest(),
+        makeFirstBatch(22LL, {first, second}, makeOplogBatchMetadata(replSetMetadata, oqMetadata)));
+    fetcher->join();
+    ASSERT_EQ(stopStatus.code(), ErrorCodes::IllegalOperation);
+    ASSERT_TRUE(clientFailedBeforeCleanup);
+    ASSERT_EQ(connection->shutdownCalls.load(), 1);
+    ASSERT_EQ(closeSession->closeExceptions.load(), 1);
+}
+
+TEST_F(OplogFetcherTest, ReceiveErrorSurvivesCloseExceptionWithoutDuplicateShutdown) {
+    ServerParameterGuard enabled("internalReplReceiveDecodePipelineEnabled", true);
+    OplogFetcher* activeFetcher = nullptr;
+    ReceiveDecodeCloseTestConnection* connection = nullptr;
+    auto session = std::make_shared<ReceiveDecodeCloseTestSession>();
+    Status finalStatus = Status::OK();
+    bool clientFailedAtCompletion = false;
+    int batches = 0;
+    enqueueDocumentsFn = [&](OplogFetcher::Documents::const_iterator,
+                             OplogFetcher::Documents::const_iterator,
+                             const OplogFetcher::DocumentsInfo&) {
+        if (++batches == 2) {
+            connection->installSession(session);
+            OplogFetcherReceiveDecodeTestAccess::startPipeline(*activeFetcher);
+        }
+        return Status::OK();
+    };
+    auto fetcher = getOplogFetcherAfterConnectionCreated(
+        [&](const Status& status) {
+            finalStatus = status;
+            clientFailedAtCompletion = connection->isFailed();
+            session->throwOnEnd.store(false);
+        },
+        0,
+        true,
+        OplogFetcher::StartingPoint::kSkipFirstDoc,
+        BSONObj(),
+        ReadConcernArgs(),
+        false,
+        [&]() -> std::unique_ptr<DBClientConnection> {
+            auto client = std::make_unique<ReceiveDecodeCloseTestConnection>(_mockServer.get());
+            connection = client.get();
+            return client;
+        });
+    activeFetcher = fetcher.get();
+    ON_BLOCK_EXIT([&] {
+        session->throwOnEnd.store(false);
+        fetcher->shutdown();
+        fetcher->join();
+    });
+    const auto first = makeNoopOplogEntry(lastFetched);
+    const auto second = makeNoopOplogEntry({{Seconds(456), 0}, lastFetched.getTerm()});
+    const auto third = makeNoopOplogEntry({{Seconds(457), 0}, lastFetched.getTerm()});
+    const auto metadata = makeOplogBatchMetadata(replSetMetadata, oqMetadata);
+    processSingleRequestResponse(fetcher->getDBClientConnection_forTest(),
+                                 makeFirstBatch(22LL, {first, second}, metadata),
+                                 true);
+    processSingleRequestResponse(fetcher->getDBClientConnection_forTest(),
+                                 makeSubsequentBatch(22LL, {third}, metadata, true));
+    const auto deadline = Date_t::now() + Seconds(10);
+    while (fetcher->isActive() && Date_t::now() < deadline) {
+        sleepFor(Milliseconds(1));
+    }
+    ASSERT_FALSE(fetcher->isActive());
+    fetcher->join();
+    ASSERT_EQ(batches, 2);
+    ASSERT_EQ(finalStatus.code(), ErrorCodes::HostUnreachable);
+    ASSERT_NE(finalStatus.reason().find("Original receive failure before close"),
+              std::string::npos);
+    ASSERT_TRUE(clientFailedAtCompletion);
+    ASSERT_EQ(connection->shutdownCalls.load(), 1);
+    ASSERT_GTE(session->closeExceptions.load(), 1);
+}
+
+TEST_F(OplogFetcherTest, DisabledPipelineStillChecksWhetherToChangeSyncSource) {
+    OplogFetcher* activeFetcher = nullptr;
+    bool disabledInjected = false;
+    enqueueDocumentsFn = [&](OplogFetcher::Documents::const_iterator,
+                             OplogFetcher::Documents::const_iterator,
+                             const OplogFetcher::DocumentsInfo&) {
+        OplogFetcherReceiveDecodeTestAccess::markDisabled(*activeFetcher);
+        disabledInjected = true;
+        dataReplicatorExternalState->setShouldStopFetchingResult(
+            ChangeSyncSourceAction::kStopSyncingAndDropLastBatchIfPresent);
+        return Status::OK();
+    };
+    ShutdownState shutdownState;
+    auto fetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState), 0);
+    activeFetcher = fetcher.get();
+    ON_BLOCK_EXIT([&] {
+        fetcher->shutdown();
+        fetcher->join();
+    });
+    const auto first = makeNoopOplogEntry(lastFetched);
+    const auto second = makeNoopOplogEntry({{Seconds(456), 0}, lastFetched.getTerm()});
+    processSingleRequestResponse(
+        fetcher->getDBClientConnection_forTest(),
+        makeFirstBatch(22LL, {first, second}, makeOplogBatchMetadata(replSetMetadata, oqMetadata)),
+        true);
+    const auto getMore = processSingleRequestResponse(
+        fetcher->getDBClientConnection_forTest(),
+        Status(ErrorCodes::CallbackCanceled, "Test pipeline disabled"));
+    const auto deadline = Date_t::now() + Seconds(10);
+    while (fetcher->isActive() && Date_t::now() < deadline) {
+        sleepFor(Milliseconds(1));
+    }
+    ASSERT_FALSE(fetcher->isActive());
+    fetcher->join();
+    ASSERT_TRUE(disabledInjected);
+    ASSERT_TRUE(OplogFetcherReceiveDecodeTestAccess::interruptConsumed(*fetcher));
+    ASSERT_TRUE(OpMsg::parse(getMore).body.hasField("getMore"));
+    ASSERT_EQ(shutdownState.getStatus().code(), ErrorCodes::CallbackCanceled);
+    ASSERT_NE(shutdownState.getStatus().reason().find("Sync source change required"),
+              std::string::npos);
+    ASSERT_NE(shutdownState.getStatus().reason().find("Test pipeline disabled"), std::string::npos);
+}
+
+TEST_F(OplogFetcherTest, DisabledPipelineContinuesWithZeroRestartBudgetWhenSourceIsValid) {
+    OplogFetcher* activeFetcher = nullptr;
+    int enqueuedBatches = 0;
+    enqueueDocumentsFn = [&](OplogFetcher::Documents::const_iterator,
+                             OplogFetcher::Documents::const_iterator,
+                             const OplogFetcher::DocumentsInfo&) {
+        if (++enqueuedBatches == 1) {
+            OplogFetcherReceiveDecodeTestAccess::markDisabled(*activeFetcher);
+            return Status::OK();
+        }
+        return Status(ErrorCodes::FailPointEnabled, "Finished checking synchronous recovery");
+    };
+    ShutdownState shutdownState;
+    auto fetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState), 0);
+    activeFetcher = fetcher.get();
+    ON_BLOCK_EXIT([&] {
+        fetcher->shutdown();
+        fetcher->join();
+    });
+    const auto first = makeNoopOplogEntry(lastFetched);
+    const OpTime secondTime{{Seconds(456), 0}, lastFetched.getTerm()};
+    const auto second = makeNoopOplogEntry(secondTime);
+    const auto third = makeNoopOplogEntry({{Seconds(457), 0}, lastFetched.getTerm()});
+    const auto metadata = makeOplogBatchMetadata(replSetMetadata, oqMetadata);
+    processSingleRequestResponse(fetcher->getDBClientConnection_forTest(),
+                                 makeFirstBatch(22LL, {first, second}, metadata),
+                                 true);
+    processSingleRequestResponse(fetcher->getDBClientConnection_forTest(),
+                                 Status(ErrorCodes::CallbackCanceled, "Test pipeline disabled"),
+                                 true);
+    const auto resumedFind = processSingleRequestResponse(
+        fetcher->getDBClientConnection_forTest(), makeFirstBatch(22LL, {second, third}, metadata));
+    const auto deadline = Date_t::now() + Seconds(10);
+    while (fetcher->isActive() && Date_t::now() < deadline) {
+        sleepFor(Milliseconds(1));
+    }
+    ASSERT_FALSE(fetcher->isActive());
+    fetcher->join();
+    validateFindCommand(resumedFind,
+                        secondTime,
+                        durationCount<Milliseconds>(fetcher->getRetriedFindMaxTime_forTest()));
+    ASSERT_EQ(enqueuedBatches, 2);
+    ASSERT_TRUE(OplogFetcherReceiveDecodeTestAccess::interruptConsumed(*fetcher));
+    ASSERT_OK(shutdownState.getStatus());
+}
+
+TEST_F(OplogFetcherTest, DisablingBetweenBatchesChecksSourceBeforeSendingAnotherFind) {
+    class BlockingSession final : public transport::MockSession {
+    public:
+        BlockingSession() : MockSession(nullptr) {}
+
+        StatusWith<Message> sourceMessage() override {
+            std::unique_lock lk(_mutex);
+            _cv.wait(lk, [&] { return _ended; });
+            return Status(ErrorCodes::HostUnreachable, "Test session closed");
+        }
+
+        void end() override {
+            std::lock_guard lk(_mutex);
+            _ended = true;
+            _cv.notify_all();
+        }
+
+    private:
+        std::mutex _mutex;
+        std::condition_variable _cv;
+        bool _ended = false;
+    };
+
+    ServerParameterGuard enabled("internalReplReceiveDecodePipelineEnabled", true);
+    OplogFetcher* activeFetcher = nullptr;
+    std::shared_ptr<ReceiveDecodePipeline> pipeline;
+    enqueueDocumentsFn = [&](OplogFetcher::Documents::const_iterator,
+                             OplogFetcher::Documents::const_iterator,
+                             const OplogFetcher::DocumentsInfo&) {
+        pipeline = ReceiveDecodePipeline::make(std::make_shared<BlockingSession>(), 100);
+        OplogFetcherReceiveDecodeTestAccess::installPipeline(*activeFetcher, pipeline);
+        gReplReceiveDecodePipelineEnabled.store(false);
+        dataReplicatorExternalState->setShouldStopFetchingResult(
+            ChangeSyncSourceAction::kStopSyncingAndDropLastBatchIfPresent);
+        return Status::OK();
+    };
+    ShutdownState shutdownState;
+    auto fetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState), 0);
+    activeFetcher = fetcher.get();
+    ON_BLOCK_EXIT([&] {
+        fetcher->shutdown();
+        fetcher->join();
+        if (pipeline) {
+            pipeline->stop(true);
+        }
+    });
+    const auto first = makeNoopOplogEntry(lastFetched);
+    const auto second = makeNoopOplogEntry({{Seconds(456), 0}, lastFetched.getTerm()});
+    processSingleRequestResponse(
+        fetcher->getDBClientConnection_forTest(),
+        makeFirstBatch(22LL, {first, second}, makeOplogBatchMetadata(replSetMetadata, oqMetadata)));
+    const auto deadline = Date_t::now() + Seconds(10);
+    while (fetcher->isActive() && Date_t::now() < deadline) {
+        sleepFor(Milliseconds(1));
+    }
+    ASSERT_FALSE(fetcher->isActive());
+    fetcher->join();
+    ASSERT_TRUE(pipeline);
+    ASSERT_TRUE(pipeline->stop(false));
+    ASSERT_TRUE(OplogFetcherReceiveDecodeTestAccess::interruptConsumed(*fetcher));
+    ASSERT_EQ(shutdownState.getStatus().code(), ErrorCodes::CallbackCanceled);
+    ASSERT_NE(shutdownState.getStatus().reason().find("Sync source change required"),
+              std::string::npos);
+    ASSERT_NE(shutdownState.getStatus().reason().find("disabled between batches"),
+              std::string::npos);
+}
 
 TEST_F(OplogFetcherTest, OplogFetcherResetsOnShutdownCallbackFnOnCompletion) {
     auto sharedCallbackData = std::make_shared<SharedCallbackState>();

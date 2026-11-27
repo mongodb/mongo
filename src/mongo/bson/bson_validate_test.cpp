@@ -805,6 +805,42 @@ TEST(BSONValidateFast, BoolValuesAreValidated) {
     }
 }
 
+TEST(BSONValidateFast, EncodedLengthsAreCheckedBeforePointerArithmetic) {
+    const auto checkLength = [](const BSONObj& original, size_t offset, uint32_t length) {
+        std::string bytes(original.objdata(), original.objsize());
+        DataView(bytes.data() + offset).write<LittleEndian<uint32_t>>(length);
+        auto exact = std::make_unique<char[]>(bytes.size());
+        std::memcpy(exact.get(), bytes.data(), bytes.size());
+        for (auto mode : {BSONValidateModeEnum::kDefault,
+                          BSONValidateModeEnum::kExtended,
+                          BSONValidateModeEnum::kFull}) {
+            const auto status = validateBSON(exact.get(), bytes.size(), mode);
+            ASSERT_EQ(status.code(), ErrorCodes::InvalidBSON);
+            ASSERT_NE(status.reason().find("BSON element value extends past the end of the buffer"),
+                      std::string::npos);
+        }
+    };
+    const auto stringObj = BSON("a" << "x");
+    const auto binaryObj = BSON("a" << BSONBinData("x", 1, BinDataType::BinDataGeneral));
+    const auto objectObj = BSON("a" << BSON("x" << 1));
+    const auto arrayObj = BSON("a" << BSON_ARRAY(1));
+    const auto scopeObj = BSON("a" << BSONCodeWScope("code", BSON("x" << 1)));
+    for (const auto& obj : {stringObj, binaryObj}) {
+        checkLength(obj, 7, 0xffffffffu);
+    }
+    checkLength(stringObj, 7, stringObj.objsize() - 11);
+    checkLength(binaryObj, 7, binaryObj.objsize() - 12);
+    for (const auto& obj : {objectObj, arrayObj, scopeObj}) {
+        checkLength(obj, 7, 0x7fffffffu);
+        checkLength(obj, 7, obj.objsize() - 6);
+    }
+    checkLength(scopeObj, 11, 0xffffffffu);
+    checkLength(scopeObj, 20, 0x7fffffffu);
+    ASSERT_OK(validateBSON(objectObj));
+    ASSERT_OK(validateBSON(arrayObj));
+    ASSERT_OK(validateBSON(scopeObj));
+}
+
 TEST(BSONValidateFast, InvalidType) {
     // Encode an invalid BSON Object with an invalid type, x90.
     const char* buffer = "\x0c\x00\x00\x00\x90\x41\x00\x10\x00\x00\x00\x00";
@@ -1462,6 +1498,50 @@ TEST(BSONValidateColumn, BSONColumnNestedColumnInInterleavedRefNestedRejected) {
     auto binary = makeInterleavedColumnWithRef(ref);
     ASSERT_EQ(validateBSONColumn(binary.data(), binary.size()).code(),
               ErrorCodes::InvalidBSONColumn);
+}
+
+TEST(BSONValidateColumn, Simple8bBlockBoundsUseRemainingBytes) {
+    const auto literal = BSON("" << 1);
+    const auto elem = literal.firstElement();
+    const std::string prefix(elem.rawdata(), elem.size());
+    const auto checkColumn = [](const std::string& bytes, ErrorCodes::Error expected) {
+        auto exact = std::make_unique<char[]>(bytes.size());
+        std::memcpy(exact.get(), bytes.data(), bytes.size());
+        const auto document =
+            BSON("c" << BSONBinData(bytes.data(), bytes.size(), BinDataType::Column));
+        auto exactDocument = std::make_unique<char[]>(document.objsize());
+        std::memcpy(exactDocument.get(), document.objdata(), document.objsize());
+        for (auto mode : {BSONValidateModeEnum::kDefault,
+                          BSONValidateModeEnum::kExtended,
+                          BSONValidateModeEnum::kFull}) {
+            const auto status = validateBSONColumn(exact.get(), bytes.size(), mode, V2_Column);
+            ASSERT_EQ(status.code(), expected);
+            if (expected == ErrorCodes::InvalidBSONColumn) {
+                ASSERT_NE(status.reason().find("BSONColumn blocks exceed buffer size"),
+                          std::string::npos);
+            }
+            const auto wrapped =
+                validateBSON(exactDocument.get(), document.objsize(), mode, V2_Column);
+            ASSERT_EQ(wrapped.code(),
+                      expected == ErrorCodes::OK ? ErrorCodes::OK : ErrorCodes::NonConformantBSON);
+        }
+    };
+    for (size_t blocks = 1; blocks <= bsoncolumn::kMaxNumSimple8bPerControl; ++blocks) {
+        const auto control = static_cast<char>(0x80 | (blocks - 1));
+        const auto payloadSize = blocks * sizeof(uint64_t);
+        for (const auto available : {size_t{0}, payloadSize / 2, payloadSize - 2}) {
+            checkColumn(prefix + control + std::string(available, '\0') + '\0',
+                        ErrorCodes::InvalidBSONColumn);
+        }
+        BufBuilder payload;
+        for (size_t i = 0; i < blocks; ++i) {
+            payload.appendNum(uint64_t{14});
+        }
+        const auto fullBlocks = prefix + control + std::string(payload.buf(), payload.len());
+        checkColumn(fullBlocks + '\0', ErrorCodes::OK);
+        checkColumn(fullBlocks, ErrorCodes::NonConformantBSON);
+        checkColumn(fullBlocks + '\0' + '\0', ErrorCodes::NonConformantBSON);
+    }
 }
 
 TEST(BSONValidateColumn, BSONColumnNoOverflowBlocksShort) {

@@ -187,6 +187,14 @@ public:
                                                       const Message& replyMsg);
 
     /**
+     * Processes an already parsed command reply through the metadata reader and stale-config
+     * checks. Must be called on the client-owning thread, not a raw receive or parsing thread.
+     * The reply must own its message and contain a non-null ReplyInterface.
+     */
+    virtual rpc::UniqueReply processParsedCommandReply(const std::string& host,
+                                                       rpc::UniqueReply reply);
+
+    /**
      * Runs the specified command request.
      */
     virtual std::pair<rpc::UniqueReply, DBClientBase*> runCommandWithTarget(OpMsgRequest request);

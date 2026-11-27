@@ -12,6 +12,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/auth_name.h"
 #include "mongo/db/auth/authorization_client_handle_shard.h"
@@ -87,6 +88,64 @@ TEST_F(OpMsgParser, SucceedsWithJustBody) {
 
     ASSERT_BSONOBJ_EQ(msg.body, fromjson("{ping: 1}"));
     ASSERT_EQ(msg.sequences.size(), 0u);
+}
+
+TEST_F(OpMsgParser, ReplicationReplySharesBufferAndKeepsChecksumValidation) {
+    auto message =
+        OpMsgBytes{kHaveChecksum, kBodySection, BSON("payload" << std::string(65536, 'x'))}
+            .appendChecksum()
+            .done();
+    auto parsed = OpMsg::parseOwnedForReplicationReply(message);
+    ASSERT_EQ(parsed.body.objdata(), message.buf() + MsgData::MsgDataHeaderSize + 5);
+    ASSERT_TRUE(parsed.body.isOwned());
+    message = Message{};
+    ASSERT_EQ(parsed.body["payload"].valueStringData().size(), 65536U);
+
+#ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
+    auto badChecksum =
+        OpMsgBytes{kHaveChecksum, kBodySection, BSON("ok" << 1)}.appendChecksum(0).done();
+    ASSERT_THROWS_CODE(OpMsg::parseOwnedForReplicationReply(badChecksum),
+                       DBException,
+                       ErrorCodes::ChecksumMismatch);
+#endif
+}
+
+TEST_F(OpMsgParser, ReplicationReplyRejectsSequenceAfterLargeBodyWithoutMutatingInput) {
+    for (bool bodyFirst : {false, true}) {
+        const auto body = BSON("payload" << std::string(1024 * 1024, 'x'));
+        auto message = bodyFirst ? OpMsgBytes{kNoFlags,
+                                              kBodySection,
+                                              body,
+                                              kDocSequenceSection,
+                                              Sized{"docs", BSONObj()}}
+                                       .done()
+                                 : OpMsgBytes{kNoFlags,
+                                              kDocSequenceSection,
+                                              Sized{"docs", BSONObj()},
+                                              kBodySection,
+                                              body}
+                                       .done();
+        ASSERT_EQ(OpMsg::parse(message).sequences.size(), 1U);
+        const std::string original(message.buf(), message.size());
+        ASSERT_THROWS_CODE(OpMsg::parseOwnedForReplicationReply(message),
+                           DBException,
+                           ErrorCodes::UnsupportedFormat);
+        ASSERT_EQ(std::string(message.buf(), message.size()), original);
+    }
+}
+
+TEST_F(OpMsgParser, ReplicationReplyReportsEarlierDuplicateBodyBeforeSequence) {
+    auto message = OpMsgBytes{
+        kNoFlags,
+        kBodySection,
+        BSON("ok" << 1),
+        kBodySection,
+        BSONObj(),
+        kDocSequenceSection,
+        Sized{"docs"}}.done();
+    ASSERT_THROWS_CODE(OpMsg::parseOwnedForReplicationReply(message),
+                       DBException,
+                       ErrorCodes::MultipleOpMsgBodySections);
 }
 
 TEST_F(OpMsgParser, SucceedsWithChecksum) {

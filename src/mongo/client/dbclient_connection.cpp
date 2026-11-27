@@ -169,6 +169,18 @@ rpc::UniqueReply DBClientConnection::parseCommandReplyMessage(const std::string&
     }
 }
 
+rpc::UniqueReply DBClientConnection::processParsedCommandReply(const std::string& host,
+                                                               rpc::UniqueReply reply) {
+    try {
+        return DBClientBase::processParsedCommandReply(host, std::move(reply));
+    } catch (const DBException& ex) {
+        if (ErrorCodes::isConnectionFatalMessageParseError(ex.code())) {
+            _markFailed(kKillSession);
+        }
+        throw;
+    }
+}
+
 void DBClientConnection::_reconnectSession() {
     // Don't hammer reconnects, backoff if needed
     sleepFor(_autoReconnectBackoff.nextSleep());

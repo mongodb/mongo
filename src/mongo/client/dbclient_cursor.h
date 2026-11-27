@@ -13,11 +13,13 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/rpc/message.h"
+#include "mongo/rpc/unique_message.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
+#include <functional>
 #include <memory>
 #include <stack>
 #include <string>
@@ -47,6 +49,17 @@ class AggregateCommandRequest;
  */
 class [[MONGO_MOD_PUBLIC]] DBClientCursor {
 public:
+    /**
+     * An exhaust message and its already parsed, owning command reply. Both must refer to the
+     * same message, and parsed must contain a non-null ReplyInterface.
+     */
+    struct ExhaustReply {
+        Message message;
+        rpc::UniqueReply parsed;
+    };
+
+    using ExhaustReplyReader = std::function<ExhaustReply(int expectedResponseTo)>;
+
     /**
      * Constructs a 'DBClientCursor' that will be opened by issuing the aggregate command described
      * by 'aggRequest'.
@@ -180,6 +193,31 @@ public:
     }
 
     /**
+     * Installs a reader used only when consuming pushed exhaust replies. It must validate the
+     * reply's responseTo against expectedResponseTo and return the matching parsed message.
+     * Installation, invocation and detachment must occur on the cursor-owning fetcher thread.
+     * The caller must stop and join external receive workers and detach the reader (by passing
+     * an empty function) before ordinary client call()/recv() use or cursor destruction.
+     */
+    void setExhaustReplyReader(ExhaustReplyReader reader) {
+        _exhaustReplyReader = std::move(reader);
+    }
+
+    int getLastRequestId() const {
+        return _lastRequestId;
+    }
+
+    /**
+     * Drops the buffers of a fully consumed exhaust batch. The fetcher must have finished copying
+     * the batch and resume token in onSuccessfulBatch() before calling this on its owning thread.
+     * The caller can then release its metadata and reservation before waiting for the next reply.
+     * When discardUnconsumed is true, the caller must have stopped external receive workers and
+     * permanently abandoned this stream; a partial batch is then discarded without network I/O.
+     * This is opt-in and must not be used for ordinary cursors.
+     */
+    void releaseExhaustReplyBuffers(bool discardUnconsumed = false);
+
+    /**
      * Changes the cursor's batchSize after construction. Can change after requesting first batch.
      */
     void setBatchSize(int newBatchSize) {
@@ -275,18 +313,24 @@ protected:
     Batch _batch;
 
 private:
-    void dataReceived(const Message& reply) {
+    void dataReceived(const Message& reply,
+                      boost::optional<rpc::UniqueReply> parsed = boost::none) {
         bool retry;
         std::string lazyHost;
-        dataReceived(reply, retry, lazyHost);
+        dataReceived(reply, retry, lazyHost, std::move(parsed));
     }
-    void dataReceived(const Message& reply, bool& retry, std::string& lazyHost);
+    void dataReceived(const Message& reply,
+                      bool& retry,
+                      std::string& lazyHost,
+                      boost::optional<rpc::UniqueReply> parsed = boost::none);
 
     /**
-     * Parses and returns command replies regardless of which command protocol was used.
+     * Parses and returns command replies regardless of which command protocol was used, or
+     * processes the supplied parsed reply without parsing its message again.
      * Does *not* parse replies from non-command OP_QUERY finds.
      */
-    BSONObj commandDataReceived(const Message& reply);
+    BSONObj commandDataReceived(const Message& reply,
+                                boost::optional<rpc::UniqueReply> parsed = boost::none);
 
     void requestMore();
 
@@ -315,6 +359,7 @@ private:
     bool _connectionHasPendingReplies = false;
     int _lastRequestId = 0;
     bool _lastRequestHadMoreToCome = false;
+    ExhaustReplyReader _exhaustReplyReader;
 
     int _batchSize = 0;
 

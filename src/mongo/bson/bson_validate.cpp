@@ -552,8 +552,9 @@ private:
            this by having at minimum a trailing EOO) */
         void skip(size_t len) {
             uassertBSONValidation(InvalidBSON,
-                                  (ptr += len) < end,
+                                  ptr < end && len < static_cast<size_t>(end - ptr),
                                   "BSON element value extends past the end of the buffer");
+            ptr += len;
         }
 
         template <typename T>
@@ -596,6 +597,9 @@ private:
                               len >= 5,
                               "Nested BSON object has to be at least 5 bytes",
                               fmt::format("decoded length {}", len));
+        uassertBSONValidation(InvalidBSON,
+                              static_cast<size_t>(len) <= static_cast<size_t>(cursor.end - obj),
+                              "BSON element value extends past the end of the buffer");
         _currFrame->end = obj + len;
 
         if constexpr (precise) {
@@ -912,9 +916,9 @@ public:
                 } else {
                     // Simple8b block sequence, just check for memory overflow of block count
                     uint8_t numBlocks = bsoncolumn::numSimple8bBlocksForControlByte(control);
-                    int size = sizeof(uint64_t) * numBlocks;
+                    const size_t size = sizeof(uint64_t) * numBlocks;
                     uassertBSONValidation(InvalidBSONColumn,
-                                          ptr + size + 1 <= end,
+                                          size + 1 <= static_cast<size_t>(end - ptr),
                                           "BSONColumn blocks exceed buffer size");
                     ptr += 1 + size;
                 }
