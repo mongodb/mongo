@@ -572,6 +572,55 @@ TEST_F(SessionWorkflowTest, OneNormalCommand) {
     joinSessions();
 }
 
+TEST_F(SessionWorkflowTest, YieldsOncePerRequest) {
+    // Count the yield points of the workflow: one before each receive, none after a send.
+    auto fp = globalFailPointRegistry().find("sessionWorkflowYieldPoint");
+    const auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn);
+    ScopeGuard turnOff([&] { fp->setMode(FailPoint::off); });
+
+    constexpr int kRequests = 3;
+    startSession();
+    for (int i = 0; i < kRequests; ++i) {
+        expect<Event::sessionSourceMessage>(makeOpMsg());
+        expect<Event::sepHandleRequest>(
+            [&](OperationContext*, const Message&) -> Future<DbResponse> {
+                return makeResponse(makeOpMsg());
+            });
+        expect<Event::sessionSinkMessage>(Status::OK());
+    }
+    expect<Event::sessionSourceMessage>(kClosedSessionError);
+    expect<Event::sepEndSession>();
+    joinSessions();
+
+    // One yield before receiving each request, and one before the final receive that fails.
+    ASSERT_EQ(fp->setMode(FailPoint::off) - initialTimesEntered, kRequests + 1);
+}
+
+TEST_F(SessionWorkflowTest, YieldsBeforeEachExhaustResponse) {
+    auto fp = globalFailPointRegistry().find("sessionWorkflowYieldPoint");
+    const auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn);
+    ScopeGuard turnOff([&] { fp->setMode(FailPoint::off); });
+
+    startSession();
+    expect<Event::sessionSourceMessage>(setExhaustSupported(makeOpMsg()));
+    expect<Event::sepHandleRequest>([&](OperationContext*, const Message&) -> Future<DbResponse> {
+        return setExhaust(makeResponse(makeOpMsg()));
+    });
+    expect<Event::sessionSinkMessage>(Status::OK());
+    // The workflow synthesizes the next exhaust request itself, after yielding.
+    expect<Event::sepHandleRequest>([&](OperationContext*, const Message&) -> Future<DbResponse> {
+        return makeResponse(makeOpMsg());
+    });
+    expect<Event::sessionSinkMessage>(Status::OK());
+    expect<Event::sessionSourceMessage>(kClosedSessionError);
+    expect<Event::sepEndSession>();
+    joinSessions();
+
+    // Before the client's request, before the synthetic exhaust request and before the final
+    // receive.
+    ASSERT_EQ(fp->setMode(FailPoint::off) - initialTimesEntered, 3);
+}
+
 TEST_F(SessionWorkflowTest, IngressLogicalNetworkMetricsTest) {
     Message req = makeOpMsg();
     Message resp = []() {
