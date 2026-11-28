@@ -20,6 +20,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/operation_context_options_gen.h"
 #include "mongo/db/operation_cpu_timer.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
@@ -185,6 +186,11 @@ public:
 };
 
 void OperationCPUTimersClientObserver::onCreateOperationContext(OperationContext* opCtx) {
+    // CPU time measurement can be turned off, in which case the operation has no timers.
+    if (!gOperationCPUTimingEnabled.loadRelaxed()) {
+        return;
+    }
+
     // Checks for time support on POSIX platforms. In particular, it checks for support in
     // presence of SMP systems.
     static bool isTimeSupported = [] {
@@ -219,7 +225,8 @@ ServiceContext::ConstructorActionRegisterer operationCPUTimersClientObserverRegi
 }  // namespace
 
 OperationCPUTimers* OperationCPUTimers::get(OperationContext* opCtx) {
-    return &*getCPUTimers(opCtx);
+    auto& timers = getCPUTimers(opCtx);
+    return timers ? &*timers : nullptr;
 }
 
 #else  // not defined(__linux__)
