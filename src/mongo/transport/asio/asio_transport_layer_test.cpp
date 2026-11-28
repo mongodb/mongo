@@ -929,6 +929,62 @@ TEST(AsioTransportLayer, SwitchTimeoutModes) {
     }
 }
 
+/**
+ * After the first message of a connection, sync sessions read the header and (part of) the body
+ * with a single read and keep any bytes past the end of the message for the next sourceMessage()
+ * call. Check pipelined messages (including one larger than the read-ahead buffer) and a message
+ * whose header arrives in two pieces.
+ */
+TEST(AsioTransportLayer, SourceSyncPipelinedAndSplitMessages) {
+    TestFixture tf;
+    Notification<test::SessionThread*> mockSessionCreated;
+    tf.sessionManager().setOnStartSession(
+        [&](test::SessionThread& st) { mockSessionCreated.set(&st); });
+
+    SyncClient conn(tf.tla().listenerMainPort());
+    auto& st = *mockSessionCreated.get();
+
+    auto makeMessage = [](size_t paddingSize) {
+        OpMsgBuilder builder;
+        builder.setBody(BSON("ping" << 1 << "padding" << std::string(paddingSize, 'x')));
+        Message msg = builder.finish();
+        msg.header().setResponseToMsgId(0);
+        msg.header().setId(0);
+        return msg;
+    };
+    auto asString = [](const Message& msg) {
+        return std::string(msg.buf(), msg.size());
+    };
+    auto sourceOne = [&] {
+        Notification<StatusWith<Message>> done;
+        st.schedule([&](auto& session) { done.set(session.sourceMessage()); });
+        return done.get();
+    };
+
+    // The first message of a connection is read the original way (TLS detection).
+    auto first = makeMessage(10);
+    ASSERT_FALSE(conn.write(first.buf(), first.size()));
+    ASSERT_EQ(asString(uassertStatusOK(sourceOne())), asString(first));
+
+    // Three messages sent at once; the last one does not fit in the read-ahead buffer.
+    std::vector<Message> pipelined{makeMessage(100), makeMessage(1000), makeMessage(20 * 1024)};
+    std::string wire;
+    for (const auto& msg : pipelined)
+        wire += asString(msg);
+    ASSERT_FALSE(conn.write(wire.data(), wire.size()));
+    for (const auto& msg : pipelined)
+        ASSERT_EQ(asString(uassertStatusOK(sourceOne())), asString(msg));
+
+    // A message whose header is split across two writes.
+    auto split = makeMessage(200);
+    Notification<StatusWith<Message>> done;
+    st.schedule([&](auto& session) { done.set(session.sourceMessage()); });
+    ASSERT_FALSE(conn.write(split.buf(), 5));
+    sleepFor(Milliseconds(50));
+    ASSERT_FALSE(conn.write(split.buf() + 5, split.size() - 5));
+    ASSERT_EQ(asString(uassertStatusOK(done.get())), asString(split));
+}
+
 class Acceptor {
 public:
     struct Connection {

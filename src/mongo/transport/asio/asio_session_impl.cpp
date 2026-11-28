@@ -92,6 +92,15 @@ size_t readFromStream(Stream& stream, MutableBufferSequence buffers, std::error_
 }
 
 template <typename Stream, typename MutableBufferSequence>
+size_t readSomeFromStream(Stream& stream, MutableBufferSequence buffers, std::error_code& ec) {
+    return doOperation(
+        [](auto& stream, auto& buffers, auto& ec) { return stream.read_some(buffers, ec); },
+        stream,
+        std::move(buffers),
+        ec);
+}
+
+template <typename Stream, typename MutableBufferSequence>
 size_t writeToStream(Stream& stream, MutableBufferSequence buffers, std::error_code& ec) {
     return doOperation(
         [](auto& stream, auto& buffers, auto& ec) { return asio::write(stream, buffers, ec); },
@@ -288,6 +297,8 @@ void CommonAsioSession::end() {
 
 StatusWith<Message> CommonAsioSession::sourceMessage() try {
     ensureSync();
+    if (canReadAhead())
+        return sourceMessageWithReadAhead();
     return sourceMessageImpl().getNoThrow();
 } catch (const DBException& ex) {
     return ex.toStatus();
@@ -302,6 +313,8 @@ Future<Message> CommonAsioSession::asyncSourceMessage(const BatonHandle& baton) 
 
 Status CommonAsioSession::waitForData() try {
     ensureSync();
+    if (_hasReadAheadData.loadRelaxed())
+        return Status::OK();  // The start of the next message was already received.
     asio::error_code ec;
     (void)getSocket().wait(asio::ip::tcp::socket::wait_read, ec);
     return errorCodeToStatus(ec, "waitForData");
@@ -394,6 +407,11 @@ bool CommonAsioSession::isConnected() {
     auto revents = swPollEvents.getValue();
     if (revents & disconnectedEvents) {
         return false;
+    }
+    // Data that was received but not consumed yet counts as pending input, as it would if it were
+    // still in the socket's receive buffer.
+    if (_hasReadAheadData.load()) {
+        return true;
     }
     if (revents & POLLIN) {
         try {
@@ -660,6 +678,94 @@ ExecutorFuture<void> CommonAsioSession::parseProxyProtocolHeader(const ReactorHa
         .onError([this](Status s) { return handleProxyProtocolError(std::move(s)); });
 }
 
+Status CommonAsioSession::validateIncomingMessageLength(size_t msgLen) {
+    static constexpr auto kHeaderSize = sizeof(MSGHEADER::Value);
+
+    const size_t maxMessageSize = isPreauthIngress()
+        ? static_cast<size_t>(gPreAuthMaximumMessageSizeBytes.loadRelaxed())
+        : MaxMessageSizeBytes;
+    if (MONGO_likely(msgLen >= kHeaderSize && msgLen <= maxMessageSize))
+        return Status::OK();
+
+    StringBuilder sb;
+    sb << "recv(): message msgLen " << msgLen << " is invalid. " << "Min " << kHeaderSize
+       << " Max: " << maxMessageSize;
+    const auto str = sb.str();
+    LOGV2_DEBUG(4615638,
+                getMessageSizeErrorLogSeverityLevel(),
+                "recv(): message msgLen is invalid.",
+                "msgLen"_attr = msgLen,
+                "min"_attr = kHeaderSize,
+                "max"_attr = maxMessageSize);
+    if (isPreauthIngress()) {
+        totalMessageSizeErrorsPreAuth.increment();
+    } else {
+        totalMessageSizeErrorsPostAuth.increment();
+    }
+
+    return Status(ErrorCodes::ProtocolError, str);
+}
+
+StatusWith<Message> CommonAsioSession::sourceMessageWithReadAhead() {
+    static constexpr auto kHeaderSize = sizeof(MSGHEADER::Value);
+    // Large enough for the vast majority of requests, small enough to live on the stack.
+    static constexpr size_t kReadAheadBytes = 4096;
+
+    _asyncOpState.start();
+    ScopeGuard opGuard([&] { _asyncOpState.complete(); });
+
+    char buf[kReadAheadBytes];
+    size_t have = 0;
+    if (MONGO_unlikely(!_readAheadData.empty())) {
+        // Bytes left over by the previous call. There are always fewer than kReadAheadBytes.
+        have = _readAheadData.size();
+        memcpy(buf, _readAheadData.data(), have);
+        _readAheadData.clear();
+        _hasReadAheadData.store(false);
+    }
+
+    while (have < kHeaderSize) {
+        asioTransportLayerBlockBeforeOpportunisticRead.pauseWhileSet();
+        std::error_code ec;
+        have += readSomeFromStream(_socket, asio::buffer(buf + have, sizeof(buf) - have), ec);
+        if (ec)
+            return errorCodeToStatus(ec, "futurize");
+    }
+
+    if (isIngress())
+        MessageHooks::onHeaderReceived(*this, buf, kHeaderSize);
+
+    const auto msgLen = size_t(MSGHEADER::ConstView(buf).getMessageLength());
+    if (auto status = validateIncomingMessageLength(msgLen); !status.isOK())
+        return status;
+
+    auto buffer = SharedBuffer::allocate(msgLen);
+    const size_t fromBuf = std::min(have, msgLen);
+    memcpy(buffer.get(), buf, fromBuf);
+    if (MONGO_unlikely(have > msgLen)) {
+        _readAheadData.assign(buf + msgLen, have - msgLen);
+        _hasReadAheadData.store(true);
+    }
+
+    if (fromBuf < msgLen) {
+        // The rest of the message has not arrived yet, or it does not fit in the read-ahead
+        // buffer: read exactly the remaining bytes directly into the message buffer.
+        asioTransportLayerBlockBeforeOpportunisticRead.pauseWhileSet();
+        std::error_code ec;
+        readFromStream(_socket, asio::buffer(buffer.get() + fromBuf, msgLen - fromBuf), ec);
+        if (ec)
+            return errorCodeToStatus(ec, "futurize");
+    }
+
+    // Pass the connection purpose like the other read paths, so replication connections are
+    // also counted in the network.repl physical byte counters.
+    globalNetworkCounter().hitPhysicalIn(isIngress() ? NetworkCounter::ConnectionType::kIngress
+                                                     : NetworkCounter::ConnectionType::kEgress,
+                                         msgLen,
+                                         getConnectionPurpose(this));
+    return Message(std::move(buffer));
+}
+
 Future<Message> CommonAsioSession::sourceMessageImpl(const BatonHandle& baton) {
     static constexpr auto kHeaderSize = sizeof(MSGHEADER::Value);
 
@@ -673,27 +779,8 @@ Future<Message> CommonAsioSession::sourceMessageImpl(const BatonHandle& baton) {
 
             const auto msgLen = size_t(MSGHEADER::View(headerBuffer.get()).getMessageLength());
 
-            const size_t maxMessageSize = isPreauthIngress()
-                ? static_cast<size_t>(gPreAuthMaximumMessageSizeBytes.loadRelaxed())
-                : MaxMessageSizeBytes;
-            if (msgLen < kHeaderSize || msgLen > maxMessageSize) {
-                StringBuilder sb;
-                sb << "recv(): message msgLen " << msgLen << " is invalid. " << "Min "
-                   << kHeaderSize << " Max: " << maxMessageSize;
-                const auto str = sb.str();
-                LOGV2_DEBUG(4615638,
-                            getMessageSizeErrorLogSeverityLevel(),
-                            "recv(): message msgLen is invalid.",
-                            "msgLen"_attr = msgLen,
-                            "min"_attr = kHeaderSize,
-                            "max"_attr = maxMessageSize);
-                if (isPreauthIngress()) {
-                    totalMessageSizeErrorsPreAuth.increment();
-                } else {
-                    totalMessageSizeErrorsPostAuth.increment();
-                }
-
-                return Future<Message>::makeReady(Status(ErrorCodes::ProtocolError, str));
+            if (auto status = validateIncomingMessageLength(msgLen); !status.isOK()) {
+                return Future<Message>::makeReady(std::move(status));
             }
 
             auto connectionType = isIngress() ? NetworkCounter::ConnectionType::kIngress

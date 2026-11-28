@@ -10,6 +10,7 @@
 #include "mongo/util/modules.h"
 
 #include <cstddef>
+#include <string>
 #include <string_view>
 #include <utility>
 
@@ -194,6 +195,29 @@ protected:
     };
 
     Future<Message> sourceMessageImpl(const BatonHandle& baton = nullptr);
+
+    /**
+     * Synchronous, plain-socket variant of `sourceMessageImpl()`, used by `sourceMessage()` once
+     * the TLS/plaintext detection for the session is done. Rather than reading the message header
+     * and the message body with two separate `recv` calls, it reads up to `kReadAheadBytes` with a
+     * single call, which normally returns the entire (small) message. Bytes received past the end
+     * of the message (only possible if the peer sends a message before receiving the reply to the
+     * previous one) are kept in `_readAheadData` and consumed by the next call.
+     */
+    StatusWith<Message> sourceMessageWithReadAhead();
+
+    /** True if `sourceMessage()` may use `sourceMessageWithReadAhead()`. */
+    bool canReadAhead() const {
+#ifdef MONGO_CONFIG_SSL
+        return !_sslSocket && _ranHandshake;
+#else
+        return true;
+#endif
+    }
+
+    /** Checks the length of an incoming message, as read from its header. */
+    Status validateIncomingMessageLength(size_t msgLen);
+
     Future<void> sinkMessageImpl(Message message, const BatonHandle& baton = nullptr);
 
     template <typename MutableBufferSequence>
@@ -341,6 +365,15 @@ protected:
      * recursively acquire the mutex when the future is readied inline.
      */
     std::recursive_mutex _asyncOpMutex;  // NOLINT
+
+    /**
+     * Bytes already received from the socket by `sourceMessageWithReadAhead()` that belong to the
+     * next message(s). Only accessed by the thread using the session synchronously.
+     * `_hasReadAheadData` mirrors `!_readAheadData.empty()` for readers that may run on other
+     * threads (`isConnected()`), and for `waitForData()`.
+     */
+    std::string _readAheadData;
+    Atomic<bool> _hasReadAheadData{false};
 };
 
 /**
