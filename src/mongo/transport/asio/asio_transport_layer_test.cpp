@@ -1713,6 +1713,60 @@ TEST_F(IngressAsioNetworkingBatonTest, MarkKillOnClientDisconnect) {
     ASSERT_EQ(opCtx->getKillStatus(), ErrorCodes::ClientDisconnect);
 }
 
+// The client's session is added to the baton's poll set when the baton first polls, not by
+// `markKillOnClientDisconnect()`. A disconnect after that first poll still kills the operation.
+TEST_F(IngressAsioNetworkingBatonTest, MarkKillOnClientDisconnectAfterBatonPolled) {
+    auto opCtx = client().makeOperationContext();
+    opCtx->markKillOnClientDisconnect();
+    connection().wait();
+
+    opCtx->sleepFor(Milliseconds(1));
+    ASSERT_FALSE(opCtx->isKillPending());
+
+    connection().close();
+    ASSERT_THROWS_CODE(opCtx->sleepFor(Seconds(5)), DBException, ErrorCodes::ClientDisconnect);
+    ASSERT_EQ(opCtx->getKillStatus(), ErrorCodes::ClientDisconnect);
+}
+
+TEST_F(IngressAsioNetworkingBatonTest, MarkKillOnClientDisconnectWhilePolling) {
+    auto opCtx = client().makeOperationContext();
+    opCtx->markKillOnClientDisconnect();
+    connection().wait();
+
+    test::JoinThread closer([&] {
+        sleepFor(Milliseconds(100));
+        connection().close();
+    });
+    ASSERT_THROWS_CODE(opCtx->sleepFor(Seconds(30)), DBException, ErrorCodes::ClientDisconnect);
+    ASSERT_EQ(opCtx->getKillStatus(), ErrorCodes::ClientDisconnect);
+}
+
+TEST_F(IngressAsioNetworkingBatonTest, MarkKillOnClientDisconnectTwice) {
+    auto opCtx = client().makeOperationContext();
+    opCtx->markKillOnClientDisconnect();
+    opCtx->markKillOnClientDisconnect();
+    connection().wait();
+    connection().close();
+
+    ASSERT_THROWS_CODE(opCtx->sleepFor(Seconds(5)), DBException, ErrorCodes::ClientDisconnect);
+}
+
+// A disconnect is only noticed while the baton polls. An operation that never waits on its baton is
+// not killed, and the next operation of the client does not inherit the request to kill.
+TEST_F(IngressAsioNetworkingBatonTest, MarkKillOnClientDisconnectWithoutPolling) {
+    {
+        auto opCtx = client().makeOperationContext();
+        opCtx->markKillOnClientDisconnect();
+        ASSERT_FALSE(opCtx->isKillPending());
+    }
+
+    auto opCtx = client().makeOperationContext();
+    connection().wait();
+    connection().close();
+    opCtx->sleepFor(Milliseconds(10));
+    ASSERT_FALSE(opCtx->isKillPending());
+}
+
 TEST_F(IngressAsioNetworkingBatonTest, Schedule) {
     // Note that the baton runs all scheduled jobs on the main test thread, so it's safe to use
     // assertions inside tasks scheduled on the baton.

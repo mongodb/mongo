@@ -266,6 +266,12 @@ void AsioNetworkingBaton::run(ClockSource* clkSource) noexcept {
 
     std::unique_lock lk(_mutex);
 
+    if (MONGO_unlikely(_deferredKillOnClientDisconnect)) {
+        lk.unlock();
+        _registerDeferredKillOnClientDisconnect();
+        lk.lock();
+    }
+
     // If anything was scheduled, run it now and skip polling and processing timers.
     if (!_scheduled.empty())
         return;
@@ -289,13 +295,34 @@ void AsioNetworkingBaton::run(ClockSource* clkSource) noexcept {
 void AsioNetworkingBaton::markKillOnClientDisconnect() {
     auto client = _opCtx->getClient();
     invariant(client);
-    if (auto session = client->session()) {
-        auto code = client->getDisconnectErrorCode();
-        _addSession(*session, POLLRDHUP).getAsync([this, code](Status status) {
-            if (status.isOK())
-                _opCtx->markKilled(code);
-        });
+    if (client->session()) {
+        // A disconnect is only detected while the baton polls, so the client's session is added to
+        // the poll set by `run()`, before it polls for the first time. Most operations never wait
+        // on their baton, and this saves them adding the session here and canceling it again in
+        // `detachImpl()`.
+        std::lock_guard lk(_mutex);
+        _deferredKillOnClientDisconnect = client->getDisconnectErrorCode();
     }
+}
+
+void AsioNetworkingBaton::_registerDeferredKillOnClientDisconnect() {
+    std::shared_ptr<Session> session;
+    ErrorCodes::Error code;
+    {
+        std::lock_guard lk(_mutex);
+        if (!_deferredKillOnClientDisconnect || !_opCtx)
+            return;
+        code = *std::exchange(_deferredKillOnClientDisconnect, boost::none);
+        session = _opCtx->getClient()->session();
+    }
+
+    if (!session)
+        return;
+
+    _addSession(*session, POLLRDHUP).getAsync([this, code](Status status) {
+        if (status.isOK())
+            _opCtx->markKilled(code);
+    });
 }
 
 Future<void> AsioNetworkingBaton::addSession(Session& session, Type type) {
@@ -693,6 +720,7 @@ void AsioNetworkingBaton::detachImpl() {
     _opCtx->setBaton(nullptr);
 
     _opCtx = nullptr;
+    _deferredKillOnClientDisconnect = boost::none;
 
     if (MONGO_likely(_scheduled.empty() && _sessions.empty() && _pendingSessions.empty() &&
                      _timers.empty() && _pendingTimers.empty()))
